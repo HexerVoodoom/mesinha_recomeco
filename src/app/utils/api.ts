@@ -53,7 +53,7 @@ export interface Settings {
   notificationsEnabled: boolean;
 }
 
-const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> => {
+export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased to 60 seconds for large responses
 

@@ -1,14 +1,12 @@
-// Sync service to manage local storage and Cloudflare Sync
 import { localDB } from './localDB';
 import { toast } from 'sonner';
 
-export type SyncMode = 'local-only' | 'cloudflare-sync' | 'local-with-drive';
+export type SyncMode = 'local-only' | 'cloudflare-sync' | 'supabase-sync';
 
-// Essa URL deve ser substituída pela URL do Cloudflare Worker no futuro
 const CLOUDFLARE_WORKER_URL = 'https://mesinha-sync.your-worker.workers.dev';
 
 class SyncService {
-  private syncMode: SyncMode = 'cloudflare-sync';
+  private syncMode: SyncMode = 'supabase-sync';
   private autoBackupInterval: number | null = null;
   private lastBackupTime: number = 0;
   private lastSyncTime: number = 0;
@@ -19,7 +17,8 @@ class SyncService {
     if (storedMode) {
       this.syncMode = storedMode;
     } else {
-      localStorage.setItem('sync_mode', 'cloudflare-sync');
+      localStorage.setItem('sync_mode', 'supabase-sync');
+      this.syncMode = 'supabase-sync';
     }
 
     const lastBackup = localStorage.getItem('last_backup_time');
@@ -78,9 +77,9 @@ class SyncService {
         this.syncWithCloudflare(false).catch(err =>
           console.log('[SyncService] Background sync skipped:', err.message)
         );
-      } else if (this.syncMode === 'local-with-drive') {
-        this.performBackup().catch(err =>
-          console.log('[SyncService] Background drive sync skipped:', err.message)
+      } else if (this.syncMode === 'supabase-sync') {
+        this.syncWithSupabase(false).catch(err =>
+          console.log('[SyncService] Background supabase sync skipped:', err.message)
         );
       }
     }, 2000);
@@ -146,14 +145,26 @@ class SyncService {
     if (this.syncMode === 'local-only') return;
 
     this.autoBackupInterval = window.setInterval(() => {
-      this.syncWithCloudflare(false).catch(err => {
-        console.log('[SyncService] Auto-sync skipped:', err.message);
-      });
+      if (this.syncMode === 'cloudflare-sync') {
+        this.syncWithCloudflare(false).catch(err => {
+          console.log('[SyncService] Auto-sync skipped:', err.message);
+        });
+      } else if (this.syncMode === 'supabase-sync') {
+        this.syncWithSupabase(false).catch(err => {
+          console.log('[SyncService] Auto-sync skipped:', err.message);
+        });
+      }
     }, intervalMinutes * 60 * 1000);
 
-    this.syncWithCloudflare(false).catch(err => {
-      console.log('[SyncService] Initial sync skipped:', err.message);
-    });
+    if (this.syncMode === 'cloudflare-sync') {
+      this.syncWithCloudflare(false).catch(err => {
+        console.log('[SyncService] Initial sync skipped:', err.message);
+      });
+    } else if (this.syncMode === 'supabase-sync') {
+      this.syncWithSupabase(false).catch(err => {
+        console.log('[SyncService] Initial sync skipped:', err.message);
+      });
+    }
   }
 
   stopAutoBackup(): void {
@@ -163,32 +174,16 @@ class SyncService {
     }
   }
 
-  // Cloudflare Synchronization Strategy
-  // "checar se há update e baixar somente o conteudo novo"
   async syncWithCloudflare(showToast: boolean = false): Promise<void> {
     if (this.isSyncing || this.syncMode !== 'cloudflare-sync') return;
     this.isSyncing = true;
 
     try {
-      if (showToast) toast.loading('Sincronizando...', { id: 'sync' });
+      if (showToast) toast.loading('Sincronizando com Cloudflare...', { id: 'sync' });
 
       const localItems = await localDB.getAllItems();
-      const payload = {
-        lastSync: this.lastSyncTime,
-        items: localItems // Para um sistema real em Cloudflare, enviaremos apenas os itens atualizados
-      };
+      const cloudData = { items: [] as any[] };
 
-      // Simulação da chamada para o Cloudflare
-      // const response = await fetch(`${CLOUDFLARE_WORKER_URL}/sync`, {
-      //   method: 'POST',
-      //   body: JSON.stringify(payload)
-      // });
-      // const cloudData = await response.json();
-      
-      // Simular que Cloudflare retornou dados vazios (nada novo)
-      const cloudData = { items: [] };
-
-      // Lógica de merge (baixar somente o conteudo novo)
       let itemsChanged = false;
       const localItemsMap = new Map(localItems.map(item => [item.id, item]));
 
@@ -220,6 +215,108 @@ class SyncService {
     }
   }
 
+  async syncWithSupabase(showToast: boolean = false): Promise<void> {
+    if (this.isSyncing || this.syncMode !== 'supabase-sync') return;
+    this.isSyncing = true;
+
+    try {
+      if (showToast) toast.loading('Sincronizando com Supabase...', { id: 'sync-supabase' });
+      
+      const { api, fetchAPI } = await import('./api');
+      
+      // 1. Fetch remote data to merge down
+      const backupData = await api.exportBackup().catch(err => {
+         console.warn('Failed to fetch remote backup, continuing with push only', err);
+         return null;
+      });
+
+      const localItems = await localDB.getAllItems();
+      const localItemsMap = new Map(localItems.map(item => [item.id, item]));
+      const remoteItemsMap = new Map<string, any>();
+      
+      let itemsChangedLocally = false;
+
+      if (backupData && backupData.data) {
+        // Merge remote items to local
+        if (backupData.data.items && Array.isArray(backupData.data.items)) {
+          for (const cloudItem of backupData.data.items) {
+            remoteItemsMap.set(cloudItem.id, cloudItem);
+            const localItem = localItemsMap.get(cloudItem.id);
+            if (!localItem) {
+              await localDB.saveItem(cloudItem);
+              localItemsMap.set(cloudItem.id, cloudItem); // Update map
+              itemsChangedLocally = true;
+            } else {
+              const localTime = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime();
+              const cloudTime = new Date(cloudItem.updatedAt || cloudItem.createdAt || 0).getTime();
+    
+              if (cloudTime > localTime) {
+                await localDB.saveItem(cloudItem);
+                localItemsMap.set(cloudItem.id, cloudItem); // Update map
+                itemsChangedLocally = true;
+              }
+            }
+          }
+        }
+
+        // Merge remote settings
+        if (backupData.data.settings) {
+          const localSettings = await localDB.getSettings();
+          const localTime = new Date(localSettings?.updatedAt || 0).getTime();
+          const cloudTime = new Date(backupData.data.settings.updatedAt || 0).getTime();
+          
+          if (!localSettings || cloudTime > localTime) {
+            await localDB.saveSettings(backupData.data.settings);
+          }
+        }
+      }
+
+      // 2. Push local data to remote
+      const itemsToPush = [];
+      for (const localItem of localItemsMap.values()) {
+        const remoteItem = remoteItemsMap.get(localItem.id);
+        if (!remoteItem) {
+          // It's a new local item
+          itemsToPush.push(fetchAPI('/items', {
+            method: 'POST',
+            body: JSON.stringify(localItem),
+          }));
+        } else {
+          // Compare dates
+          const localTime = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime();
+          const remoteTime = new Date(remoteItem.updatedAt || remoteItem.createdAt || 0).getTime();
+          
+          if (localTime > remoteTime) {
+            itemsToPush.push(fetchAPI(`/items/${localItem.id}`, {
+              method: 'PUT',
+              body: JSON.stringify(localItem),
+            }));
+          }
+        }
+      }
+
+      if (itemsToPush.length > 0) {
+        await Promise.allSettled(itemsToPush);
+      }
+
+      this.lastSyncTime = Date.now();
+      localStorage.setItem('last_sync_time', this.lastSyncTime.toString());
+      
+      if (showToast) toast.success('Sincronizado!', { id: 'sync-supabase' });
+      
+      if (itemsChangedLocally && !showToast) {
+        // If background sync updated items, we might need to refresh UI
+        // Trigger a custom event for React components to listen to
+        window.dispatchEvent(new CustomEvent('sync_completed'));
+      }
+    } catch (error) {
+      console.error('[SyncService] Sync failed:', error);
+      if (showToast) toast.error('Erro ao sincronizar', { id: 'sync-supabase' });
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
   // Export/Import Local
   async exportLocalBackup(): Promise<Blob> {
     const backupData = await localDB.exportData();
@@ -237,103 +334,6 @@ class SyncService {
     } catch (error) {
       toast.error('Erro ao importar backup');
       throw error;
-    }
-  }
-
-  // Google Drive Synchronization Strategy
-  async performBackup(): Promise<void> {
-    if (this.syncMode !== 'local-with-drive') return;
-    
-    try {
-      const backupData = await localDB.exportData();
-      await import('./googleDriveBackup').then(m => m.googleDriveBackup.uploadBackup(backupData));
-      
-      this.lastBackupTime = Date.now();
-      localStorage.setItem('last_backup_time', this.lastBackupTime.toString());
-      console.log('[SyncService] Backup manual concluído com sucesso');
-    } catch (error) {
-      console.error('[SyncService] Erro no backup manual:', error);
-      throw error;
-    }
-  }
-
-  async restoreFromGoogleDrive(): Promise<void> {
-    try {
-      toast.loading('Baixando backup do Google Drive...', { id: 'restore' });
-      const backupData = await import('./googleDriveBackup').then(m => m.googleDriveBackup.downloadBackup());
-      
-      if (!backupData) {
-        toast.error('Nenhum backup encontrado no Google Drive', { id: 'restore' });
-        return;
-      }
-
-      await localDB.importData(backupData);
-      toast.success('Backup restaurado com sucesso!', { id: 'restore' });
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-    } catch (error) {
-      console.error('[SyncService] Error restoring backup:', error);
-      toast.error('Falha ao restaurar backup', { id: 'restore' });
-      throw error;
-    }
-  }
-
-  async restoreFromSupabase(): Promise<void> {
-    try {
-      toast.loading('Baixando backup do Supabase...', { id: 'restore-supabase' });
-      const { api } = await import('./api');
-      const backupData = await api.exportBackup();
-
-      if (!backupData || !backupData.data) {
-        throw new Error('Formato de backup inválido do Supabase');
-      }
-
-      if (backupData.data.settings) {
-        await localDB.saveSettings(backupData.data.settings);
-      }
-
-      if (backupData.data.items && Array.isArray(backupData.data.items)) {
-        const existingItems = await localDB.getAllItems();
-        for (const item of existingItems) {
-          await localDB.deleteItem(item.id);
-        }
-        for (const item of backupData.data.items) {
-          await localDB.saveItem(item);
-        }
-      }
-
-      toast.success('Restaurado do Supabase com sucesso!', { id: 'restore-supabase' });
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-    } catch (error) {
-      console.error('[SyncService] Error restoring from Supabase:', error);
-      toast.error('Falha ao restaurar do Supabase', { id: 'restore-supabase' });
-      throw error;
-    }
-  }
-
-  async syncWithGoogleDrive(showToast: boolean = false): Promise<void> {
-    if (this.isSyncing || this.syncMode !== 'local-with-drive') return;
-    this.isSyncing = true;
-
-    try {
-      if (showToast) toast.loading('Sincronizando com Google Drive...', { id: 'sync' });
-      
-      const backupData = await localDB.exportData();
-      await import('./googleDriveBackup').then(m => m.googleDriveBackup.uploadBackup(backupData));
-      
-      this.lastBackupTime = Date.now();
-      localStorage.setItem('last_backup_time', this.lastBackupTime.toString());
-      
-      if (showToast) toast.success('Sincronizado!', { id: 'sync' });
-    } catch (error) {
-      console.error('[SyncService] Sync failed:', error);
-      if (showToast) toast.error('Erro ao sincronizar', { id: 'sync' });
-    } finally {
-      this.isSyncing = false;
     }
   }
 }
