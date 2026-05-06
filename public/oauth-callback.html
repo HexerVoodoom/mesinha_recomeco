@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Google Drive Authorization</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .debug {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner" id="spinner"></div>
+        <h1 id="title">Autenticando com Google Drive...</h1>
+        <p id="message">Esta janela será fechada automaticamente</p>
+        <div id="status"></div>
+        <div id="debug" class="debug" style="display: none;"></div>
+    </div>
+
+    <script>
+        const debugLog = [];
+        const statusDiv = document.getElementById('status');
+        const debugDiv = document.getElementById('debug');
+        const titleEl = document.getElementById('title');
+        const messageEl = document.getElementById('message');
+        const spinnerEl = document.getElementById('spinner');
+
+        function log(msg) {
+            console.log(msg);
+            debugLog.push(msg);
+            debugDiv.innerHTML = debugLog.join('<br>');
+            debugDiv.style.display = 'block';
+        }
+
+        function showSuccess(msg) {
+            spinnerEl.style.display = 'none';
+            titleEl.textContent = '✅ Sucesso!';
+            messageEl.textContent = msg;
+            statusDiv.innerHTML = '<div class="success">' + msg + '</div>';
+        }
+
+        function showError(msg) {
+            spinnerEl.style.display = 'none';
+            titleEl.textContent = '❌ Erro';
+            messageEl.textContent = msg;
+            statusDiv.innerHTML = '<div class="error">' + msg + '</div>';
+        }
+
+        try {
+            log('OAuth callback loaded');
+            log('URL: ' + window.location.href);
+
+            // Parse the OAuth callback response from URL hash
+            const hash = window.location.hash.substring(1);
+            log('Hash: ' + hash);
+
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            const expiresIn = params.get('expires_in');
+            const error = params.get('error');
+
+            log('Access Token: ' + (accessToken ? 'Present (' + accessToken.length + ' chars)' : 'Missing'));
+            log('Expires In: ' + expiresIn);
+            log('Error: ' + error);
+
+            if (error) {
+                log('OAuth error detected: ' + error);
+                showError('Erro na autenticação: ' + error);
+                setTimeout(() => window.close(), 3000);
+            } else if (accessToken && expiresIn) {
+                log('Valid token received, processing...');
+
+                // Save to localStorage
+                try {
+                    localStorage.setItem('google_access_token', accessToken);
+                    const expiryTime = Date.now() + (parseInt(expiresIn) * 1000);
+                    localStorage.setItem('google_token_expiry', expiryTime.toString());
+                    log('Saved to localStorage successfully');
+                } catch (e) {
+                    log('LocalStorage error: ' + e.message);
+                }
+
+                // Send message to parent window (opener)
+                if (window.opener) {
+                    log('Sending postMessage to opener...');
+                    try {
+                        window.opener.postMessage({
+                            type: 'google-oauth-token',
+                            access_token: accessToken,
+                            expires_in: parseInt(expiresIn)
+                        }, '*');
+                        log('PostMessage sent successfully');
+                        showSuccess('Autenticação concluída! Fechando...');
+                    } catch (e) {
+                        log('PostMessage error: ' + e.message);
+                        showError('Erro ao enviar token: ' + e.message);
+                    }
+                } else {
+                    log('No window.opener found');
+                    showSuccess('Token salvo! Você pode fechar esta janela.');
+                }
+
+                // Close the popup after a short delay
+                setTimeout(() => {
+                    log('Attempting to close window...');
+                    try {
+                        window.close();
+                    } catch (e) {
+                        log('Failed to close window: ' + e.message);
+                        messageEl.textContent = 'Por favor, feche esta janela manualmente';
+                    }
+                }, 2000);
+            } else {
+                log('No access token or expires_in in URL');
+                showError('Token não encontrado na URL');
+                setTimeout(() => window.close(), 3000);
+            }
+        } catch (err) {
+            log('Uncaught error: ' + err.message);
+            log('Stack: ' + err.stack);
+            showError('Erro inesperado: ' + err.message);
+        }
+    </script>
+</body>
+</html>

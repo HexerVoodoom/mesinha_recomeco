@@ -1,0 +1,19 @@
+═══════════════════════════════════════════════════════════════════
+   ⚠️  AÇÃO NECESSÁRIA - CONFIGURAR URI NO GOOGLE CLOUD CONSOLE
+═══════════════════════════════════════════════════════════════════
+
+1. ACESSE:
+   https://console.cloud.google.com/apis/credentials
+
+2. EDITE suas credenciais OAuth 2.0
+   Client ID: 305705048348-jbfvtamh0llghkfiuntt9bqlc48vhukc.apps.googleusercontent.com
+
+3. ADICIONE esta URI de redirecionamento:
+
+   https://3601c913-7a74-42c7-903d-a102ec598374-v3-figmaiframepreview.figma.site/oauth-callback.html
+
+4. SALVE
+
+5. AGUARDE 1-2 minutos e teste no app!
+
+═══════════════════════════════════════════════════════════════════

@@ -1,0 +1,21 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <defs>
+    <clipPath id="roundedFavicon">
+      <rect width="32" height="32" rx="6" />
+    </clipPath>
+  </defs>
+  
+  <rect width="32" height="32" fill="#F8F6F4" clip-path="url(#roundedFavicon)"/>
+  
+  <!-- Image -->
+  <image 
+    href="figma:asset/63f1c91888d5013b6ec77f78cfdc3f2164718216.png" 
+    x="2" 
+    y="2" 
+    width="28" 
+    height="28"
+    preserveAspectRatio="xMidYMid meet"
+    clip-path="url(#roundedFavicon)"
+  />
+</svg>
