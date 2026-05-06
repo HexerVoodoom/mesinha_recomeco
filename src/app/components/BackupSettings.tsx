@@ -6,7 +6,7 @@ import { syncService, SyncMode } from '../utils/syncService';
 import { toast } from 'sonner';
 import { api } from '../utils/api';
 
-export default function BackupSettings() {
+export function BackupSettings() {
   const [syncMode, setSyncMode] = useState<SyncMode>('local-only');
   const [isSaving, setIsSaving] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState<number>(0);
