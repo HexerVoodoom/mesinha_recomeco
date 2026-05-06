@@ -42,6 +42,14 @@ class SyncService {
     }
   }
 
+  getLastBackupTime(): number {
+    return this.lastBackupTime;
+  }
+
+  getLastSyncTime(): number {
+    return this.lastSyncTime;
+  }
+
   async saveItem(item: any): Promise<void> {
     try {
       item.updatedAt = new Date().toISOString();
