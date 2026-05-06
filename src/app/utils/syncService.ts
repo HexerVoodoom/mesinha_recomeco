@@ -2,7 +2,7 @@
 import { localDB } from './localDB';
 import { toast } from 'sonner';
 
-export type SyncMode = 'local-only' | 'cloudflare-sync';
+export type SyncMode = 'local-only' | 'cloudflare-sync' | 'local-with-drive';
 
 // Essa URL deve ser substituída pela URL do Cloudflare Worker no futuro
 const CLOUDFLARE_WORKER_URL = 'https://mesinha-sync.your-worker.workers.dev';
@@ -60,7 +60,7 @@ class SyncService {
       await localDB.saveItem(item);
       console.log('[SyncService] Item saved locally:', item.id);
 
-      if (this.syncMode === 'cloudflare-sync') {
+      if (this.syncMode !== 'local-only') {
         this.debouncedBackup();
       }
     } catch (error) {
@@ -74,16 +74,22 @@ class SyncService {
   private debouncedBackup(): void {
     if (this.backupTimeout) clearTimeout(this.backupTimeout);
     this.backupTimeout = window.setTimeout(() => {
-      this.syncWithCloudflare(false).catch(err =>
-        console.log('[SyncService] Background sync skipped:', err.message)
-      );
+      if (this.syncMode === 'cloudflare-sync') {
+        this.syncWithCloudflare(false).catch(err =>
+          console.log('[SyncService] Background sync skipped:', err.message)
+        );
+      } else if (this.syncMode === 'local-with-drive') {
+        this.performBackup().catch(err =>
+          console.log('[SyncService] Background drive sync skipped:', err.message)
+        );
+      }
     }, 2000);
   }
 
   async deleteItem(id: string): Promise<void> {
     try {
       await localDB.deleteItem(id);
-      if (this.syncMode === 'cloudflare-sync') {
+      if (this.syncMode !== 'local-only') {
         this.debouncedBackup();
       }
     } catch (error) {
@@ -111,7 +117,7 @@ class SyncService {
   async saveSettings(settings: any): Promise<void> {
     try {
       await localDB.saveSettings(settings);
-      if (this.syncMode === 'cloudflare-sync') {
+      if (this.syncMode !== 'local-only') {
         this.debouncedBackup();
       }
     } catch (error) {
@@ -231,6 +237,68 @@ class SyncService {
     } catch (error) {
       toast.error('Erro ao importar backup');
       throw error;
+    }
+  }
+
+  // Google Drive Synchronization Strategy
+  async performBackup(): Promise<void> {
+    if (this.syncMode !== 'local-with-drive') return;
+    
+    try {
+      const backupData = await localDB.exportData();
+      await import('./googleDriveBackup').then(m => m.googleDriveBackup.uploadBackup(backupData));
+      
+      this.lastBackupTime = Date.now();
+      localStorage.setItem('last_backup_time', this.lastBackupTime.toString());
+      console.log('[SyncService] Backup manual concluído com sucesso');
+    } catch (error) {
+      console.error('[SyncService] Erro no backup manual:', error);
+      throw error;
+    }
+  }
+
+  async restoreFromGoogleDrive(): Promise<void> {
+    try {
+      toast.loading('Baixando backup do Google Drive...', { id: 'restore' });
+      const backupData = await import('./googleDriveBackup').then(m => m.googleDriveBackup.downloadBackup());
+      
+      if (!backupData) {
+        toast.error('Nenhum backup encontrado no Google Drive', { id: 'restore' });
+        return;
+      }
+
+      await localDB.importData(backupData);
+      toast.success('Backup restaurado com sucesso!', { id: 'restore' });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[SyncService] Error restoring backup:', error);
+      toast.error('Falha ao restaurar backup', { id: 'restore' });
+      throw error;
+    }
+  }
+
+  async syncWithGoogleDrive(showToast: boolean = false): Promise<void> {
+    if (this.isSyncing || this.syncMode !== 'local-with-drive') return;
+    this.isSyncing = true;
+
+    try {
+      if (showToast) toast.loading('Sincronizando com Google Drive...', { id: 'sync' });
+      
+      const backupData = await localDB.exportData();
+      await import('./googleDriveBackup').then(m => m.googleDriveBackup.uploadBackup(backupData));
+      
+      this.lastBackupTime = Date.now();
+      localStorage.setItem('last_backup_time', this.lastBackupTime.toString());
+      
+      if (showToast) toast.success('Sincronizado!', { id: 'sync' });
+    } catch (error) {
+      console.error('[SyncService] Sync failed:', error);
+      if (showToast) toast.error('Erro ao sincronizar', { id: 'sync' });
+    } finally {
+      this.isSyncing = false;
     }
   }
 }
