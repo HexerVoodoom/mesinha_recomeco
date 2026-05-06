@@ -280,6 +280,41 @@ class SyncService {
     }
   }
 
+  async restoreFromSupabase(): Promise<void> {
+    try {
+      toast.loading('Baixando backup do Supabase...', { id: 'restore-supabase' });
+      const { api } = await import('./api');
+      const backupData = await api.exportBackup();
+
+      if (!backupData || !backupData.data) {
+        throw new Error('Formato de backup inválido do Supabase');
+      }
+
+      if (backupData.data.settings) {
+        await localDB.saveSettings(backupData.data.settings);
+      }
+
+      if (backupData.data.items && Array.isArray(backupData.data.items)) {
+        const existingItems = await localDB.getAllItems();
+        for (const item of existingItems) {
+          await localDB.deleteItem(item.id);
+        }
+        for (const item of backupData.data.items) {
+          await localDB.saveItem(item);
+        }
+      }
+
+      toast.success('Restaurado do Supabase com sucesso!', { id: 'restore-supabase' });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[SyncService] Error restoring from Supabase:', error);
+      toast.error('Falha ao restaurar do Supabase', { id: 'restore-supabase' });
+      throw error;
+    }
+  }
+
   async syncWithGoogleDrive(showToast: boolean = false): Promise<void> {
     if (this.isSyncing || this.syncMode !== 'local-with-drive') return;
     this.isSyncing = true;
