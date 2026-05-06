@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ListItem } from '../utils/api';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TextArea } from './ui/Input';
+import { TextArea } from './ui/input';
 import { TagSelector } from './TagSelector';
 import { toast } from 'sonner';
 import { LazyPhoto } from './LazyPhoto';

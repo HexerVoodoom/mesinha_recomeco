@@ -13,7 +13,7 @@ import { DeleteConfirmationModal } from "./DeleteConfirmationModal";
 import { ImageModal } from "./ImageModal";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { LazyPhoto } from "./LazyPhoto";
-import { Card, CardContent } from "./ui/Card";
+import { Card, CardContent } from "./ui/card";
 import primaryButtonBg from "figma:asset/85f171ff8cd9cb4f7140b1d04b0f2e0ecceb0615.png";
 import secondaryButtonBg from "figma:asset/75c872bdf2a28b8670edf0ef3851acf422588625.png";
 

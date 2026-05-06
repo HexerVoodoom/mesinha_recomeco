@@ -3,7 +3,7 @@ import { ChevronRight, Play, ExternalLink, AlarmClock, Star } from 'lucide-react
 import { ListItem } from '../utils/api';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Card, CardContent } from './ui/Card';
+import { Card, CardContent } from './ui/card';
 import { LazyPhoto } from './LazyPhoto';
 import { ItemDetailModal } from './ItemDetailModal';
 
