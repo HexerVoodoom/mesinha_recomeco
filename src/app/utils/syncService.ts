@@ -53,7 +53,7 @@ class SyncService {
     try {
       item.updatedAt = new Date().toISOString();
       if (!item.createdAt) {
-        item.createdAt = new Date().toISOString();
+        item.createdAt = new Date(0).toISOString();
       }
 
       await localDB.saveItem(item);

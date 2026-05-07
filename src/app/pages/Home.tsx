@@ -25,6 +25,7 @@ import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useNotifications } from '../hooks/useNotifications';
 import { seedInitialData } from '../utils/seedData';
+import { localDB } from '../utils/localDB';
 import { ListItemComponent } from '../components/ListItemComponent';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -150,12 +151,15 @@ export default function Home() {
           return [...prev, event.data];
         });
         toast.success('Nova lista adicionada! 💕');
+        localDB.saveItem(event.data).catch(console.error);
       } else if (event.type === 'item_updated') {
         setItems(prev => prev.map(item => 
           item.id === event.data.id ? event.data : item
         ));
+        localDB.saveItem(event.data).catch(console.error);
       } else if (event.type === 'item_deleted') {
         setItems(prev => prev.filter(item => item.id !== event.data.id));
+        localDB.deleteItem(event.data.id).catch(console.error);
       }
     },
     enabled: true,
@@ -240,8 +244,16 @@ export default function Home() {
 
     init();
 
+    const handleSyncComplete = () => {
+      console.log('[Home] Background sync completed, reloading items silently');
+      loadItems(true);
+    };
+
+    window.addEventListener('sync_completed', handleSyncComplete);
+
     return () => {
       isActive = false;
+      window.removeEventListener('sync_completed', handleSyncComplete);
     };
   }, []);
 
