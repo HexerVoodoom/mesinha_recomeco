@@ -215,8 +215,9 @@ class SyncService {
     }
   }
 
-  async syncWithSupabase(showToast: boolean = false): Promise<void> {
-    if (this.isSyncing || this.syncMode !== 'supabase-sync') return;
+  async syncWithSupabase(showToast: boolean = false, force: boolean = false): Promise<void> {
+    if (this.isSyncing) return;
+    if (!force && this.syncMode !== 'supabase-sync') return;
     this.isSyncing = true;
 
     try {

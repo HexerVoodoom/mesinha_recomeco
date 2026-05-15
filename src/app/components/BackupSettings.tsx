@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Cloud, HardDrive, RefreshCw, Upload, Download, Database, Check } from 'lucide-react';
+import { Cloud, HardDrive, RefreshCw, Upload, Download, Database, Check, Settings } from 'lucide-react';
 import { syncService, SyncMode } from '../utils/syncService';
 import { toast } from 'sonner';
 import { api } from '../utils/api';
@@ -75,7 +75,7 @@ export function BackupSettings() {
     // Puxa tudo forçadamente substituindo e atualizando o cache
     setIsSaving(true);
     try {
-      await syncService.syncWithSupabase(true);
+      await syncService.syncWithSupabase(true, true);
       setLastBackupTime(syncService.getLastSyncTime());
       toast.success('Restauração/Sincronização concluída!');
       setTimeout(() => {
