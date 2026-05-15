@@ -226,10 +226,28 @@ class SyncService {
       const { api, fetchAPI } = await import('./api');
       
       // 1. Fetch remote data to merge down
-      const backupData = await api.exportBackup().catch(err => {
-         console.warn('Failed to fetch remote backup, continuing with push only', err);
+      let backupData = await api.exportBackup().catch(err => {
+         console.warn('Failed to fetch remote backup via /backup, trying manual fetch...', err);
          return null;
       });
+
+      if (!backupData || !backupData.data) {
+        try {
+          // Fallback: manually fetch all items and settings directly from server
+          const itemsData = await fetchAPI('/items?limit=5000'); // get up to 5000 items
+          const settingsData = await fetchAPI('/settings').catch(() => null);
+          
+          backupData = {
+            data: {
+              items: itemsData.items || [],
+              settings: settingsData ? settingsData.settings : null
+            }
+          };
+          console.log('[SyncService] Fetched data manually as fallback', backupData.data.items.length, 'items');
+        } catch (fallbackErr) {
+          console.warn('Fallback manual fetch also failed, continuing with push only', fallbackErr);
+        }
+      }
 
       const localItems = await localDB.getAllItems();
       const localItemsMap = new Map(localItems.map(item => [item.id, item]));
