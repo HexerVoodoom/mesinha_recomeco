@@ -132,34 +132,19 @@ export default function Home() {
     updateReminders(items);
   }, [items]);
 
-  // Realtime Sync - escuta mudanças de outros usuários
+  // Realtime Sync - ao receber qualquer evento, rebusca todos os itens da API
   useRealtimeSync({
     onSync: (event) => {
-      console.log('[Home] Sync event received:', event);
-      
-      if (event.type === 'item_created') {
-        setItems(prev => {
-          // Evita duplicatas
-          if (prev.some(item => item.id === event.data.id)) return prev;
-          
-          // Notificar se for item do mural
-          if (event.data.category === 'mural') {
-            notifyNewMuralItem(event.data);
-          }
-          
-          return [...prev, event.data];
-        });
-        toast.success('Nova lista adicionada! 💕');
-        localDB.saveItem(event.data).catch(console.error);
-      } else if (event.type === 'item_updated') {
-        setItems(prev => prev.map(item => 
-          item.id === event.data.id ? event.data : item
-        ));
-        localDB.saveItem(event.data).catch(console.error);
-      } else if (event.type === 'item_deleted') {
-        setItems(prev => prev.filter(item => item.id !== event.data.id));
-        localDB.deleteItem(event.data.id).catch(console.error);
+      console.log('[Home] Sync event received, reloading from API:', event.type);
+      // Notificar se for novo item do mural
+      if (event.type === 'item_created' && event.data?.category === 'mural') {
+        notifyNewMuralItem(event.data);
+        toast.success('Nova publicação no Mural! 💕', { duration: 3000 });
+      } else if (event.type === 'item_created') {
+        toast.success('Lista atualizada! 💕', { duration: 2000 });
       }
+      // Sempre rebusca da API para garantir dados atualizados
+      loadItems(true);
     },
     enabled: true,
   });
@@ -243,6 +228,14 @@ export default function Home() {
 
     init();
 
+    // Polling de fallback a cada 30s caso o WebSocket falhe
+    const pollInterval = setInterval(() => {
+      if (isActive) {
+        console.log('[Home] Polling fallback: reloading items silently');
+        loadItems(true);
+      }
+    }, 30000);
+
     const handleSyncComplete = () => {
       console.log('[Home] Background sync completed, reloading items silently');
       loadItems(true);
@@ -252,6 +245,7 @@ export default function Home() {
 
     return () => {
       isActive = false;
+      clearInterval(pollInterval);
       window.removeEventListener('sync_completed', handleSyncComplete);
     };
   }, []);

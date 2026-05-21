@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { subscribeToSync, SyncEvent } from '../utils/realtimeChannel';
 
 interface UseRealtimeSyncOptions {
@@ -7,20 +7,26 @@ interface UseRealtimeSyncOptions {
 }
 
 export function useRealtimeSync({ onSync, enabled = true }: UseRealtimeSyncOptions) {
+  // Use ref to always call the latest onSync without re-subscribing
+  const onSyncRef = useRef(onSync);
+  useEffect(() => {
+    onSyncRef.current = onSync;
+  });
+
   useEffect(() => {
     if (!enabled) return;
 
     console.log('[useRealtimeSync] Setting up sync listener...');
-    
-    // Registra callback no canal compartilhado
-    const unsubscribe = subscribeToSync(onSync);
 
-    // Cleanup ao desmontar
+    // Wrap in stable function that always calls latest ref
+    const stableHandler = (event: SyncEvent) => onSyncRef.current(event);
+    const unsubscribe = subscribeToSync(stableHandler);
+
     return () => {
       console.log('[useRealtimeSync] Cleaning up sync listener...');
       unsubscribe();
     };
-  }, [onSync, enabled]);
+  }, [enabled]); // Only re-subscribe if enabled changes
 }
 
 export type { SyncEvent };
