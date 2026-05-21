@@ -36,7 +36,6 @@ import { MuralItemComponent } from '../components/MuralItemComponent';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
-import { RestoreBanner } from '../components/RestoreBanner';
 import { toast } from 'sonner';
 import fabButton from "figma:asset/dd4b98f23138814cb5d5f735480190b4a56f65a0.png";
 import grainTexture from "figma:asset/870f87368b0cc75469636c24542ec183a844dabf.png";
@@ -684,8 +683,6 @@ export default function Home() {
         margin: '0 auto'
       }}
     >
-      {/* Restore Banner */}
-      <RestoreBanner />
 
       {/* Top Lace Decoration */}
       <div className="absolute top-0 left-0 right-0 w-full flex items-start justify-center pointer-events-none z-10">

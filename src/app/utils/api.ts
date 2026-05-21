@@ -2,7 +2,7 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { syncService } from './syncService';
 
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-19717bce`;
-const USE_LOCAL_STORAGE = true; // Set to true to use local storage primarily
+const USE_LOCAL_STORAGE = false; // Disable local storage to use Supabase strictly
 
 export interface ListItem {
   id: string;

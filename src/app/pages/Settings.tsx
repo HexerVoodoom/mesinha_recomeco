@@ -247,68 +247,6 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Backup Section */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground px-2">Backup de Dados</h3>
-
-            {/* Export Backup */}
-            <button 
-              onClick={handleExportBackup}
-              className="w-full bg-card rounded-xl p-6 border border-border hover:bg-muted/30 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <Download className="w-6 h-6" />
-                <div>
-                  <div className="text-base font-medium">Salvar Backup</div>
-                  <div className="text-sm text-muted-foreground">Exportar todos os dados</div>
-                </div>
-              </div>
-            </button>
-
-            {/* Import Backup */}
-            <button 
-              onClick={handleImportBackup}
-              className="w-full bg-card rounded-xl p-6 border border-border hover:bg-muted/30 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <Upload className="w-6 h-6" />
-                <div>
-                  <div className="text-base font-medium">Carregar Backup</div>
-                  <div className="text-sm text-muted-foreground">Restaurar dados salvos</div>
-                </div>
-              </div>
-            </button>
-            
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-
-          {/* Advanced Backup Settings */}
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowAdvancedBackup(!showAdvancedBackup)}
-              className="w-full bg-card rounded-xl p-4 border border-border hover:bg-muted/30 transition-colors flex items-center justify-between"
-            >
-              <h3 className="text-base font-medium">Configurações Avançadas de Backup</h3>
-              {showAdvancedBackup ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
-              )}
-            </button>
-
-            {showAdvancedBackup && (
-              <div className="bg-card rounded-xl border border-border overflow-hidden">
-                <BackupSettings />
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>
