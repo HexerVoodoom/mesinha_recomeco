@@ -22,7 +22,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt', // O usuário será perguntado se quer baixar as novas atualizações
+      registerType: 'autoUpdate', // Atualiza automaticamente em background
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Mesinha App',

@@ -187,6 +187,7 @@ export const api = {
     if (category) params.set('category', category);
     params.set('offset', offset.toString());
     params.set('limit', limit.toString());
+    params.set('_t', Date.now().toString());
 
     const data = await fetchAPI(`/items?${params.toString()}`);
     return {
