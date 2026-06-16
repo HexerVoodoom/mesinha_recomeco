@@ -121,8 +121,11 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
   };
 
   const renderPreview = () => {
-    // Show placeholder for images without loaded content
-    if (!content && contentType === 'image') {
+    // Imagens: usa a miniatura leve pro preview do grid (já vem na listagem, sem precisar tocar).
+    // Só recorre ao placeholder "toque para visualizar" se o item for antigo e não tiver miniatura.
+    const imagePreviewSrc = content || item.muralThumbnail;
+
+    if (!imagePreviewSrc && contentType === 'image') {
       return (
         <div
           className="w-full aspect-square bg-[#F8F6F3] rounded-sm overflow-hidden cursor-pointer hover:opacity-95 transition-opacity flex items-center justify-center"
@@ -150,7 +153,7 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
             onClick={handleOpenContent}
           >
             <img
-              src={content}
+              src={imagePreviewSrc}
               alt={item.title || 'Imagem do mural'}
               className="w-full h-full object-cover"
             />

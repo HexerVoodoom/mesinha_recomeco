@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# One-off operational scripts and data backups - contain real user data, never commit
+scripts/

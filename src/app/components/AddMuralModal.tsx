@@ -8,7 +8,7 @@ import secondaryButtonBg from "figma:asset/75c872bdf2a28b8670edf0ef3851acf422588
 interface AddMuralModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string) => void;
+  onAdd: (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string, thumbnail?: string) => void;
 }
 
 type ContentType = 'text' | 'image' | 'video' | 'audio';
@@ -18,42 +18,46 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
   const [contentType, setContentType] = useState<ContentType>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaFile, setMediaFile] = useState<string>('');
+  const [mediaThumbnail, setMediaThumbnail] = useState<string>('');
   const [caption, setCaption] = useState(''); // Caption para posts de imagem
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
-  const compressImage = (file: File): Promise<string> => {
+  // Gera, a partir da mesma imagem já carregada, uma versão completa (para visualização expandida)
+  // e uma miniatura bem mais leve (para o preview no grid do mural).
+  const compressImage = (file: File): Promise<{ full: string; thumbnail: string }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxSize = 1200;
+          const renderToDataUrl = (maxSize: number, quality: number) => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-          if (width > height && width > maxSize) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-          } else if (height > maxSize) {
-            width = (width / height) * maxSize;
-            height = maxSize;
+            if (width > height && width > maxSize) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else if (height > maxSize) {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            return canvas.toDataURL('image/jpeg', quality);
+          };
+
+          let full = renderToDataUrl(1200, 0.7);
+          if (full.length > 2800000) {
+            full = renderToDataUrl(1200, 0.5);
           }
+          const thumbnail = renderToDataUrl(320, 0.5);
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          
-          if (compressedDataUrl.length > 2800000) {
-            const lowerQuality = canvas.toDataURL('image/jpeg', 0.5);
-            resolve(lowerQuality);
-          } else {
-            resolve(compressedDataUrl);
-          }
+          resolve({ full, thumbnail });
         };
         img.onerror = reject;
         img.src = e.target?.result as string;
@@ -77,8 +81,9 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
 
       try {
         toast.info('Processando imagem...');
-        const compressed = await compressImage(file);
-        setMediaFile(compressed);
+        const { full, thumbnail } = await compressImage(file);
+        setMediaFile(full);
+        setMediaThumbnail(thumbnail);
         toast.success('Imagem adicionada!');
       } catch (error) {
         console.error('Error compressing image:', error);
@@ -182,13 +187,14 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     }
 
     const content = contentType === 'text' ? textContent : mediaFile;
-    
-    onAdd(title.trim(), contentType, content, caption);
-    
+
+    onAdd(title.trim(), contentType, content, caption, contentType === 'image' ? mediaThumbnail : undefined);
+
     // Reset
     setTitle('');
     setTextContent('');
     setMediaFile('');
+    setMediaThumbnail('');
     setCaption('');
     setContentType('text');
     onClose();
@@ -201,6 +207,7 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     setTitle('');
     setTextContent('');
     setMediaFile('');
+    setMediaThumbnail('');
     setCaption('');
     setContentType('text');
     onClose();
@@ -391,7 +398,7 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
                             </div>
                           )}
                           <button
-                            onClick={() => setMediaFile('')}
+                            onClick={() => { setMediaFile(''); setMediaThumbnail(''); }}
                             className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
                           >
                             <X className="w-4 h-4" />

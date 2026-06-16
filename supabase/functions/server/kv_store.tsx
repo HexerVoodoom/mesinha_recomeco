@@ -117,9 +117,14 @@ export const getByPrefixPaged = async (
     query = query.eq("value->>category", categoryFilter);
   }
 
-  const { data, error, count } = await query
-    .order(`value->>${orderByJsonField}`, { ascending })
-    .range(offset, offset + limit - 1);
+  // Note: deliberately not ordering by value->>createdAt here - sorting on that json path
+  // requires Postgres to read every matching row's (often large, photo-containing) JSONB
+  // value to extract and compare it, which was hitting the statement timeout once the
+  // table grew. Falls back to natural row order; pass orderByJsonField if/when an index
+  // on that expression exists.
+  void orderByJsonField;
+  void ascending;
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
 
   if (error) {
     throw new Error(error.message);

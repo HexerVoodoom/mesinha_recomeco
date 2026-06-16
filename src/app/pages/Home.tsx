@@ -466,7 +466,7 @@ export default function Home() {
     toast.success('Item adicionado com sucesso!');
   };
 
-  const handleAddMuralPost = async (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string) => {
+  const handleAddMuralPost = async (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string, thumbnail?: string) => {
     const item: ListItem = {
       id: Date.now().toString(),
       title,
@@ -481,6 +481,7 @@ export default function Home() {
       tags: [],
       muralContentType: contentType,
       muralContent: content,
+      muralThumbnail: thumbnail,
       caption: caption || undefined, // Adiciona caption se fornecido
     };
 

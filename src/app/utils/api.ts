@@ -42,6 +42,7 @@ export interface ListItem {
   // Campos específicos para Mural
   muralContentType?: 'text' | 'image' | 'video' | 'audio';
   muralContent?: string;
+  muralThumbnail?: string; // Miniatura leve (imagem), incluída na listagem para preview sem precisar tocar
   viewedBy?: string[]; // Lista de usuários que visualizaram o post
   likedBy?: string[]; // Lista de usuários que curtiram o post
   caption?: string; // Texto/legenda para posts de imagem do mural

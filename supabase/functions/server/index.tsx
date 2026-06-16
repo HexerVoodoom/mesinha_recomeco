@@ -148,6 +148,7 @@ app.get("/make-server-19717bce/items", async (c) => {
         top3Mateus: item.top3Mateus,
         top3Amanda: item.top3Amanda,
         muralContentType: item.muralContentType,
+        muralThumbnail: item.muralThumbnail,
         viewedBy: item.viewedBy,
         updatedAt: item.updatedAt,
       });
@@ -160,7 +161,7 @@ app.get("/make-server-19717bce/items", async (c) => {
     });
   } catch (error) {
     console.error("[GET /items] Error:", error);
-    return c.json({ error: "Failed to fetch items" }, 500);
+    return c.json({ error: "Failed to fetch items", details: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
 
@@ -262,6 +263,7 @@ app.post("/make-server-19717bce/items", async (c) => {
       // Campos específicos para Mural
       muralContentType: body.muralContentType || undefined,
       muralContent: body.muralContent || undefined,
+      muralThumbnail: body.muralThumbnail || undefined,
       viewedBy: Array.isArray(body.viewedBy) ? body.viewedBy : [],
     };
 
