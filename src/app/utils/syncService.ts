@@ -233,26 +233,44 @@ class SyncService {
 
       if (!backupData || !backupData.data) {
         try {
-          // Fallback: manually fetch all items and settings directly from server
-          const itemsData = await fetchAPI('/items?limit=5000'); // get up to 5000 items
+          // Fallback: page through all items (server caps each page at 200) instead of
+          // one huge request, which used to overload the server and silently fail.
+          const PAGE_SIZE = 200;
+          const allItems: any[] = [];
+          let offset = 0;
+          let hasMore = true;
+          while (hasMore) {
+            const page = await fetchAPI(`/items?offset=${offset}&limit=${PAGE_SIZE}`);
+            allItems.push(...(page.items || []));
+            hasMore = !!page.hasMore;
+            offset += PAGE_SIZE;
+          }
           const settingsData = await fetchAPI('/settings').catch(() => null);
-          
+
           backupData = {
             data: {
-              items: itemsData.items || [],
+              items: allItems,
               settings: settingsData ? settingsData.settings : null
             }
           };
           console.log('[SyncService] Fetched data manually as fallback', backupData.data.items.length, 'items');
         } catch (fallbackErr) {
-          console.warn('Fallback manual fetch also failed, continuing with push only', fallbackErr);
+          console.warn('Fallback manual fetch also failed, skipping push this cycle', fallbackErr);
         }
+      }
+
+      const remoteFetchSucceeded = !!(backupData && backupData.data);
+
+      if (!remoteFetchSucceeded) {
+        console.warn('[SyncService] Could not fetch remote data, skipping push to avoid creating duplicates. Will retry next cycle.');
+        if (showToast) toast.error('Não foi possível sincronizar agora. Tentando novamente em breve.', { id: 'sync-supabase' });
+        return;
       }
 
       const localItems = await localDB.getAllItems();
       const localItemsMap = new Map(localItems.map(item => [item.id, item]));
       const remoteItemsMap = new Map<string, any>();
-      
+
       let itemsChangedLocally = false;
 
       if (backupData && backupData.data) {

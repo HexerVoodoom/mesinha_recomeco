@@ -108,32 +108,18 @@ app.get("/make-server-19717bce/items", async (c) => {
   try {
     const category = c.req.query("category");
     const offset = parseInt(c.req.query("offset") || "0");
-    const limit = parseInt(c.req.query("limit") || "100");
+    // Cap limit so a single request can't force-load an unbounded number of rows (with photos) into memory.
+    const limit = Math.min(parseInt(c.req.query("limit") || "100"), 200);
 
-    const allItems = await kv.getByPrefix("item:");
-
-    if (!allItems || allItems.length === 0) {
-      return c.json({ items: [], total: 0, hasMore: false });
-    }
-
-    // Filter by category if specified
-    let filteredItems = allItems.filter(item =>
-      item?.id && item?.category && item?.title
-    );
-
-    if (category) {
-      filteredItems = filteredItems.filter(item => item.category === category);
-    }
-
-    // Sort by creation date (most recent first)
-    filteredItems.sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0).getTime();
-      const dateB = new Date(b.createdAt || 0).getTime();
-      return dateB - dateA;
+    const { items: rawItems, total } = await kv.getByPrefixPaged("item:", {
+      offset,
+      limit,
+      orderByJsonField: "createdAt",
+      ascending: false,
+      categoryFilter: category || undefined,
     });
 
-    const total = filteredItems.length;
-    const paginatedItems = filteredItems.slice(offset, offset + limit);
+    const paginatedItems = rawItems.filter(item => item?.id && item?.category && item?.title);
 
     // Build minimal items (no photo, no muralContent) - simplified
     const items = [];
@@ -243,7 +229,11 @@ app.post("/make-server-19717bce/items", async (c) => {
       return c.json({ error: "Photo too large. Maximum size is 2MB. Please compress the image." }, 400);
     }
 
-    const itemId = crypto.randomUUID();
+    // If the client sends an id that already exists (e.g. a retried/duplicated sync push),
+    // upsert that same record instead of minting a new one - prevents duplicate items.
+    const providedId = typeof body.id === "string" && body.id ? body.id : null;
+    const existingItem = providedId ? await kv.get(`item:${providedId}`) : null;
+    const itemId = existingItem ? providedId! : (providedId || crypto.randomUUID());
     const item = {
       id: itemId,
       title: String(title).substring(0, 500),
@@ -255,8 +245,8 @@ app.post("/make-server-19717bce/items", async (c) => {
       reminderFrequency: reminderFrequency === null ? null : (reminderFrequency || undefined),
       repeatCount: repeatCount !== undefined ? Number(repeatCount) : undefined,
       createdBy: createdBy || "Unknown",
-      createdAt: new Date().toISOString(),
-      status: "pending",
+      createdAt: existingItem?.createdAt || new Date().toISOString(),
+      status: existingItem?.status || "pending",
       tags: Array.isArray(tags) ? tags.slice(0, 20) : [],
       // Campo para vídeos curtos (categoria watch)
       videoLink: body.videoLink || undefined,
@@ -376,12 +366,12 @@ app.get("/make-server-19717bce/backup/stats", async (c) => {
   try {
     console.log('[GET /backup/stats] Getting backup statistics...');
 
-    // Fetch all items (without photos for count)
-    const items = await kv.getByPrefix("item:");
-    console.log(`[GET /backup/stats] Found ${items?.length || 0} items`);
+    // Count only - never loads item values (including photos) into memory.
+    const totalItems = await kv.countByPrefix("item:");
+    console.log(`[GET /backup/stats] Found ${totalItems} items`);
 
     const stats = {
-      totalItems: items?.length || 0,
+      totalItems,
       lastChecked: new Date().toISOString(),
     };
 
@@ -401,9 +391,21 @@ app.get("/make-server-19717bce/backup", async (c) => {
   try {
     console.log('[GET /backup] Starting backup export...');
 
-    // Fetch all items with photos
-    const items = await kv.getByPrefix("item:");
-    console.log(`[GET /backup] Found ${items?.length || 0} items`);
+    // Fetch all items with photos, in bounded batches so peak memory per query stays small
+    // even as the dataset grows (a single getByPrefix("item:") call was OOM-ing the function).
+    const BATCH_SIZE = 200;
+    const total = await kv.countByPrefix("item:");
+    const items: any[] = [];
+    for (let offset = 0; offset < total; offset += BATCH_SIZE) {
+      const { items: batch } = await kv.getByPrefixPaged("item:", {
+        offset,
+        limit: BATCH_SIZE,
+        orderByJsonField: "createdAt",
+        ascending: false,
+      });
+      items.push(...batch);
+    }
+    console.log(`[GET /backup] Found ${items.length} items`);
 
     // Fetch settings
     const settings = await kv.get("settings") || {
@@ -421,7 +423,7 @@ app.get("/make-server-19717bce/backup", async (c) => {
         items: items || [],
       },
       stats: {
-        totalItems: items?.length || 0,
+        totalItems: items.length,
       }
     };
 

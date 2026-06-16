@@ -85,3 +85,44 @@ export const getByPrefix = async (prefix: string): Promise<any[]> => {
   }
   return data?.map((d) => d.value) ?? [];
 };
+
+// Counts keys matching a prefix without fetching any values (cheap, avoids loading large rows into memory).
+export const countByPrefix = async (prefix: string): Promise<number> => {
+  const supabase = client();
+  const { count, error } = await supabase
+    .from("kv_store_19717bce")
+    .select("key", { count: "exact", head: true })
+    .like("key", prefix + "%");
+  if (error) {
+    throw new Error(error.message);
+  }
+  return count ?? 0;
+};
+
+// Fetches a page of values matching a prefix, ordered/filtered/paginated at the DB level
+// so memory usage is bounded by `limit` instead of the full matching row set.
+export const getByPrefixPaged = async (
+  prefix: string,
+  options: { offset?: number; limit?: number; orderByJsonField?: string; ascending?: boolean; categoryFilter?: string } = {},
+): Promise<{ items: any[]; total: number }> => {
+  const { offset = 0, limit = 100, orderByJsonField = "createdAt", ascending = false, categoryFilter } = options;
+  const supabase = client();
+
+  let query = supabase
+    .from("kv_store_19717bce")
+    .select("value", { count: "exact" })
+    .like("key", prefix + "%");
+
+  if (categoryFilter) {
+    query = query.eq("value->>category", categoryFilter);
+  }
+
+  const { data, error, count } = await query
+    .order(`value->>${orderByJsonField}`, { ascending })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return { items: data?.map((d) => d.value) ?? [], total: count ?? 0 };
+};
