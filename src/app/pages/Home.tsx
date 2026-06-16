@@ -258,11 +258,22 @@ export default function Home() {
   }, [activeCategory]);
 
   const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
-    try {
-      // Debug: Check if token exists before making API call
-      const token = localStorage.getItem('authToken');
-      console.log('[loadItems] Token in localStorage:', token ? `${token.substring(0, 50)}...` : 'MISSING');
+    // Show cached data immediately so the UI isn't blank while the API wakes up
+    if (!silent && offset === 0 && items.length === 0) {
+      const cached = localStorage.getItem('offlineItems');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setItems(parsed);
+            setLoading(false);
+            silent = true; // API fetch continues in background, no spinner
+          }
+        } catch (_) {}
+      }
+    }
 
+    try {
       const result = await api.getItems(categoryFilter, offset, 100);
       if (result && Array.isArray(result.items)) {
         const fetchedItems = result.items;
