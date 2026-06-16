@@ -1,7 +1,27 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
+import webpush from "npm:web-push";
 import * as kv from "./kv_store.tsx";
+
+const VAPID_PUBLIC_KEY = "BEeyyQPVJ900xV1F1Jo8Q2TNc2DK7jb9jyiqmQQX3QnUwzJYxy1j5BByQ0vJFDSbPTGacjS3oUtpOKCtxAF5WIY";
+const VAPID_PRIVATE_KEY = "V9PFLTWJWHdqXPGmuJZHfJds-L0nmme4kti5dD_nF5o";
+
+webpush.setVapidDetails("mailto:mateus.sprnd@gmail.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+async function sendPushToUser(user: string, payload: object): Promise<void> {
+  const subscription = await kv.get(`push-subscription:${user}`);
+  if (!subscription) return;
+  try {
+    await webpush.sendNotification(subscription, JSON.stringify(payload));
+    console.log(`[Push] Sent to ${user}`);
+  } catch (err: any) {
+    console.error(`[Push] Failed to send to ${user}:`, err?.statusCode, err?.message);
+    if (err?.statusCode === 410 || err?.statusCode === 404) {
+      await kv.del(`push-subscription:${user}`);
+    }
+  }
+}
 
 const app = new Hono();
 
@@ -269,6 +289,20 @@ app.post("/make-server-19717bce/items", async (c) => {
 
     await kv.set(`item:${itemId}`, item);
     console.log("Item created successfully:", itemId);
+
+    // Send Web Push to the other user for new mural posts
+    if (item.category === "mural" && item.createdBy) {
+      const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      const typeEmoji: Record<string, string> = { text: "📝", image: "🖼️", video: "🎥", audio: "🎵" };
+      const emoji = typeEmoji[item.muralContentType || "text"] || "📝";
+      sendPushToUser(otherUser, {
+        title: "Novo no Mural! 💗",
+        body: `${item.createdBy} adicionou: ${emoji} ${item.title || "Novo post"}`,
+        tag: "mesinha-mural",
+        url: "/",
+      }).catch(console.error);
+    }
+
     return c.json({ item });
   } catch (error) {
     console.error("Error creating item:", error);
@@ -437,6 +471,34 @@ app.get("/make-server-19717bce/backup", async (c) => {
       error: "Failed to create backup",
       details: error instanceof Error ? error.message : String(error)
     }, 500);
+  }
+});
+
+// Save push subscription for a user
+app.post("/make-server-19717bce/push-subscription", async (c) => {
+  try {
+    const { profile, subscription } = await c.req.json();
+    if (!profile || !subscription) return c.json({ error: "Missing profile or subscription" }, 400);
+    if (profile !== "Amanda" && profile !== "Mateus") return c.json({ error: "Invalid profile" }, 400);
+    await kv.set(`push-subscription:${profile}`, subscription);
+    console.log(`[Push] Subscription saved for ${profile}`);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[POST /push-subscription] Error:", error);
+    return c.json({ error: "Failed to save subscription" }, 500);
+  }
+});
+
+// Remove push subscription for a user
+app.delete("/make-server-19717bce/push-subscription", async (c) => {
+  try {
+    const { profile } = await c.req.json();
+    if (!profile) return c.json({ error: "Missing profile" }, 400);
+    await kv.del(`push-subscription:${profile}`);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /push-subscription] Error:", error);
+    return c.json({ error: "Failed to remove subscription" }, 500);
   }
 });
 
