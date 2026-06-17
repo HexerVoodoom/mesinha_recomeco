@@ -64,8 +64,6 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retr
     ...options.headers as Record<string, string>,
   };
 
-  console.log(`[API] Making request to ${BASE_URL}${endpoint}`);
-
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
@@ -80,9 +78,7 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retr
     // For login endpoint, return the response data even if not ok
     // This allows us to handle error messages properly
     if (endpoint === '/login') {
-      const data = await response.json();
-      console.log(`[API] Login response:`, data);
-      return data;
+      return await response.json();
     }
 
     if (!response.ok) {
@@ -103,7 +99,6 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retr
     
     try {
       const data = await response.json();
-      console.log(`[API] Success: ${endpoint}`, { size: JSON.stringify(data).length });
       return data;
     } catch (parseError) {
       console.error('Error parsing response:', parseError);
@@ -127,7 +122,6 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retr
       (error instanceof TypeError && error.message.includes('fetch')) ||
       (error instanceof Error && error.message.includes('connection closed'))
     )) {
-      console.log(`Retrying request to ${endpoint}... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, 1000));
       return fetchAPI(endpoint, options, retries - 1);
     }

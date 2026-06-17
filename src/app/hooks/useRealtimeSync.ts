@@ -16,14 +16,10 @@ export function useRealtimeSync({ onSync, enabled = true }: UseRealtimeSyncOptio
   useEffect(() => {
     if (!enabled) return;
 
-    console.log('[useRealtimeSync] Setting up sync listener...');
-
-    // Wrap in stable function that always calls latest ref
     const stableHandler = (event: SyncEvent) => onSyncRef.current(event);
     const unsubscribe = subscribeToSync(stableHandler);
 
     return () => {
-      console.log('[useRealtimeSync] Cleaning up sync listener...');
       unsubscribe();
     };
   }, [enabled]); // Only re-subscribe if enabled changes

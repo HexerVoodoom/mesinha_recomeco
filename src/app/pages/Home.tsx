@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { api, ListItem } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import { isRealtimeConnected } from '../utils/realtimeChannel';
 import { useNotifications } from '../hooks/useNotifications';
 import { seedInitialData } from '../utils/seedData';
 import { localDB } from '../utils/localDB';
@@ -135,7 +136,6 @@ export default function Home() {
   // Realtime Sync - ao receber qualquer evento, rebusca todos os itens da API
   useRealtimeSync({
     onSync: (event) => {
-      console.log('[Home] Sync event received, reloading from API:', event.type);
       // Notificar se for novo item do mural
       if (event.type === 'item_created' && event.data?.category === 'mural') {
         notifyNewMuralItem(event.data);
@@ -228,16 +228,14 @@ export default function Home() {
 
     init();
 
-    // Polling de fallback a cada 30s caso o WebSocket falhe
+    // Polling de fallback a cada 30s — só executa se o WebSocket não estiver conectado
     const pollInterval = setInterval(() => {
-      if (isActive) {
-        console.log('[Home] Polling fallback: reloading items silently');
+      if (isActive && !isRealtimeConnected()) {
         loadItems(true);
       }
     }, 30000);
 
     const handleSyncComplete = () => {
-      console.log('[Home] Background sync completed, reloading items silently');
       loadItems(true);
     };
 

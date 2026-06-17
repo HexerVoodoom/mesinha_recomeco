@@ -29,7 +29,6 @@ async function subscribeToPush(currentUser: 'Amanda' | 'Mateus') {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile: currentUser, subscription }),
     });
-    console.log('[Push] Subscribed successfully for', currentUser);
   } catch (err) {
     console.error('[Push] Failed to subscribe:', err);
   }
