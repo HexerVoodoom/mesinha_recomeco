@@ -14,23 +14,17 @@ export default function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      console.log('[App] Initializing app...');
       try {
         await localDB.init();
-        console.log('[App] Local database initialized');
       } catch (error) {
         console.error('[App] Failed to initialize local database:', error);
       }
 
       const profile = localStorage.getItem('userProfile') as 'Amanda' | 'Mateus' | null;
-      console.log('[App] Stored profile:', profile);
 
       if (profile && (profile === 'Amanda' || profile === 'Mateus')) {
-        console.log('[App] Profile found, setting authenticated');
         setIsAuthenticated(true);
         setUserProfile(profile);
-      } else {
-        console.log('[App] No valid profile found');
       }
 
       setIsLoading(false);
@@ -40,10 +34,8 @@ export default function App() {
   }, []);
 
   const handleLoginSuccess = (profile: 'Amanda' | 'Mateus') => {
-    console.log('[App] Login success callback:', { profile });
     setUserProfile(profile);
     setIsAuthenticated(true);
-    console.log('[App] Authentication state updated');
   };
 
   const handleLoadingComplete = () => {

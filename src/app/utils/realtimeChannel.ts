@@ -6,6 +6,10 @@ let channelInstance: RealtimeChannel | null = null;
 let isSubscribed = false;
 let subscriptionPromise: Promise<void> | null = null;
 
+export function isRealtimeConnected(): boolean {
+  return isSubscribed;
+}
+
 export type SyncEvent = 
   | { type: 'item_created'; data: any }
   | { type: 'item_updated'; data: any }
@@ -21,7 +25,6 @@ function initChannel() {
     return channelInstance;
   }
 
-  console.log('[RealtimeChannel] Initializing shared channel...');
   const supabase = getSupabaseClient();
   
   channelInstance = supabase.channel('shared-couple-lists', {
@@ -34,8 +37,6 @@ function initChannel() {
   subscriptionPromise = new Promise((resolve) => {
     channelInstance!
       .on('broadcast', { event: 'sync' }, ({ payload }) => {
-        console.log('[RealtimeChannel] Received event:', payload.type);
-        
         // Notificar todos os callbacks registrados
         callbacks.forEach(callback => {
           try {
@@ -46,7 +47,6 @@ function initChannel() {
         });
       })
       .subscribe((status) => {
-        console.log('[RealtimeChannel] Subscription status:', status);
         if (status === 'SUBSCRIBED') {
           isSubscribed = true;
           resolve();
@@ -59,7 +59,6 @@ function initChannel() {
 
 // Registra um callback para receber eventos
 export function subscribeToSync(callback: SyncCallback): () => void {
-  console.log('[RealtimeChannel] New subscriber registered');
   callbacks.add(callback);
   
   // Inicializa o canal se ainda não foi feito
@@ -69,12 +68,9 @@ export function subscribeToSync(callback: SyncCallback): () => void {
 
   // Retorna função de cleanup
   return () => {
-    console.log('[RealtimeChannel] Subscriber unregistered');
     callbacks.delete(callback);
-    
-    // Se não houver mais callbacks, desconectar
+
     if (callbacks.size === 0 && channelInstance) {
-      console.log('[RealtimeChannel] No more subscribers, unsubscribing...');
       channelInstance.unsubscribe();
       channelInstance = null;
       isSubscribed = false;
@@ -89,7 +85,6 @@ export async function broadcastSync(event: SyncEvent): Promise<void> {
   
   // Aguardar até que o canal esteja subscrito antes de enviar
   if (subscriptionPromise && !isSubscribed) {
-    console.log('[RealtimeChannel] Waiting for subscription before broadcasting...');
     await subscriptionPromise;
   }
   
@@ -101,7 +96,6 @@ export async function broadcastSync(event: SyncEvent): Promise<void> {
       payload: event,
     });
     
-    console.log('[RealtimeChannel] Broadcast sent:', event.type);
   } catch (error) {
     console.error('[RealtimeChannel] Failed to broadcast:', error);
   }
