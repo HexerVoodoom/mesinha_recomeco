@@ -681,7 +681,7 @@ export default function Home() {
 
   return (
     <div
-      className="min-h-screen bg-background flex flex-col font-['Quicksand',sans-serif] relative"
+      className="min-h-screen bg-background flex flex-col font-['Quicksand',sans-serif] relative isolate"
       style={{
         maxWidth: 390,
         margin: '0 auto'
@@ -699,12 +699,13 @@ export default function Home() {
       </div>
 
       {/* Background Texture */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none opacity-50"
         style={{
           backgroundImage: `url(${grainTexture})`,
           backgroundRepeat: 'repeat',
-          backgroundSize: 'auto'
+          backgroundSize: 'auto',
+          zIndex: -1,
         }}
       />
 
