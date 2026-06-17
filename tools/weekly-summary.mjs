@@ -3,15 +3,15 @@
  * Resumo Semanal da Mesinha 💕
  *
  * SETUP (uma vez só):
- *   cd scripts && npm install
+ *   cd tools && npm install
  *
  * EXECUÇÃO MANUAL:
- *   ANTHROPIC_API_KEY=sk-ant-... node scripts/weekly-summary.mjs
+ *   node tools/weekly-summary.mjs
  *
  * AUTOMAÇÃO — roda todo Monday às 9h (macOS / Linux):
  *   crontab -e
- *   Adicione a linha abaixo (ajuste o caminho):
- *   0 9 * * 1 ANTHROPIC_API_KEY=sk-ant-... /usr/local/bin/node /caminho/para/mesinha_recomeco/scripts/weekly-summary.mjs >> /tmp/mesinha-cron.log 2>&1
+ *   Adicione a linha abaixo (ajuste o caminho absoluto):
+ *   0 9 * * 1 /usr/local/bin/node /caminho/para/mesinha_recomeco/tools/weekly-summary.mjs >> /tmp/mesinha-cron.log 2>&1
  *
  * SAÍDA:
  *   ~/mesinha-resumos/
@@ -20,12 +20,29 @@
  *         resumo-semana-2026-06-16.md
  *
  *   Personalize com: MESINHA_OUTPUT_DIR=/outro/caminho
+ *
+ * CHAVE API:
+ *   Salva em tools/.env.local (gitignored automaticamente)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Carrega .env.local automaticamente (chave da API, etc.)
+try {
+  const envFile = path.join(__dirname, '.env.local');
+  if (fs.existsSync(envFile)) {
+    for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (m) process.env[m[1]] ??= m[2].trim();
+    }
+  }
+} catch { /* silencioso */ }
 
 // ── Configuração ─────────────────────────────────────────────────────────────
 
