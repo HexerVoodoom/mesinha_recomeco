@@ -71,10 +71,10 @@ export function ListItemComponent({
   // Determine background color based on creator
   const isAmanda = item.createdBy === 'Amanda';
   const isMateus = item.createdBy === 'Mateus';
-  const cardBackgroundClass = isAmanda 
-    ? 'bg-purple-50/50' 
-    : isMateus 
-    ? 'bg-gray-50/50' 
+  const cardBackgroundClass = isAmanda
+    ? 'bg-purple-50/50'
+    : isMateus
+    ? 'bg-gray-50/50'
     : 'bg-white';
   
   const frequencyLabels = {
