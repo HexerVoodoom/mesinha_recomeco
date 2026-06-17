@@ -10,7 +10,6 @@ export function getSupabaseClient() {
       `https://${projectId}.supabase.co`,
       publicAnonKey
     );
-    console.log('[Supabase] Client instance created');
   }
   return supabaseInstance;
 }

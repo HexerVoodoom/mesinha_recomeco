@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { api, ListItem } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import { isRealtimeConnected } from '../utils/realtimeChannel';
 import { useNotifications } from '../hooks/useNotifications';
 import { seedInitialData } from '../utils/seedData';
 import { localDB } from '../utils/localDB';
@@ -135,7 +136,6 @@ export default function Home() {
   // Realtime Sync - ao receber qualquer evento, rebusca todos os itens da API
   useRealtimeSync({
     onSync: (event) => {
-      console.log('[Home] Sync event received, reloading from API:', event.type);
       // Notificar se for novo item do mural
       if (event.type === 'item_created' && event.data?.category === 'mural') {
         notifyNewMuralItem(event.data);
@@ -228,16 +228,14 @@ export default function Home() {
 
     init();
 
-    // Polling de fallback a cada 30s caso o WebSocket falhe
+    // Polling de fallback a cada 30s — só executa se o WebSocket não estiver conectado
     const pollInterval = setInterval(() => {
-      if (isActive) {
-        console.log('[Home] Polling fallback: reloading items silently');
+      if (isActive && !isRealtimeConnected()) {
         loadItems(true);
       }
     }, 30000);
 
     const handleSyncComplete = () => {
-      console.log('[Home] Background sync completed, reloading items silently');
       loadItems(true);
     };
 
@@ -258,11 +256,22 @@ export default function Home() {
   }, [activeCategory]);
 
   const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
-    try {
-      // Debug: Check if token exists before making API call
-      const token = localStorage.getItem('authToken');
-      console.log('[loadItems] Token in localStorage:', token ? `${token.substring(0, 50)}...` : 'MISSING');
+    // Show cached data immediately so the UI isn't blank while the API wakes up
+    if (!silent && offset === 0 && items.length === 0) {
+      const cached = localStorage.getItem('offlineItems');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setItems(parsed);
+            setLoading(false);
+            silent = true; // API fetch continues in background, no spinner
+          }
+        } catch (_) {}
+      }
+    }
 
+    try {
       const result = await api.getItems(categoryFilter, offset, 100);
       if (result && Array.isArray(result.items)) {
         const fetchedItems = result.items;

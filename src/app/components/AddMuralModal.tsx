@@ -55,7 +55,7 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
           if (full.length > 2800000) {
             full = renderToDataUrl(1200, 0.5);
           }
-          const thumbnail = renderToDataUrl(320, 0.5);
+          const thumbnail = renderToDataUrl(600, 0.72);
 
           resolve({ full, thumbnail });
         };

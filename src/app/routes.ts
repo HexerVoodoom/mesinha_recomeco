@@ -1,14 +1,18 @@
 import { createBrowserRouter } from "react-router";
-import Home from "./pages/Home";
-import Settings from "./pages/Settings";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: Home,
+    lazy: async () => {
+      const { default: Component } = await import("./pages/Home");
+      return { Component };
+    },
   },
   {
     path: "/settings",
-    Component: Settings,
+    lazy: async () => {
+      const { default: Component } = await import("./pages/Settings");
+      return { Component };
+    },
   },
 ]);
