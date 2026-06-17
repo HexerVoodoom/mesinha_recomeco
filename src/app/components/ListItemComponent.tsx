@@ -127,7 +127,7 @@ export function ListItemComponent({
                 ) : (
                   // Checkbox para outras categorias
                   <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                    isDone ? 'border-primary bg-primary' : 'border-[#4D989B]/30 bg-white'
+                    isDone ? 'border-primary bg-primary' : 'border-[#4D989B]/60 bg-white'
                   }`}>
                     {isDone && (
                       <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -335,7 +335,7 @@ export function ListItemComponent({
               
               {/* Chevron */}
               <button onClick={() => setShowModal(true)}>
-                <ChevronRight className="w-5 h-5 text-[#8A847D]/40" strokeWidth={2.5} />
+                <ChevronRight className="w-5 h-5 text-[#8A847D]/70" strokeWidth={2.5} />
               </button>
             </div>
           </div>
