@@ -46,7 +46,8 @@ interface NotificationSchedule {
 
 export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
   const scheduledNotifications = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const lastCheckTime = useRef<Date>(new Date());
+  // Última vez (data + horário) que cada lembrete disparou, para não repetir no mesmo minuto
+  const lastNotified = useRef<Map<string, string>>(new Map());
 
   // Solicitar permissão e registrar push subscription
   useEffect(() => {
@@ -99,42 +100,28 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
 
     const checkAndNotify = () => {
       const now = new Date();
-      const currentDay = now.toLocaleDateString('pt-BR', { weekday: 'long' }).toLowerCase();
-      const currentTime = now.toTimeString().slice(0, 5);
 
-      // Mapear dias em português para abreviações em inglês (como salvo em reminderDays)
-      const dayMap: { [key: string]: string } = {
-        'domingo': 'sun',
-        'segunda-feira': 'mon',
-        'terça-feira': 'tue',
-        'quarta-feira': 'wed',
-        'quinta-feira': 'thu',
-        'sexta-feira': 'fri',
-        'sábado': 'sat',
-      };
-
-      const mappedDay = dayMap[currentDay];
+      // Dia da semana atual como abreviação em inglês (como salvo em reminderDays)
+      const dayByIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const mappedDay = dayByIndex[now.getDay()];
 
       // Verificar se hoje é um dos dias configurados
       const shouldNotifyToday = schedule.days.includes(mappedDay);
 
       // Verificar se é o horário certo (com margem de 1 minuto)
       const [scheduleHour, scheduleMinute] = schedule.time.split(':').map(Number);
-      const [currentHour, currentMinute] = currentTime.split(':').map(Number);
+      const isRightTime =
+        scheduleHour === now.getHours() &&
+        Math.abs(scheduleMinute - now.getMinutes()) <= 1;
 
-      const isRightTime = 
-        scheduleHour === currentHour && 
-        Math.abs(scheduleMinute - currentMinute) <= 1;
-
-      // Verificar se já notificou neste minuto
-      const lastCheck = lastCheckTime.current;
-      const alreadyNotified = 
-        lastCheck.getHours() === now.getHours() &&
-        lastCheck.getMinutes() === now.getMinutes();
+      // Chave única por dia + horário do lembrete: evita repetir no mesmo minuto,
+      // mas permite disparar novamente no próximo dia configurado.
+      const fireKey = `${now.toDateString()} ${schedule.time}`;
+      const alreadyNotified = lastNotified.current.get(schedule.itemId) === fireKey;
 
       if (shouldNotifyToday && isRightTime && !alreadyNotified) {
         showNotification('Lembrete', schedule.title);
-        lastCheckTime.current = now;
+        lastNotified.current.set(schedule.itemId, fireKey);
       }
     };
 
