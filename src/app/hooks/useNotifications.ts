@@ -102,15 +102,15 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
       const currentDay = now.toLocaleDateString('pt-BR', { weekday: 'long' }).toLowerCase();
       const currentTime = now.toTimeString().slice(0, 5);
 
-      // Mapear dias em português para inglês
+      // Mapear dias em português para abreviações em inglês (como salvo em reminderDays)
       const dayMap: { [key: string]: string } = {
-        'domingo': 'sunday',
-        'segunda-feira': 'monday',
-        'terça-feira': 'tuesday',
-        'quarta-feira': 'wednesday',
-        'quinta-feira': 'thursday',
-        'sexta-feira': 'friday',
-        'sábado': 'saturday',
+        'domingo': 'sun',
+        'segunda-feira': 'mon',
+        'terça-feira': 'tue',
+        'quarta-feira': 'wed',
+        'quinta-feira': 'thu',
+        'sexta-feira': 'fri',
+        'sábado': 'sat',
       };
 
       const mappedDay = dayMap[currentDay];

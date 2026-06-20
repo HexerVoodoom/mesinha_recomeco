@@ -156,13 +156,13 @@ export function ListItemComponent({
                   (() => {
                     const today = new Date().getDay();
                     const dayMap: { [key: number]: string } = {
-                      0: 'dom',
-                      1: 'seg',
-                      2: 'ter',
-                      3: 'qua',
-                      4: 'qui',
-                      5: 'sex',
-                      6: 'sab'
+                      0: 'sun',
+                      1: 'mon',
+                      2: 'tue',
+                      3: 'wed',
+                      4: 'thu',
+                      5: 'fri',
+                      6: 'sat'
                     };
                     const todayKey = dayMap[today];
                     const isActiveToday = item.reminderDays?.includes(todayKey) && item.reminderActive;
