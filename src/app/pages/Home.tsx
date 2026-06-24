@@ -460,15 +460,18 @@ export default function Home() {
 
     try {
       const createdItem = await syncApi.createItem(item);
-      setItems([...items, createdItem]);
-      localStorage.setItem('offlineItems', JSON.stringify([...items, createdItem]));
+      setItems(prev => {
+        const updated = [...prev, createdItem];
+        localStorage.setItem('offlineItems', JSON.stringify(updated));
+        return updated;
+      });
       setShowAddModal(false);
       toast.success('Item adicionado com sucesso!');
     } catch (error: any) {
       console.error('Failed to create item:', error);
       const msg = error?.message || '';
-      if (msg.toLowerCase().includes('photo too large') || msg.toLowerCase().includes('too large')) {
-        toast.error('Foto muito grande! Use uma imagem menor que 2MB.');
+      if (msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('grande')) {
+        toast.error('Foto muito grande! Use uma imagem menor.');
       } else {
         toast.error('Erro ao salvar item. Tente novamente.');
       }
@@ -496,17 +499,20 @@ export default function Home() {
 
     try {
       const createdItem = await syncApi.createItem(item);
-      setItems([...items, createdItem]);
-      localStorage.setItem('offlineItems', JSON.stringify([...items, createdItem]));
+      setItems(prev => {
+        const updated = [...prev, createdItem];
+        localStorage.setItem('offlineItems', JSON.stringify(updated));
+        return updated;
+      });
       toast.success('Post adicionado ao mural!');
     } catch (error: any) {
-      console.error('Failed to create mural post:', error);
       const msg = error?.message || '';
-      if (msg.toLowerCase().includes('too large')) {
+      if (msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('grande')) {
         toast.error('Imagem muito grande! Use uma foto menor ou comprima antes de enviar.');
       } else {
         toast.error('Erro ao publicar no mural. Tente novamente.');
       }
+      throw error; // modal permanece aberto para o usuário tentar novamente
     }
   };
 

@@ -40,38 +40,29 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // Calculate new dimensions (max 1200px width/height)
-          let width = img.width;
-          let height = img.height;
-          const maxSize = 1200;
-          
-          if (width > height && width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
+          const render = (maxSize: number, quality: number) => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            if (w > h && w > maxSize) { h = (h / w) * maxSize; w = maxSize; }
+            else if (h > maxSize) { w = (w / h) * maxSize; h = maxSize; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+            return canvas.toDataURL('image/jpeg', quality);
+          };
+
+          // Adaptive: tenta até caber em 8MB base64
+          const MAX = 8000000;
+          const attempts: [number, number][] = [
+            [1200, 0.8], [1200, 0.65], [1200, 0.5],
+            [900, 0.7],  [900, 0.5],
+            [700, 0.7],  [500, 0.6],
+          ];
+          let result = render(1200, 0.8);
+          for (const [size, q] of attempts) {
+            if (result.length <= MAX) break;
+            result = render(size, q);
           }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // Compress to JPEG with 0.7 quality (good balance)
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          
-          // Check size (max ~2MB base64)
-          if (compressedDataUrl.length > 2800000) {
-            // Try with lower quality
-            const lowerQuality = canvas.toDataURL('image/jpeg', 0.5);
-            resolve(lowerQuality);
-          } else {
-            resolve(compressedDataUrl);
-          }
+          resolve(result);
         };
         img.onerror = reject;
         img.src = e.target?.result as string;
@@ -95,13 +86,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
         toast.info('Comprimindo imagem...');
         const compressed = await compressImage(file);
         
-        // Check compressed size
-        const compressedSizeMB = compressed.length / (1024 * 1024);
-        if (compressedSizeMB > 2) {
-          toast.warning('Imagem ainda grande após compressão. Pode haver problemas ao salvar.');
-        } else {
           toast.success('Imagem adicionada!');
-        }
         
         setPhotoUrl(compressed);
       } catch (error) {
