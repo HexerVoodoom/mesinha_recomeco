@@ -8,7 +8,7 @@ import secondaryButtonBg from "figma:asset/75c872bdf2a28b8670edf0ef3851acf422588
 interface AddMuralModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string, thumbnail?: string) => void;
+  onAdd: (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string, thumbnail?: string) => Promise<void>;
 }
 
 type ContentType = 'text' | 'image' | 'video' | 'audio';
@@ -21,10 +21,9 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
   const [mediaThumbnail, setMediaThumbnail] = useState<string>('');
   const [caption, setCaption] = useState(''); // Caption para posts de imagem
   const [isRecording, setIsRecording] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
-  // Gera, a partir da mesma imagem já carregada, uma versão completa (para visualização expandida)
-  // e uma miniatura bem mais leve (para o preview no grid do mural).
   const compressImage = (file: File): Promise<{ full: string; thumbnail: string }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -35,7 +34,6 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-
             if (width > height && width > maxSize) {
               height = (height / width) * maxSize;
               width = maxSize;
@@ -43,20 +41,28 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
               width = (width / height) * maxSize;
               height = maxSize;
             }
-
             canvas.width = width;
             canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
+            canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
             return canvas.toDataURL('image/jpeg', quality);
           };
 
-          let full = renderToDataUrl(1200, 0.7);
-          if (full.length > 2800000) {
-            full = renderToDataUrl(1200, 0.5);
-          }
-          const thumbnail = renderToDataUrl(600, 0.72);
+          // Adaptive compression: tenta combinações até caber em 8MB base64
+          const MAX_BYTES = 8000000;
+          const attempts = [
+            [1200, 0.8], [1200, 0.65], [1200, 0.5],
+            [900, 0.7], [900, 0.5],
+            [700, 0.7], [700, 0.5],
+            [500, 0.6],
+          ] as [number, number][];
 
+          let full = renderToDataUrl(1200, 0.8);
+          for (const [size, quality] of attempts) {
+            if (full.length <= MAX_BYTES) break;
+            full = renderToDataUrl(size, quality);
+          }
+
+          const thumbnail = renderToDataUrl(600, 0.72);
           resolve({ full, thumbnail });
         };
         img.onerror = reject;
@@ -169,47 +175,36 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     }
   };
 
-  const handleSubmit = () => {
-    // Validar título obrigatório
-    if (!title.trim()) {
-      toast.error('Digite um título');
-      return;
-    }
-
-    if (contentType === 'text' && !textContent.trim()) {
-      toast.error('Digite um texto');
-      return;
-    }
-
-    if (contentType !== 'text' && !mediaFile) {
-      toast.error('Adicione uma mídia');
-      return;
-    }
-
-    const content = contentType === 'text' ? textContent : mediaFile;
-
-    onAdd(title.trim(), contentType, content, caption, contentType === 'image' ? mediaThumbnail : undefined);
-
-    // Reset
+  const resetForm = () => {
     setTitle('');
     setTextContent('');
     setMediaFile('');
     setMediaThumbnail('');
     setCaption('');
     setContentType('text');
-    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim()) { toast.error('Digite um título'); return; }
+    if (contentType === 'text' && !textContent.trim()) { toast.error('Digite um texto'); return; }
+    if (contentType !== 'text' && !mediaFile) { toast.error('Adicione uma mídia'); return; }
+
+    const content = contentType === 'text' ? textContent : mediaFile;
+    setIsSubmitting(true);
+    try {
+      await onAdd(title.trim(), contentType, content, caption, contentType === 'image' ? mediaThumbnail : undefined);
+      resetForm();
+      onClose();
+    } catch {
+      // erro já mostrado como toast em Home.tsx — modal fica aberto para tentar novamente
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
-    if (isRecording) {
-      stopRecording();
-    }
-    setTitle('');
-    setTextContent('');
-    setMediaFile('');
-    setMediaThumbnail('');
-    setCaption('');
-    setContentType('text');
+    if (isRecording) stopRecording();
+    resetForm();
     onClose();
   };
 
@@ -504,11 +499,11 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={isRecording}
+                  disabled={isRecording || isSubmitting}
                   className="flex-1 h-12 relative bg-contain bg-center bg-no-repeat text-white font-medium hover:opacity-80 transition-opacity flex items-center justify-center disabled:opacity-50"
                   style={{ backgroundImage: `url(${primaryButtonBg})` }}
                 >
-                  Adicionar
+                  {isSubmitting ? 'Salvando...' : 'Adicionar'}
                 </button>
               </div>
             </div>

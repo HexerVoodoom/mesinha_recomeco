@@ -117,13 +117,15 @@ export const getByPrefixPaged = async (
     query = query.eq("value->>category", categoryFilter);
   }
 
-  // Note: deliberately not ordering by value->>createdAt here - sorting on that json path
-  // requires Postgres to read every matching row's (often large, photo-containing) JSONB
-  // value to extract and compare it, which was hitting the statement timeout once the
-  // table grew. Falls back to natural row order; pass orderByJsonField if/when an index
-  // on that expression exists.
-  void orderByJsonField;
-  void ascending;
+  // Index idx_kv_items_createdat (DESC NULLS LAST) cobre esta ordenação.
+  // É ESSENCIAL passar nullsFirst: false: sem isso o PostgREST gera
+  // "ORDER BY ... DESC" que no PostgreSQL é NULLS FIRST — itens sem createdAt
+  // iriam para o topo (empurrando posts novos para fora do limite/página) e o
+  // índice NULLS LAST não seria usado, causando full scan + timeout na tabela
+  // grande. Com NULLS LAST os mais recentes ficam no topo e o índice é usado.
+  if (orderByJsonField === "createdAt") {
+    query = query.order(`value->>'createdAt'` as any, { ascending, nullsFirst: false });
+  }
   const { data, error, count } = await query.range(offset, offset + limit - 1);
 
   if (error) {

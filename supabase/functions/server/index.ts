@@ -244,10 +244,16 @@ app.post("/make-server-19717bce/items", async (c) => {
       return c.json({ error: "Title and category are required" }, 400);
     }
 
-    // Validate photo size (max 2MB base64 to prevent connection issues)
-    if (photo && photo.length > 3000000) {
-      console.warn("Photo rejected: too large");
-      return c.json({ error: "Photo too large. Maximum size is 2MB. Please compress the image." }, 400);
+    // Validate photo size (max 8MB base64)
+    if (photo && photo.length > 10000000) {
+      console.warn("Photo rejected: too large", photo.length);
+      return c.json({ error: "Foto muito grande. Use uma imagem menor que 6MB." }, 400);
+    }
+
+    // Validate mural content size (max 8MB base64)
+    if (body.muralContent && typeof body.muralContent === "string" && body.muralContent.length > 10000000) {
+      console.warn("Mural content rejected: too large", body.muralContent.length);
+      return c.json({ error: "Imagem do mural muito grande. Use uma foto menor que 6MB." }, 400);
     }
 
     // If the client sends an id that already exists (e.g. a retried/duplicated sync push),
@@ -500,6 +506,113 @@ app.delete("/make-server-19717bce/push-subscription", async (c) => {
     console.error("[DELETE /push-subscription] Error:", error);
     return c.json({ error: "Failed to remove subscription" }, 500);
   }
+});
+
+// ── Cron endpoint: dispara Web Push para lembretes do horário atual ──────────
+//
+// Chamado a cada minuto por pg_cron ou serviço externo.
+// Protegido com Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+// ou com o header X-Cron-Secret: <CRON_SECRET>.
+//
+// Setup Supabase (rodar no SQL Editor UMA VEZ):
+//
+//   -- Habilita as extensões necessárias
+//   create extension if not exists pg_cron;
+//   create extension if not exists pg_net;
+//
+//   -- Agenda a chamada a cada minuto
+//   select cron.schedule(
+//     'mesinha-reminders',
+//     '* * * * *',
+//     $$
+//     select net.http_post(
+//       url := 'https://oubdmmaqxnutbbxiqeow.supabase.co/functions/v1/make-server-19717bce/trigger-reminders',
+//       headers := jsonb_build_object(
+//         'Content-Type', 'application/json',
+//         'X-Cron-Secret', 'mesinha-cron-2024'
+//       ),
+//       body := '{}',
+//       timeout_milliseconds := 55000
+//     )
+//     $$
+//   );
+//
+// Para cancelar: select cron.unschedule('mesinha-reminders');
+
+const CRON_SECRET = Deno.env.get("CRON_SECRET") || "mesinha-cron-2024";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+// Fuso horário do Brasil (UTC-3, sem horário de verão desde 2019)
+const BRAZIL_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+function brazilNow(): Date {
+  return new Date(Date.now() + BRAZIL_OFFSET_MS);
+}
+
+app.post("/make-server-19717bce/trigger-reminders", async (c) => {
+  // Validar autorização
+  const authHeader = c.req.header("Authorization") || "";
+  const cronSecret = c.req.header("X-Cron-Secret") || "";
+  const isServiceRole = SERVICE_ROLE_KEY && authHeader === `Bearer ${SERVICE_ROLE_KEY}`;
+  const isCronSecret = cronSecret === CRON_SECRET;
+  if (!isServiceRole && !isCronSecret) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const now = brazilNow();
+  const dayByIndex = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  const todayDay = dayByIndex[now.getDay()];
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  // Buscar todos os itens de lembrete ativos
+  const { items: allItems } = await kv.getByPrefixPaged("item:", {
+    offset: 0,
+    limit: 1000,
+    orderByJsonField: "createdAt",
+    ascending: false,
+    categoryFilter: "alarm",
+  });
+
+  const alarmItems = allItems.filter((item: any) =>
+    item.category === "alarm" &&
+    item.reminderActive !== false &&
+    item.reminderTime &&
+    Array.isArray(item.reminderDays) &&
+    item.reminderDays.length > 0
+  );
+
+  const fired: string[] = [];
+
+  for (const item of alarmItems) {
+    // Verificar se hoje é um dos dias configurados
+    if (!item.reminderDays.includes(todayDay)) continue;
+
+    // Verificar horário (margem de 1 minuto)
+    const [h, m] = item.reminderTime.split(":").map(Number);
+    const minutesDiff = Math.abs((h * 60 + m) - (currentHour * 60 + currentMinute));
+    if (minutesDiff > 1) continue;
+
+    // Disparar para os usuários configurados
+    const payload = {
+      title: `⏰ Lembrete: ${item.title}`,
+      body: item.comment || `Hora do seu lembrete!`,
+      tag: `reminder-${item.id}`,
+      url: "/",
+    };
+
+    const sends: Promise<void>[] = [];
+    if (item.reminderForMateus) sends.push(sendPushToUser("Mateus", payload));
+    if (item.reminderForAmanda) sends.push(sendPushToUser("Amanda", payload));
+    await Promise.all(sends);
+
+    fired.push(item.title);
+    console.log(`[Reminders] Fired "${item.title}" at ${item.reminderTime} for day ${todayDay}`);
+  }
+
+  const brazilTimeStr = `${String(currentHour).padStart(2,"0")}:${String(currentMinute).padStart(2,"0")} (Brasília)`;
+  console.log(`[Reminders] Checked ${alarmItems.length} alarms at ${brazilTimeStr}. Fired: ${fired.length}`);
+  return c.json({ checked: alarmItems.length, fired, time: brazilTimeStr });
 });
 
 // Serve the application
