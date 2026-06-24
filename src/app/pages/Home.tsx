@@ -105,6 +105,14 @@ function toLightItem(item: ListItem): ListItem {
   } as ListItem;
 }
 
+function saveItemsToStorage(items: ListItem[]) {
+  try {
+    localStorage.setItem('offlineItems', JSON.stringify(items.map(toLightItem)));
+  } catch {
+    localStorage.removeItem('offlineItems');
+  }
+}
+
 function loadPendingFromStorage(): Map<string, ListItem> {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
@@ -225,9 +233,7 @@ export default function Home() {
         const others = prev.filter(i => i.category !== category);
         const fresh = confirmAndMergePending(result.items);
         const merged = [...others, ...fresh];
-        try {
-          localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
-        } catch { localStorage.removeItem('offlineItems'); }
+        saveItemsToStorage(merged);
         return merged;
       });
     } catch (e) {
@@ -406,9 +412,7 @@ export default function Home() {
           // (não confirma com base em dados locais).
           setItems(prev => {
             const merged = injectPending([...prev, ...fetchedItems]);
-            try {
-              localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
-            } catch { localStorage.removeItem('offlineItems'); }
+            saveItemsToStorage(merged);
             return merged;
           });
         } else {
@@ -419,9 +423,7 @@ export default function Home() {
             const serverIds = new Set(fetchedItems.map(i => i.id));
             const extraMuralItems = prev.filter(i => i.category === 'mural' && !serverIds.has(i.id));
             const merged = confirmAndMergePending([...fetchedItems, ...extraMuralItems]);
-            try {
-              localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
-            } catch { localStorage.removeItem('offlineItems'); }
+            saveItemsToStorage(merged);
             return merged;
           });
         }
@@ -589,9 +591,7 @@ export default function Home() {
       trackPendingItem(createdItem);
       setItems(prev => {
         const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
-        try {
-          localStorage.setItem('offlineItems', JSON.stringify(updated.map(toLightItem)));
-        } catch { localStorage.removeItem('offlineItems'); }
+        saveItemsToStorage(updated);
         return updated;
       });
       setShowAddModal(false);
@@ -631,9 +631,7 @@ export default function Home() {
       trackPendingItem(createdItem);
       setItems(prev => {
         const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
-        try {
-          localStorage.setItem('offlineItems', JSON.stringify(updated.map(toLightItem)));
-        } catch { localStorage.removeItem('offlineItems'); }
+        saveItemsToStorage(updated);
         return updated;
       });
       toast.success('Post adicionado ao mural!');
@@ -665,9 +663,7 @@ export default function Home() {
       // possam ter buscado enquanto aguardávamos o retorno da API de update.
       setItems(prev => {
         const finalItems = prev.map(i => i.id === id ? toLightItem(updatedItem) : i);
-        try {
-          localStorage.setItem('offlineItems', JSON.stringify(finalItems.map(toLightItem)));
-        } catch { localStorage.removeItem('offlineItems'); }
+        saveItemsToStorage(finalItems);
         return finalItems;
       });
     } catch (error) {
@@ -677,9 +673,7 @@ export default function Home() {
         const fallback = prev.map(i =>
           i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString() } : i
         );
-        try {
-          localStorage.setItem('offlineItems', JSON.stringify(fallback.map(toLightItem)));
-        } catch { localStorage.removeItem('offlineItems'); }
+        saveItemsToStorage(fallback);
         return fallback;
       });
 
@@ -712,9 +706,7 @@ export default function Home() {
 
     setItems(prev => {
       const filtered = prev.filter(i => i.id !== id);
-      try {
-        localStorage.setItem('offlineItems', JSON.stringify(filtered.map(toLightItem)));
-      } catch { localStorage.removeItem('offlineItems'); }
+      saveItemsToStorage(filtered);
       return filtered;
     });
     setExpandedItemId(null);

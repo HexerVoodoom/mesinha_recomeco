@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Trash2, X, Download, Copy, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ListItem, api } from '../utils/api';
@@ -52,6 +52,13 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id, contentType, item.muralContent]);
+
+  // Rotação estável derivada do ID — evita re-calcular em cada re-render (polling, likes, etc.)
+  const cardRotation = useMemo(() => {
+    if (isHeroItem) return 0;
+    const seed = item.id.slice(-6).split('').reduce((n, c) => n + c.charCodeAt(0), 0);
+    return ((seed % 40) - 20) / 10; // -2 a +2 graus
+  }, [item.id, isHeroItem]);
 
   // Verifica se é novo para o usuário atual
   const isNew = item.createdBy !== currentUser && !item.viewedBy?.includes(currentUser);
@@ -109,25 +116,29 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
     document.body.removeChild(link);
   };
 
-  const handleCopy = () => {
-    // Fallback para navegadores que bloqueiam Clipboard API
+  const handleCopy = async () => {
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(content);
+        toast.success('Conteúdo copiado para a área de transferência!');
+        return;
+      } catch (_) {
+        // Fall through to execCommand fallback
+      }
+    }
+    // Fallback para contextos sem Clipboard API (HTTP, browsers antigos)
     const textArea = document.createElement('textarea');
     textArea.value = content;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
+    textArea.style.cssText = 'position:fixed;left:-999999px;top:-999999px';
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
     try {
       document.execCommand('copy');
       toast.success('Conteúdo copiado para a área de transferência!');
-    } catch (err) {
-      console.error('Erro ao copiar:', err);
+    } catch {
       toast.error('Não foi possível copiar o conteúdo');
     }
-    
     document.body.removeChild(textArea);
   };
 
@@ -294,7 +305,7 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
         className={`relative ${cardBackgroundClass} ${isHeroItem ? 'p-4 pb-6' : 'p-3 pb-4'} rounded-lg shadow-lg`}
         style={{
           boxShadow: '0 4px 8px rgba(0,0,0,0.1), 0 6px 20px rgba(0,0,0,0.08)',
-          transform: isHeroItem ? 'rotate(0deg)' : `rotate(${Math.random() * 4 - 2}deg)`,
+          transform: `rotate(${cardRotation}deg)`,
         }}
       >
         {/* Fita adesiva no topo */}
