@@ -250,6 +250,12 @@ app.post("/make-server-19717bce/items", async (c) => {
       return c.json({ error: "Photo too large. Maximum size is 2MB. Please compress the image." }, 400);
     }
 
+    // Validate mural content size (images stored as base64, same 2MB limit)
+    if (body.muralContent && typeof body.muralContent === "string" && body.muralContent.length > 3000000) {
+      console.warn("Mural content rejected: too large", body.muralContent.length);
+      return c.json({ error: "Imagem do mural muito grande. Use uma foto menor que 2MB." }, 400);
+    }
+
     // If the client sends an id that already exists (e.g. a retried/duplicated sync push),
     // upsert that same record instead of minting a new one - prevents duplicate items.
     const providedId = typeof body.id === "string" && body.id ? body.id : null;

@@ -462,17 +462,17 @@ export default function Home() {
       const createdItem = await syncApi.createItem(item);
       setItems([...items, createdItem]);
       localStorage.setItem('offlineItems', JSON.stringify([...items, createdItem]));
-    } catch (error) {
+      setShowAddModal(false);
+      toast.success('Item adicionado com sucesso!');
+    } catch (error: any) {
       console.error('Failed to create item:', error);
-      // Fallback to offline mode
-      const newItems = [...items, item];
-      setItems(newItems);
-      localStorage.setItem('offlineItems', JSON.stringify(newItems));
-      toast.info('Item adicionado localmente (modo offline)');
+      const msg = error?.message || '';
+      if (msg.toLowerCase().includes('photo too large') || msg.toLowerCase().includes('too large')) {
+        toast.error('Foto muito grande! Use uma imagem menor que 2MB.');
+      } else {
+        toast.error('Erro ao salvar item. Tente novamente.');
+      }
     }
-    
-    setShowAddModal(false);
-    toast.success('Item adicionado com sucesso!');
   };
 
   const handleAddMuralPost = async (title: string, contentType: 'text' | 'image' | 'video' | 'audio', content: string, caption?: string, thumbnail?: string) => {
@@ -491,23 +491,23 @@ export default function Home() {
       muralContentType: contentType,
       muralContent: content,
       muralThumbnail: thumbnail,
-      caption: caption || undefined, // Adiciona caption se fornecido
+      caption: caption || undefined,
     };
 
     try {
       const createdItem = await syncApi.createItem(item);
       setItems([...items, createdItem]);
       localStorage.setItem('offlineItems', JSON.stringify([...items, createdItem]));
-    } catch (error) {
+      toast.success('Post adicionado ao mural!');
+    } catch (error: any) {
       console.error('Failed to create mural post:', error);
-      // Fallback to offline mode
-      const newItems = [...items, item];
-      setItems(newItems);
-      localStorage.setItem('offlineItems', JSON.stringify(newItems));
-      toast.info('Post adicionado localmente (modo offline)');
+      const msg = error?.message || '';
+      if (msg.toLowerCase().includes('too large')) {
+        toast.error('Imagem muito grande! Use uma foto menor ou comprima antes de enviar.');
+      } else {
+        toast.error('Erro ao publicar no mural. Tente novamente.');
+      }
     }
-    
-    toast.success('Post adicionado ao mural!');
   };
 
   const handleUpdateItem = async (id: string, updates: Partial<ListItem>) => {
