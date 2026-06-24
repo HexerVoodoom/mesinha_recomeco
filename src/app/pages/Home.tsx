@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { 
   Tv,
@@ -87,10 +87,97 @@ const categoryIcons: Record<Category | 'search', string> = {
   search: imgIconPesquisar,
 };
 
+// Chave de localStorage para itens criados localmente que ainda não foram
+// confirmados na resposta de listagem do servidor.
+const PENDING_KEY = 'pendingCreatedItems';
+
+// Versão "leve" de um item para armazenar/renderizar sem estourar a cota do
+// localStorage: remove o conteúdo pesado (base64 de imagem/vídeo/áudio) mas
+// mantém a miniatura e o conteúdo de texto (que é pequeno), igual ao formato
+// que o GET /items já retorna na listagem. O conteúdo pesado é recarregado sob
+// demanda via getItemFull quando o usuário abre o post.
+function toLightItem(item: ListItem): ListItem {
+  const isHeavyMedia = item.muralContentType && item.muralContentType !== 'text';
+  return {
+    ...item,
+    muralContent: isHeavyMedia ? undefined : item.muralContent,
+    photo: item.photo ? 'HAS_PHOTO' : null,
+  } as ListItem;
+}
+
+function loadPendingFromStorage(): Map<string, ListItem> {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return new Map();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      return new Map(arr.filter((i: any) => i?.id).map((i: ListItem) => [i.id, i]));
+    }
+  } catch (_) {}
+  return new Map();
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<Category>('mural');
   const [items, setItems] = useState<ListItem[]>([]);
+  // Itens recém-criados nesta sessão que ainda podem não aparecer numa resposta
+  // de listagem do servidor (por race de polling ou ordenação/paginação). Eles
+  // são re-injetados em todo refresh para nunca "sumirem" da tela, e só são
+  // removidos quando o servidor confirma o item ou quando ele é excluído.
+  const pendingCreatedRef = useRef<Map<string, ListItem>>(loadPendingFromStorage());
+
+  const persistPending = () => {
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify([...pendingCreatedRef.current.values()]));
+    } catch (_) {
+      try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
+    }
+  };
+
+  const trackPendingItem = (item: ListItem) => {
+    const pending = pendingCreatedRef.current;
+    pending.set(item.id, toLightItem(item));
+    // Limite de segurança: mantém só os 100 mais recentes (Map preserva ordem
+    // de inserção) para o registro nunca crescer indefinidamente.
+    while (pending.size > 100) {
+      const oldest = pending.keys().next().value;
+      if (oldest === undefined) break;
+      pending.delete(oldest);
+    }
+    persistPending();
+  };
+
+  const untrackPendingItem = (id: string) => {
+    if (pendingCreatedRef.current.delete(id)) persistPending();
+  };
+
+  // Injeta os itens pendentes que ainda não estão na lista, sem removê-los do
+  // registro. Usado para exibir cache local (que não é confirmação do servidor).
+  const injectPending = (list: ListItem[]): ListItem[] => {
+    const pending = pendingCreatedRef.current;
+    if (pending.size === 0) return list;
+    const ids = new Set(list.map(i => i.id));
+    const survivors = [...pending.values()].filter(p => !ids.has(p.id));
+    return survivors.length ? [...survivors, ...list] : list;
+  };
+
+  // Mescla os itens pendentes com a lista vinda do SERVIDOR: remove do registro
+  // os que o servidor já retornou (confirmados) e mantém visíveis os demais.
+  // Só deve ser chamado com uma resposta real do servidor.
+  const confirmAndMergePending = (serverItems: ListItem[]): ListItem[] => {
+    const pending = pendingCreatedRef.current;
+    if (pending.size === 0) return serverItems;
+    const serverIds = new Set(serverItems.map(i => i.id));
+    let changed = false;
+    for (const id of [...pending.keys()]) {
+      if (serverIds.has(id)) { pending.delete(id); changed = true; }
+    }
+    if (changed) persistPending();
+    const survivors = [...pending.values()].filter(p => !serverIds.has(p.id));
+    return survivors.length ? [...survivors, ...serverItems] : serverItems;
+  };
+
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -263,7 +350,7 @@ export default function Home() {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setItems(parsed);
+            setItems(injectPending(parsed));
             setLoading(false);
             silent = true; // API fetch continues in background, no spinner
           }
@@ -280,11 +367,19 @@ export default function Home() {
         const hasUpdates = JSON.stringify(items.map(i => ({ id: i.id, updatedAt: i.updatedAt }))) !==
                           JSON.stringify(fetchedItems.map(i => ({ id: i.id, updatedAt: i.updatedAt })));
 
-        // If offset > 0, append to existing items; otherwise replace
+        // If offset > 0, append to existing items; otherwise replace.
+        // Em ambos os casos mesclamos os itens pendentes (recém-criados) para
+        // que um refresh em background nunca apague um post que o servidor
+        // ainda não retornou. Usamos o updater funcional para evitar race com
+        // o setItems do create.
         if (offset > 0) {
-          setItems(prev => [...prev, ...fetchedItems]);
+          // "Carregar mais": páginas mais antigas. Apenas injeta pendentes
+          // (não confirma com base em dados locais).
+          setItems(prev => injectPending([...prev, ...fetchedItems]));
         } else {
-          setItems(fetchedItems);
+          // Refresh completo: fetchedItems é a resposta real do servidor
+          // (100 mais recentes). Confirma e mescla os pendentes.
+          setItems(confirmAndMergePending(fetchedItems));
         }
 
         // Show toast only if this is a silent update and there are changes
@@ -460,8 +555,9 @@ export default function Home() {
 
     try {
       const createdItem = await syncApi.createItem(item);
+      trackPendingItem(createdItem);
       setItems(prev => {
-        const updated = [...prev, createdItem];
+        const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
         try {
           const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
           localStorage.setItem('offlineItems', JSON.stringify(forStorage));
@@ -502,8 +598,9 @@ export default function Home() {
 
     try {
       const createdItem = await syncApi.createItem(item);
+      trackPendingItem(createdItem);
       setItems(prev => {
-        const updated = [...prev, createdItem];
+        const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
         try {
           const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
           localStorage.setItem('offlineItems', JSON.stringify(forStorage));
@@ -558,7 +655,8 @@ export default function Home() {
 
   const handleDeleteItem = async (id: string) => {
     const filteredItems = items.filter(item => item.id !== id);
-    
+    untrackPendingItem(id); // não re-injetar um item que foi excluído
+
     try {
       await syncApi.deleteItem(id);
       setItems(filteredItems);
