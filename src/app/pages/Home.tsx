@@ -462,7 +462,10 @@ export default function Home() {
       const createdItem = await syncApi.createItem(item);
       setItems(prev => {
         const updated = [...prev, createdItem];
-        localStorage.setItem('offlineItems', JSON.stringify(updated));
+        try {
+          const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
+          localStorage.setItem('offlineItems', JSON.stringify(forStorage));
+        } catch { localStorage.removeItem('offlineItems'); }
         return updated;
       });
       setShowAddModal(false);
@@ -501,7 +504,10 @@ export default function Home() {
       const createdItem = await syncApi.createItem(item);
       setItems(prev => {
         const updated = [...prev, createdItem];
-        localStorage.setItem('offlineItems', JSON.stringify(updated));
+        try {
+          const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
+          localStorage.setItem('offlineItems', JSON.stringify(forStorage));
+        } catch { localStorage.removeItem('offlineItems'); }
         return updated;
       });
       toast.success('Post adicionado ao mural!');
