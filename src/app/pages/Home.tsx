@@ -212,6 +212,25 @@ export default function Home() {
 
   const userProfile = (localStorage.getItem('userProfile') || 'You') as 'Amanda' | 'Mateus';
 
+  // Recarrega itens de UMA categoria específica (até 200) e os mescla ao estado
+  // mantendo todas as outras categorias intactas. Resolve o problema de posts
+  // do mural sumindo quando a lista geral de 100 itens os empurra para fora
+  // do limite: aqui buscamos diretamente os posts do mural, independente de
+  // quantos itens de outras categorias existem.
+  const refreshCategoryItems = async (category: string) => {
+    try {
+      const result = await api.getItems(category, 0, 200);
+      if (!result || !Array.isArray(result.items)) return;
+      setItems(prev => {
+        const others = prev.filter(i => i.category !== category);
+        const fresh = confirmAndMergePending(result.items);
+        return [...others, ...fresh];
+      });
+    } catch (e) {
+      console.warn('[refreshCategoryItems] failed:', e);
+    }
+  };
+
   // Sistema de notificações
   const { updateReminders, notifyNewMuralItem } = useNotifications(userProfile);
 
@@ -335,10 +354,16 @@ export default function Home() {
     };
   }, []);
 
-  // Carregar dados quando uma categoria é aberta pela primeira vez
+  // Carregar dados quando uma categoria é aberta pela primeira vez.
+  // Para o mural: sempre faz um refresh específico ao entrar na aba,
+  // garantindo que todos os posts (até 200) estejam carregados mesmo que
+  // a lista geral de 100 itens os exclua por limite de paginação.
   useEffect(() => {
     if (!loadedCategories.has(activeCategory)) {
       setLoadedCategories(prev => new Set([...prev, activeCategory]));
+    }
+    if (activeCategory === 'mural') {
+      refreshCategoryItems('mural');
     }
   }, [activeCategory]);
 
@@ -608,6 +633,10 @@ export default function Home() {
         return updated;
       });
       toast.success('Post adicionado ao mural!');
+      // Recarrega todos os posts do mural especificamente para garantir que o
+      // post anterior (antigo hero) não seja empurrado para fora dos 100 itens
+      // gerais e desapareça do grid.
+      refreshCategoryItems('mural');
     } catch (error: any) {
       const msg = error?.message || '';
       if (msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('grande')) {
