@@ -168,6 +168,10 @@ app.get("/make-server-19717bce/items", async (c) => {
         top3Mateus: item.top3Mateus,
         top3Amanda: item.top3Amanda,
         muralContentType: item.muralContentType,
+        // Texto é pequeno: inclui na listagem para o preview aparecer sem precisar
+        // abrir o post. Mídia (imagem/vídeo/áudio) fica undefined — é base64 pesado
+        // que só carrega sob demanda via GET /items/:id/full.
+        muralContent: item.muralContentType === 'text' ? item.muralContent : undefined,
         muralThumbnail: item.muralThumbnail,
         viewedBy: item.viewedBy,
         updatedAt: item.updatedAt,

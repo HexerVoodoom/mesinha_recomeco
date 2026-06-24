@@ -27,7 +27,7 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
   const contentType = (fullItem?.muralContentType || item.muralContentType) || 'text';
   const content = (fullItem?.muralContent || item.muralContent) || '';
 
-  // Load full content only when user clicks to view
+  // Load full content only when user clicks to view (for media)
   const loadFullContentIfNeeded = async () => {
     if (!fullItem && !item.muralContent && !loadingContent) {
       setLoadingContent(true);
@@ -41,6 +41,17 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
       }
     }
   };
+
+  // Posts de texto: carrega o conteúdo automaticamente no mount quando a
+  // listagem não o trouxe (GET /items antigo não incluía muralContent para
+  // nenhum tipo; servidor foi corrigido mas posts carregados antes do deploy
+  // ou em cache podem chegar sem conteúdo).
+  useEffect(() => {
+    if (contentType === 'text' && !item.muralContent && !fullItem) {
+      loadFullContentIfNeeded();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id, contentType, item.muralContent]);
 
   // Verifica se é novo para o usuário atual
   const isNew = item.createdBy !== currentUser && !item.viewedBy?.includes(currentUser);
