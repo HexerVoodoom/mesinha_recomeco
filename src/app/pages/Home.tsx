@@ -584,8 +584,7 @@ export default function Home() {
       setItems(prev => {
         const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
         try {
-          const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
-          localStorage.setItem('offlineItems', JSON.stringify(forStorage));
+          localStorage.setItem('offlineItems', JSON.stringify(updated.map(toLightItem)));
         } catch { localStorage.removeItem('offlineItems'); }
         return updated;
       });
@@ -627,8 +626,7 @@ export default function Home() {
       setItems(prev => {
         const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
         try {
-          const forStorage = updated.map(i => ({ ...i, muralContent: undefined, photo: i.photo === 'HAS_PHOTO' ? null : i.photo }));
-          localStorage.setItem('offlineItems', JSON.stringify(forStorage));
+          localStorage.setItem('offlineItems', JSON.stringify(updated.map(toLightItem)));
         } catch { localStorage.removeItem('offlineItems'); }
         return updated;
       });
@@ -649,33 +647,47 @@ export default function Home() {
   };
 
   const handleUpdateItem = async (id: string, updates: Partial<ListItem>) => {
-    const item = items.find(i => i.id === id);
-    const updatedItems = items.map(item => 
-      item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
-    );
-    
+    // Snapshot do item para toast e feedback offline — não use `items` diretamente
+    // dentro do try/catch assíncrono: o closure seria obsoleto se loadItems ou
+    // refreshCategoryItems atualizassem o estado enquanto aguardamos a API.
+    const itemSnapshot = items.find(i => i.id === id);
+
     try {
       const updatedItem = await syncApi.updateItem(id, updates);
-      const finalItems = items.map(item => item.id === id ? updatedItem : item);
-      setItems(finalItems);
-      localStorage.setItem('offlineItems', JSON.stringify(finalItems));
+      // Usa atualização funcional para sempre operar sobre o estado mais recente,
+      // evitando sobrescrever muralContent que loadItems ou refreshCategoryItems
+      // possam ter buscado enquanto aguardávamos o retorno da API de update.
+      setItems(prev => {
+        const finalItems = prev.map(i => i.id === id ? toLightItem(updatedItem) : i);
+        try {
+          localStorage.setItem('offlineItems', JSON.stringify(finalItems.map(toLightItem)));
+        } catch { localStorage.removeItem('offlineItems'); }
+        return finalItems;
+      });
     } catch (error) {
       console.error('Failed to update item:', error);
-      // Fallback to offline mode
-      setItems(updatedItems);
-      localStorage.setItem('offlineItems', JSON.stringify(updatedItems));
-      
+      // Fallback offline: aplica as mudanças sobre o estado atual (não closure obsoleto)
+      setItems(prev => {
+        const fallback = prev.map(i =>
+          i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString() } : i
+        );
+        try {
+          localStorage.setItem('offlineItems', JSON.stringify(fallback.map(toLightItem)));
+        } catch { localStorage.removeItem('offlineItems'); }
+        return fallback;
+      });
+
       // Feedback específico para lembretes ou genérico
-      if (item?.category === 'alarm' && 'reminderActive' in updates) {
+      if (itemSnapshot?.category === 'alarm' && 'reminderActive' in updates) {
         toast.info(updates.reminderActive ? 'Lembrete ativado localmente (modo offline)' : 'Lembrete desativado localmente (modo offline)');
       } else {
         toast.info('Item atualizado localmente (modo offline)');
       }
       return;
     }
-    
+
     // Feedback específico para lembretes ou genérico
-    if (item?.category === 'alarm' && 'reminderActive' in updates) {
+    if (itemSnapshot?.category === 'alarm' && 'reminderActive' in updates) {
       toast.success(updates.reminderActive ? 'Lembrete ativado!' : 'Lembrete desativado!');
     } else {
       toast.success('Item atualizado!');
@@ -683,21 +695,22 @@ export default function Home() {
   };
 
   const handleDeleteItem = async (id: string) => {
-    const filteredItems = items.filter(item => item.id !== id);
     untrackPendingItem(id); // não re-injetar um item que foi excluído
 
     try {
       await syncApi.deleteItem(id);
-      setItems(filteredItems);
-      localStorage.setItem('offlineItems', JSON.stringify(filteredItems));
     } catch (error) {
       console.error('Failed to delete item:', error);
-      // Fallback to offline mode
-      setItems(filteredItems);
-      localStorage.setItem('offlineItems', JSON.stringify(filteredItems));
       toast.info('Item removido localmente (modo offline)');
     }
-    
+
+    setItems(prev => {
+      const filtered = prev.filter(i => i.id !== id);
+      try {
+        localStorage.setItem('offlineItems', JSON.stringify(filtered.map(toLightItem)));
+      } catch { localStorage.removeItem('offlineItems'); }
+      return filtered;
+    });
     setExpandedItemId(null);
     toast.success('Item removido!');
   };
