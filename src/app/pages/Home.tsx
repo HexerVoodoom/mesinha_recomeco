@@ -224,7 +224,11 @@ export default function Home() {
       setItems(prev => {
         const others = prev.filter(i => i.category !== category);
         const fresh = confirmAndMergePending(result.items);
-        return [...others, ...fresh];
+        const merged = [...others, ...fresh];
+        try {
+          localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
+        } catch { localStorage.removeItem('offlineItems'); }
+        return merged;
       });
     } catch (e) {
       console.warn('[refreshCategoryItems] failed:', e);
@@ -400,30 +404,32 @@ export default function Home() {
         if (offset > 0) {
           // "Carregar mais": páginas mais antigas. Apenas injeta pendentes
           // (não confirma com base em dados locais).
-          setItems(prev => injectPending([...prev, ...fetchedItems]));
+          setItems(prev => {
+            const merged = injectPending([...prev, ...fetchedItems]);
+            try {
+              localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
+            } catch { localStorage.removeItem('offlineItems'); }
+            return merged;
+          });
         } else {
-          // Refresh completo: fetchedItems é a resposta real do servidor
-          // (100 mais recentes). Confirma e mescla os pendentes.
-          setItems(confirmAndMergePending(fetchedItems));
+          // Refresh completo: fetchedItems é a resposta real do servidor (100 mais
+          // recentes). Preserva itens do mural que já estavam em `prev` mas ficaram
+          // fora dos 100 gerais (o refreshCategoryItems busca até 200 especificamente).
+          setItems(prev => {
+            const serverIds = new Set(fetchedItems.map(i => i.id));
+            const extraMuralItems = prev.filter(i => i.category === 'mural' && !serverIds.has(i.id));
+            const merged = confirmAndMergePending([...fetchedItems, ...extraMuralItems]);
+            try {
+              localStorage.setItem('offlineItems', JSON.stringify(merged.map(toLightItem)));
+            } catch { localStorage.removeItem('offlineItems'); }
+            return merged;
+          });
         }
 
         // Show toast only if this is a silent update and there are changes
         if (silent && hasUpdates && items.length > 0) {
           const partnerName = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
           toast.info(`${partnerName} atualizou a lista! 💕`, { duration: 2000 });
-        }
-
-        // Save to localStorage for offline mode (without photos to save space)
-        try {
-          const itemsForStorage = fetchedItems.map(item => ({
-            ...item,
-            photo: item.photo === 'HAS_PHOTO' ? null : item.photo
-          }));
-          localStorage.setItem('offlineItems', JSON.stringify(itemsForStorage));
-        } catch (storageError) {
-          console.warn('Failed to save to localStorage (quota exceeded?):', storageError);
-          // Clear old data and try again
-          localStorage.removeItem('offlineItems');
         }
         setError(null); // Clear any previous errors
       }
