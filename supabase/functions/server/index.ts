@@ -569,10 +569,11 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
 
-  // Buscar todos os itens de lembrete ativos
+  // Buscar itens de lembrete ativos. limit baixo (50) porque alarmes são poucos
+  // e o cron roda a cada minuto — queries grandes aqui desperdiçam Disk IO.
   const { items: allItems } = await kv.getByPrefixPaged("item:", {
     offset: 0,
-    limit: 1000,
+    limit: 50,
     orderByJsonField: "createdAt",
     ascending: false,
     categoryFilter: "alarm",
