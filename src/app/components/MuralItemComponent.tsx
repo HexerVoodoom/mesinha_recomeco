@@ -184,23 +184,45 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
       
       case 'video':
         return (
-          <div 
+          <div
             className="w-full aspect-video bg-[#F8F6F3] rounded-sm overflow-hidden relative cursor-pointer group"
             onClick={handleOpenContent}
           >
-            <video 
-              src={content}
-              className="w-full h-full object-cover"
-            >
-              Seu navegador não suporta vídeo.
-            </video>
-            {/* Play overlay */}
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#4D989B] ml-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                </svg>
-              </div>
+            {content ? (
+              // Quem subiu o vídeo tem o conteúdo completo em memória — mostra o vídeo.
+              <video
+                src={content}
+                className="w-full h-full object-cover"
+              >
+                Seu navegador não suporta vídeo.
+              </video>
+            ) : item.muralThumbnail ? (
+              // Destinatário: usa o poster leve (primeiro frame) que vem na listagem,
+              // sem precisar baixar o vídeo inteiro.
+              <img
+                src={item.muralThumbnail}
+                alt={item.title || 'Vídeo do mural'}
+                className="w-full h-full object-cover"
+              />
+            ) : null}
+
+            {/* Play overlay (ou estado de carregamento ao tocar para abrir) */}
+            <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center gap-2 group-hover:bg-black/40 transition-colors">
+              {loadingContent ? (
+                <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-[#4D989B] ml-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  </div>
+                  {/* Sem conteúdo nem poster (vídeos antigos sem thumbnail): deixa claro que dá pra tocar */}
+                  {!content && !item.muralThumbnail && (
+                    <span className="text-xs font-medium text-white/90">Toque para assistir</span>
+                  )}
+                </>
+              )}
             </div>
           </div>
         );

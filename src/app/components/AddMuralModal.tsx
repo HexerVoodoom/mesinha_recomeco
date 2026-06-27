@@ -73,6 +73,59 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     });
   };
 
+  // Captura o primeiro frame de um vídeo como miniatura JPEG leve (poster),
+  // para que o preview do mural apareça sem precisar baixar o vídeo inteiro.
+  const generateVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const url = URL.createObjectURL(file);
+
+      const cleanup = () => URL.revokeObjectURL(url);
+
+      const capture = () => {
+        try {
+          const maxSize = 600;
+          let width = video.videoWidth;
+          let height = video.videoHeight;
+          if (!width || !height) {
+            cleanup();
+            return reject(new Error('Vídeo sem dimensões'));
+          }
+          if (width > height && width > maxSize) {
+            height = (height / width) * maxSize;
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = (width / height) * maxSize;
+            height = maxSize;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')?.drawImage(video, 0, 0, width, height);
+          const thumb = canvas.toDataURL('image/jpeg', 0.7);
+          cleanup();
+          resolve(thumb);
+        } catch (err) {
+          cleanup();
+          reject(err);
+        }
+      };
+
+      video.onloadeddata = () => {
+        // Avança um instante para evitar capturar um frame preto inicial
+        const seekTo = Math.min(0.1, (video.duration || 1) / 2);
+        const onSeeked = () => { video.removeEventListener('seeked', onSeeked); capture(); };
+        video.addEventListener('seeked', onSeeked);
+        try { video.currentTime = seekTo; } catch { capture(); }
+      };
+      video.onerror = () => { cleanup(); reject(new Error('Falha ao ler vídeo')); };
+      video.src = url;
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -102,8 +155,16 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
       }
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         setMediaFile(e.target?.result as string);
+        // Gera o poster (primeiro frame) para o preview do mural. Se falhar,
+        // o post ainda é publicado — o card cai no placeholder "Toque para assistir".
+        try {
+          const thumb = await generateVideoThumbnail(file);
+          setMediaThumbnail(thumb);
+        } catch (err) {
+          console.warn('[AddMuralModal] não foi possível gerar thumbnail do vídeo:', err);
+        }
         toast.success('Vídeo adicionado!');
       };
       reader.readAsDataURL(file);
@@ -192,7 +253,7 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     const content = contentType === 'text' ? textContent : mediaFile;
     setIsSubmitting(true);
     try {
-      await onAdd(title.trim(), contentType, content, caption, contentType === 'image' ? mediaThumbnail : undefined);
+      await onAdd(title.trim(), contentType, content, caption, (contentType === 'image' || contentType === 'video') ? mediaThumbnail : undefined);
       resetForm();
       onClose();
     } catch {
