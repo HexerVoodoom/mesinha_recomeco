@@ -16,12 +16,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         /**
-         * URL do PWA do Mesinha publicado.
-         *
-         * >>> AJUSTE AQUI <<< — troque pela URL de produção do app
-         * (ex.: a URL do deploy no Figma Make / hospedagem do frontend).
+         * URL do PWA do Mesinha publicado (Cloudflare Pages).
          */
-        const val MESINHA_URL = "https://mesinha.app"
+        const val MESINHA_URL = "https://mesinha-recomeco2.pages.dev/"
     }
 
     private lateinit var webView: WebView
