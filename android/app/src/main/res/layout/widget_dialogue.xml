@@ -1,45 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Layout do widget 2x4:
-    [ Corvinho ]   [ balão do Corvinho   ]   [ Alpaquinha ]
-                   [   balão da Alpaquinha ]
+  Layout do widget 2x4 — personagens o maior possível (altura cheia):
+    [ CORVINHO ]  [ balão do Corvinho    ]  [ ALPAQUINHA ]
+       grande     [   balão da Alpaquinha ]     grande
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:padding="10dp">
+    android:padding="6dp">
 
-    <!-- Etiqueta no topo -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|center_horizontal"
-        android:background="@drawable/widget_label_bg"
-        android:paddingHorizontal="10dp"
-        android:paddingVertical="2dp"
-        android:text="@string/widget_label"
-        android:textColor="#3A8A8D"
-        android:textSize="9sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.08"
-        android:fontFamily="sans-serif-medium" />
-
-    <!-- Linha principal: personagem | balões | personagem -->
+    <!-- Linha principal: personagem | balões | personagem (ocupa tudo) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_gravity="center_vertical"
-        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:baselineAligned="false">
 
-        <!-- Corvinho (esquerda) -->
+        <!-- Corvinho (esquerda) — altura cheia -->
         <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="6dp"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.35"
             android:adjustViewBounds="true"
             android:contentDescription="@string/corvinho"
             android:scaleType="fitCenter"
@@ -48,8 +32,9 @@
         <!-- Balões (centro) -->
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_weight="1.8"
+            android:gravity="center_vertical"
             android:orientation="vertical">
 
             <!-- Balão do Corvinho -->
@@ -87,15 +72,30 @@
                 android:ellipsize="end" />
         </LinearLayout>
 
-        <!-- Alpaquinha (direita) -->
+        <!-- Alpaquinha (direita) — altura cheia -->
         <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.35"
             android:adjustViewBounds="true"
             android:contentDescription="@string/alpaquinha"
             android:scaleType="fitCenter"
             android:src="@drawable/alpaquinha" />
     </LinearLayout>
+
+    <!-- Etiqueta sobreposta no topo (não rouba altura dos personagens) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:background="@drawable/widget_label_bg"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="2dp"
+        android:text="@string/widget_label"
+        android:textColor="#3A8A8D"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:fontFamily="sans-serif-medium" />
 
 </FrameLayout>
