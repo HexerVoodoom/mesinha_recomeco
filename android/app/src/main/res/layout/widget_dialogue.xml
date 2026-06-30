@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Layout do widget 2x4:
+    [ Corvinho ]   [ balão do Corvinho   ]   [ Alpaquinha ]
+                   [   balão da Alpaquinha ]
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:padding="10dp">
+
+    <!-- Etiqueta no topo -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:background="@drawable/widget_label_bg"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="2dp"
+        android:text="@string/widget_label"
+        android:textColor="#3A8A8D"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:fontFamily="sans-serif-medium" />
+
+    <!-- Linha principal: personagem | balões | personagem -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center_vertical"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Corvinho (esquerda) -->
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="6dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/corvinho"
+            android:scaleType="fitCenter"
+            android:src="@drawable/corvinho" />
+
+        <!-- Balões (centro) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Balão do Corvinho -->
+            <TextView
+                android:id="@+id/tv_corvinho"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bubble_corvinho"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="3"
+                android:ellipsize="end" />
+
+            <!-- Balão da Alpaquinha -->
+            <TextView
+                android:id="@+id/tv_alpaquinha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:background="@drawable/bubble_alpaquinha"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textAlignment="textEnd"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="3"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Alpaquinha (direita) -->
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="6dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/alpaquinha"
+            android:scaleType="fitCenter"
+            android:src="@drawable/alpaquinha" />
+    </LinearLayout>
+
+</FrameLayout>

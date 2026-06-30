@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- A WebView do app precisa de internet para carregar o PWA do Mesinha. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reagendar a troca diária de frase após o boot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Mesinha"
+        android:usesCleartextTraffic="false">
+
+        <!-- Tela principal: abre o PWA do Mesinha numa WebView. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Widget de tela inicial: Corvinho + Alpaquinha conversando. -->
+        <receiver
+            android:name=".MesinhaWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <!-- Disparo customizado da virada do dia (à meia-noite). -->
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_dialogue_info" />
+        </receiver>
+
+        <!-- Reagenda a troca diária quando o aparelho reinicia. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

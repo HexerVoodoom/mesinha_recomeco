@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mesinha</string>
+    <string name="widget_label">Conversa do dia</string>
+    <string name="corvinho">Corvinho</string>
+    <string name="alpaquinha">Alpaquinha</string>
+</resources>

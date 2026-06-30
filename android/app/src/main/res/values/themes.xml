@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema base do app (AppCompat, sem ActionBar — a UI é a WebView). -->
+    <style name="Theme.Mesinha" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/mesinha_teal_dark</item>
+        <item name="colorPrimaryDark">@color/mesinha_teal_dark</item>
+        <item name="colorAccent">@color/mesinha_teal</item>
+        <item name="android:windowBackground">@color/mesinha_cream</item>
+    </style>
+</resources>
