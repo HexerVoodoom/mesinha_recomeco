@@ -4,12 +4,14 @@ App Android nativo do Mesinha. Ele faz duas coisas:
 
 1. **App** (`MainActivity`): abre o PWA do Mesinha dentro de uma WebView, então
    no celular você tem o ícone do Mesinha junto dos outros apps.
-2. **Widget de tela inicial** (`MesinhaWidgetProvider`): um widget **2×4** com o
-   **Corvinho** à esquerda, a **Alpaquinha** à direita e dois balões de fala no
-   centro. As frases **mudam 1× por dia**, sorteadas de um pool de **32 pares**
-   (ver `Dialogues.kt`). É a versão nativa do widget que existe dentro do app web
-   (`src/app/components/CharacterDialogueWidget.tsx`) — usam a mesma fórmula de
-   índice diário, então mostram a **mesma frase no mesmo dia**.
+2. **Widgets de tela inicial** — três opções no menu de widgets, todas **2×4** e
+   com a frase mudando **1× por dia** (ver `Dialogues.kt`):
+   - **Mesinha · Conversa** (`MesinhaWidgetProvider`): Corvinho à esquerda,
+     Alpaquinha à direita e dois balões de fala (32 pares de frases).
+   - **Mesinha · Recado da Amanda** (`AlpaquinhaWidgetProvider`): só a Alpaquinha,
+     com recadinhos da Amanda para o Mateus (30 frases).
+   - **Mesinha · Recado do Mateus** (`CorvinhoWidgetProvider`): só o Corvinho,
+     com recadinhos do Mateus para a Amanda (30 frases).
 
 ## Pré-requisitos
 

@@ -26,10 +26,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Widget de tela inicial: Corvinho + Alpaquinha conversando. -->
+        <!-- Widget 1: Corvinho + Alpaquinha conversando. -->
         <receiver
             android:name=".MesinhaWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_name_dupla">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <!-- Disparo customizado da virada do dia (à meia-noite). -->
@@ -38,6 +39,34 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_dialogue_info" />
+        </receiver>
+
+        <!-- Widget 2: só a Alpaquinha (recado da Amanda para o Mateus). -->
+        <receiver
+            android:name=".AlpaquinhaWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_amanda">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_alpaquinha_info" />
+        </receiver>
+
+        <!-- Widget 3: só o Corvinho (recado do Mateus para a Amanda). -->
+        <receiver
+            android:name=".CorvinhoWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_mateus">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_corvinho_info" />
         </receiver>
 
         <!-- Reagenda a troca diária quando o aparelho reinicia. -->

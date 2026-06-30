@@ -8,21 +8,21 @@ import android.os.Build
 import java.util.Calendar
 
 /**
- * Agenda um disparo diário à meia-noite para trocar a frase do widget.
+ * Agenda um disparo diário à meia-noite para trocar a frase dos widgets.
  *
  * Usa um alarme inexato e repetitivo (INTERVAL_DAY) — suficiente, já que a frase
- * só muda 1x por dia e não precisa ser no segundo exato. É leve para a bateria.
+ * só muda 1x por dia. Cada tipo de widget agenda o seu próprio alarme (com um
+ * requestCode distinto) apontando para o seu próprio provider.
  */
 object WidgetScheduler {
 
     const val ACTION_DAILY_UPDATE = "com.mesinha.app.ACTION_DAILY_UPDATE"
-    private const val REQUEST_CODE = 4321
 
-    fun scheduleDailyUpdate(context: Context) {
+    fun scheduleDailyUpdate(context: Context, provider: Class<*>, requestCode: Int) {
         val alarmManager =
             context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        val intent = Intent(context, MesinhaWidgetProvider::class.java).apply {
+        val intent = Intent(context, provider).apply {
             action = ACTION_DAILY_UPDATE
         }
 
@@ -31,7 +31,7 @@ object WidgetScheduler {
             flags = flags or PendingIntent.FLAG_IMMUTABLE
         }
         val pendingIntent =
-            PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags)
+            PendingIntent.getBroadcast(context, requestCode, intent, flags)
 
         // Próxima meia-noite (00:00:01 do dia seguinte).
         val nextMidnight = Calendar.getInstance().apply {
