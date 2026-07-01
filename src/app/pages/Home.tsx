@@ -37,7 +37,6 @@ import { MuralItemComponent } from '../components/MuralItemComponent';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
-import { CharacterDialogueWidget } from '../components/CharacterDialogueWidget';
 import { toast } from 'sonner';
 import fabButton from "figma:asset/dd4b98f23138814cb5d5f735480190b4a56f65a0.png";
 import grainTexture from "figma:asset/870f87368b0cc75469636c24542ec183a844dabf.png";
@@ -907,9 +906,6 @@ export default function Home() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Character Dialogue Widget */}
-        <CharacterDialogueWidget />
-
         {/* Category Card */}
         <div className="bg-[#F8F6F4] rounded-[32px] border-2 border-[#E9E4DF] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[21px] mb-6 relative mx-6">
           {/* Label Badge */}
