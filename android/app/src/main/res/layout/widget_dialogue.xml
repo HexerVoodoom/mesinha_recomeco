@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget duplo 2x4 (compacto p/ caber também no 1x4 sem cortar a fala de baixo):
+    [     CONVERSA DO DIA     ]
+    [ CORVINHO ] [ balões ] [ ALPAQUINHA ]
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <!-- Etiqueta compacta no topo (faixa própria, não sobrepõe) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/widget_label_bg"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="1dp"
+        android:text="@string/widget_label"
+        android:textColor="#3A8A8D"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.06"
+        android:fontFamily="sans-serif-medium" />
+
+    <!-- Linha principal: personagem | balões | personagem (ocupa o resto) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <!-- Corvinho (esquerda) — preenche a altura disponível -->
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.4"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/corvinho"
+            android:scaleType="fitCenter"
+            android:src="@drawable/corvinho" />
+
+        <!-- Balões (centro) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.7"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_corvinho"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="3dp"
+                android:background="@drawable/bubble_corvinho"
+                android:paddingHorizontal="9dp"
+                android:paddingVertical="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tv_alpaquinha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:background="@drawable/bubble_alpaquinha"
+                android:paddingHorizontal="9dp"
+                android:paddingVertical="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textAlignment="textEnd"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Alpaquinha (direita) — preenche a altura disponível -->
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.4"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/alpaquinha"
+            android:scaleType="fitCenter"
+            android:src="@drawable/alpaquinha" />
+    </LinearLayout>
+
+</LinearLayout>

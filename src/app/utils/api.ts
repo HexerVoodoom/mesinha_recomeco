@@ -389,4 +389,24 @@ export const api = {
     const data = await fetchAPI('/backup/stats');
     return data;
   },
+
+  // Falas dos widgets (Corvinho/Alpaquinha). Editáveis pelo app, lidas pelo widget nativo.
+  getWidgetPhrases: async (): Promise<{ dupla: any[]; amanda: string[]; mateus: string[] }> => {
+    return await fetchAPI('/widget-phrases');
+  },
+
+  updateWidgetPhrases: async (
+    list: 'amanda' | 'mateus',
+    phrases: string[],
+    profile: 'Amanda' | 'Mateus'
+  ): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI(`/widget-phrases/${list}`, {
+      method: 'PUT',
+      body: JSON.stringify({ phrases, profile }),
+    });
+  },
 };
+
+// Limite de caracteres por fala (deve casar com o servidor).
+export const WIDGET_PHRASE_MAX_LEN = 60;
+export const WIDGET_PHRASE_MAX_COUNT = 60;

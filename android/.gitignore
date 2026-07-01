@@ -1,0 +1,14 @@
+# Artefatos de build do Gradle/Android
+.gradle/
+build/
+app/build/
+
+# Configuração local da máquina (caminho do Android SDK) — NÃO versionar
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+.kotlin/
+.cxx/

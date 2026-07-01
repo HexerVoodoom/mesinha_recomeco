@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Versão COMPACTA do widget duplo, usada quando o widget está baixo (~1 célula).
+  Os dois balões ficam lado a lado (1 linha cada) para não cortar:
+    [ CORV ] [ balão corvinho ] [ balão alpaquinha ] [ ALPA ]
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:padding="3dp">
+
+    <!-- Corvinho (esquerda) -->
+    <ImageView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.9"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/corvinho"
+        android:scaleType="fitCenter"
+        android:src="@drawable/corvinho" />
+
+    <!-- Balão do Corvinho -->
+    <TextView
+        android:id="@+id/tv_corvinho"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2.1"
+        android:layout_marginHorizontal="2dp"
+        android:background="@drawable/bubble_corvinho"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Balão da Alpaquinha -->
+    <TextView
+        android:id="@+id/tv_alpaquinha"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2.1"
+        android:layout_marginHorizontal="2dp"
+        android:background="@drawable/bubble_alpaquinha"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:textAlignment="textEnd"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Alpaquinha (direita) -->
+    <ImageView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.9"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/alpaquinha"
+        android:scaleType="fitCenter"
+        android:src="@drawable/alpaquinha" />
+
+</LinearLayout>

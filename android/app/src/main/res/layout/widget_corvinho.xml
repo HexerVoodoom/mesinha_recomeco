@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget só do Corvinho (Mateus): recadinho do Mateus para a Amanda.
+  Compacto para caber também no 1x4.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/widget_label_bg"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="1dp"
+        android:text="@string/widget_label_mateus"
+        android:textColor="#3A8A8D"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.06"
+        android:fontFamily="sans-serif-medium" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <!-- Corvinho (esquerda) — preenche a altura -->
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.3"
+            android:layout_marginEnd="6dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/corvinho"
+            android:scaleType="fitCenter"
+            android:src="@drawable/corvinho" />
+
+        <!-- Balão (recado do Mateus) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2.2"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:background="@drawable/bubble_corvinho"
+                android:paddingHorizontal="9dp"
+                android:paddingVertical="5dp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textAlignment="textEnd"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="3"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

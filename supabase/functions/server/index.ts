@@ -407,6 +407,168 @@ app.put("/make-server-19717bce/settings", async (c) => {
   }
 });
 
+// ===== Falas dos widgets (editáveis pelo app, lidas pelo widget nativo) =====
+const WIDGET_PHRASES_KEY = "widget-phrases";
+const MAX_PHRASE_LEN = 60;
+const MAX_PHRASES = 60;
+
+const DEFAULT_WIDGET_PHRASES: { dupla: any[]; amanda: string[]; mateus: string[] } = {
+  dupla: [
+    { corvinho: "Viram algum post novo no Mural hoje?", alpaquinha: "Vi sim! Que memória mais fofa..." },
+    { corvinho: "Qual é o plano de hoje?", alpaquinha: "Jantar naquele lugar que a gente salvou!" },
+    { corvinho: "Tem filme novo na lista pra maratonar?", alpaquinha: "Tem! Coloca na fila e aguarda!" },
+    { corvinho: "Não esquece o lembrete das 21h!", alpaquinha: "Já ativei! Obrigada, corvinho." },
+    { corvinho: "Que data especial está chegando?", alpaquinha: "Olha lá nas Datas e se prepara!" },
+    { corvinho: "Bobeira do dia: qual foi a melhor?", alpaquinha: "Aquela do elevador ainda me faz rir!" },
+    { corvinho: "Top 3 filmes de romance, vai lá!", alpaquinha: "La La Land, já garantido no primeiro!" },
+    { corvinho: "Tem lugar novo pra visitar na lista?", alpaquinha: "Uma cachoeira novinha apareceu!" },
+    { corvinho: "Comida nova pra explorar esse mês?", alpaquinha: "Aquela pizza na lista me chama demais!" },
+    { corvinho: "Alguém curtiu o post do mural hoje?", alpaquinha: "Só corações e amor por aqui!" },
+    { corvinho: "Já planejaram o fim de semana?", alpaquinha: "Praia, piquenique ou sofá? Difícil!" },
+    { corvinho: "Série nova na lista pra ver juntos?", alpaquinha: "Adiciona lá e a gente decide!" },
+    { corvinho: "Lembrete: dizer 'te amo' hoje!", alpaquinha: "Isso não precisa de lembrete!" },
+    { corvinho: "Viram algum vídeo curtinho hoje?", alpaquinha: "Mandei um nos Vídeos Curtos!" },
+    { corvinho: "Top 3 de sabores de sorvete, rápido!", alpaquinha: "Chocolate, morango e creme! Fácil." },
+    { corvinho: "Tem jogo novo pra jogar junto?", alpaquinha: "It Takes Two ainda está esperando!" },
+    { corvinho: "Mural cheio de memórias boas?", alpaquinha: "Cada post é uma históriazinha!" },
+    { corvinho: "Aquele restaurante novo está na lista?", alpaquinha: "Já adicionei em Comidas!" },
+    { corvinho: "O aniversário de vocês está marcado?", alpaquinha: "Claro! Com lembrete e tudo!" },
+    { corvinho: "Qual o plano pra próxima viagem?", alpaquinha: "Tem bastante coisa em Lugares!" },
+    { corvinho: "Tem vídeo novo pra rir juntos?", alpaquinha: "Adicionei três hoje! Vai rir muito." },
+    { corvinho: "Já escreveram alguma bobeira hoje?", alpaquinha: "Ainda não, mas tem história pra contar!" },
+    { corvinho: "Lembrou de marcar a data importante?", alpaquinha: "Sim! Com notificação e tudo!" },
+    { corvinho: "Alguém ganhou o Top 3 de hoje?", alpaquinha: "Empate! Os dois têm bom gosto." },
+    { corvinho: "Que lugar faz tempo que querem ir?", alpaquinha: "Machu Picchu está na lista há séculos!" },
+    { corvinho: "Stardew Valley ou Unravel Two hoje?", alpaquinha: "Precisa de uma votação rápida!" },
+    { corvinho: "Quantos itens pendentes na lista?", alpaquinha: "Bastante! Mas faz parte do charme!" },
+    { corvinho: "Já mandaram um post fofo no Mural?", alpaquinha: "Ainda não! Vai lá e surpreende!" },
+    { corvinho: "Culinária nova na lista de comidas?", alpaquinha: "Japonesa está esperando uma chance!" },
+    { corvinho: "Próximo jogo de tabuleiro: qual?", alpaquinha: "Tem ideia salva em Jogos! Olha lá." },
+    { corvinho: "O mural está com saudade de vocês!", alpaquinha: "Bora adicionar uma memória nova!" },
+    { corvinho: "Já conferiram os lembretes de hoje?", alpaquinha: "Sim! Tudo certo e no horário." }
+  ],
+  amanda: [
+    "Bom dia, meu amor! Já pensei em você hoje 💕",
+    "Mateus, não esquece que te amo, viu?",
+    "Add aquele filme na lista que quero ver com você!",
+    "Saudade de você... vem logo pra Mesinha!",
+    "Você é meu lugar favorito, sabia?",
+    "Topa um date hoje? Eu escolho o lugar!",
+    "Lembra de beber água, meu cuidadoso preferido!",
+    "Te amo mais que ontem e menos que amanhã.",
+    "Guardei uma bobeira nossa pra te contar!",
+    "Você faz meus dias bem melhores, Mateus.",
+    "Qual nosso próximo lugar pra visitar juntos?",
+    "Coloquei a gente no Top 3 de hoje 😄",
+    "Obrigada por ser tão você comigo.",
+    "Vamos maratonar algo hoje à noite?",
+    "Pensa numa pessoa apaixonada... sou eu por você.",
+    "Te mandei um beijo pelo mural, achou?",
+    "Você é o melhor parceiro de mesinha do mundo.",
+    "Bora marcar mais uma memória nossa hoje?",
+    "Meu coração tem seu nome, Mateus 💌",
+    "Comida nova ou nosso clássico? Você decide!",
+    "Conta comigo sempre, viu, amor?",
+    "Cada dia com você é meu favorito.",
+    "Já tô pensando no nosso próximo abraço.",
+    "Você merece o mundo, e eu vou te dar.",
+    "Vem fazer nada comigo, que é tudo com você.",
+    "Anota aí: encontro marcado, eu e você.",
+    "Te escolho de novo, todo santo dia.",
+    "Seu sorriso é meu app favorito 😊",
+    "Faz um carinho virtual em mim? Te amo!",
+    "Tamo juntos nessa mesinha, pra sempre."
+  ],
+  mateus: [
+    "Bom dia, Amanda! Você é minha alegria 💙",
+    "Amanda, tô aqui torcendo por você sempre.",
+    "Separei um lugar lindo pra gente visitar!",
+    "Você deixa tudo mais leve, sabia?",
+    "Te amo do jeitinho que você é.",
+    "Bora um date? Hoje eu cuido de tudo.",
+    "Lembra que você é incrível, viu?",
+    "Mal posso esperar pra te ver de novo.",
+    "Add um jogo pra gente jogar juntos!",
+    "Você é meu sorriso favorito, Amanda.",
+    "Guardei uma memória nossa no mural 💌",
+    "Conta comigo pra qualquer bobeira.",
+    "Meu dia melhora quando penso em você.",
+    "Qual filme a gente vê hoje, princesa?",
+    "Você é o meu lugar de paz.",
+    "Te escolhi e escolho todo dia.",
+    "Saudade já... volta logo pra Mesinha!",
+    "Obrigado por existir do meu lado.",
+    "Você é o melhor que me aconteceu.",
+    "Coloquei a gente no Top 3 de sempre.",
+    "Vem cá receber um abraço apertado.",
+    "Seu nome é meu lembrete favorito 💙",
+    "Topa criar mais uma memória hoje?",
+    "Você merece todo o carinho do mundo.",
+    "Tô planejando uma surpresa... aguarda!",
+    "Com você até o nada vira aventura.",
+    "Te amo mais a cada mesinha nossa.",
+    "Você é forte, linda e minha inspiração.",
+    "Manda um oi que meu dia já ganha cor.",
+    "Pra sempre eu e você, combinado?"
+  ],
+};
+
+function mergedWidgetPhrases(stored: any) {
+  return {
+    dupla: Array.isArray(stored?.dupla) && stored.dupla.length ? stored.dupla : DEFAULT_WIDGET_PHRASES.dupla,
+    amanda: Array.isArray(stored?.amanda) && stored.amanda.length ? stored.amanda : DEFAULT_WIDGET_PHRASES.amanda,
+    mateus: Array.isArray(stored?.mateus) && stored.mateus.length ? stored.mateus : DEFAULT_WIDGET_PHRASES.mateus,
+  };
+}
+
+// Lida pelo widget nativo (sem edição). Sempre retorna listas completas.
+app.get("/make-server-19717bce/widget-phrases", async (c) => {
+  try {
+    const stored = await kv.get(WIDGET_PHRASES_KEY);
+    return c.json(mergedWidgetPhrases(stored));
+  } catch (error) {
+    console.log("Error fetching widget phrases:", error);
+    return c.json(DEFAULT_WIDGET_PHRASES);
+  }
+});
+
+// Atualiza a lista de um personagem. Mateus edita "mateus" (Corvinho); Amanda edita "amanda" (Alpaquinha).
+app.put("/make-server-19717bce/widget-phrases/:list", async (c) => {
+  try {
+    const list = c.req.param("list");
+    if (list !== "amanda" && list !== "mateus") {
+      return c.json({ error: "Lista invalida" }, 400);
+    }
+    const body = await c.req.json();
+    const profile = body?.profile;
+    const allowed =
+      (list === "amanda" && profile === "Amanda") ||
+      (list === "mateus" && profile === "Mateus");
+    if (!allowed) {
+      return c.json({ error: "Sem permissao para editar esta lista" }, 403);
+    }
+    if (!Array.isArray(body?.phrases)) {
+      return c.json({ error: "phrases deve ser uma lista" }, 400);
+    }
+    const phrases = body.phrases
+      .map((p: any) => String(p ?? "").trim())
+      .filter((p: string) => p.length > 0)
+      .slice(0, MAX_PHRASES)
+      .map((p: string) => p.substring(0, MAX_PHRASE_LEN));
+    if (phrases.length === 0) {
+      return c.json({ error: "Adicione pelo menos uma frase" }, 400);
+    }
+    const stored = (await kv.get(WIDGET_PHRASES_KEY)) || {};
+    const merged: any = mergedWidgetPhrases(stored);
+    merged[list] = phrases;
+    await kv.set(WIDGET_PHRASES_KEY, merged);
+    return c.json({ success: true, list, count: phrases.length });
+  } catch (error) {
+    console.log("Error updating widget phrases:", error);
+    return c.json({ error: "Falha ao salvar frases", details: String(error) }, 500);
+  }
+});
+
 // Backup stats - Just return statistics without data
 app.get("/make-server-19717bce/backup/stats", async (c) => {
   try {
