@@ -18,7 +18,12 @@ import java.net.URL
  */
 object PhraseRepository {
 
-    private const val URL_JSON = "https://mesinha-recomeco2.pages.dev/widget-phrases.json"
+    // Endpoint do Supabase que devolve { dupla, amanda, mateus }. É a mesma
+    // fonte editada pelo app em Configurações. O anon key é público (já vai no PWA).
+    private const val URL_JSON =
+        "https://oubdmmaqxnutbbxiqeow.supabase.co/functions/v1/make-server-19717bce/widget-phrases"
+    private const val SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91YmRtbWFxeG51dGJieGlxZW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDE2OTMsImV4cCI6MjA4ODA3NzY5M30.jLMAGrD0jOaId3Tjy1IKDPc4rtDqm4hx-Bv6Mzo0dDw"
 
     private const val PREFS = "widget_phrases"
     private const val KEY_DUPLA = "dupla"
@@ -109,6 +114,8 @@ object PhraseRepository {
             connectTimeout = 8000
             readTimeout = 8000
             requestMethod = "GET"
+            setRequestProperty("apikey", SUPABASE_ANON_KEY)
+            setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
         }
         try {
             if (conn.responseCode != HttpURLConnection.HTTP_OK) {

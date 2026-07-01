@@ -6,9 +6,11 @@ import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { toast } from 'sonner';
 import { BackupSettings } from '../components/BackupSettings';
+import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const userProfile = (localStorage.getItem('userProfile') === 'Amanda' ? 'Amanda' : 'Mateus') as 'Amanda' | 'Mateus';
   const [settings, setSettings] = useState<SettingsType>({
     coupleName: 'Você & Partner',
     themeColor: '#81D8D0',
@@ -246,6 +248,9 @@ export default function Settings() {
               </label>
             </div>
           </div>
+
+          {/* Editor de falas do widget (cada um edita o seu personagem) */}
+          <WidgetPhrasesEditor profile={userProfile} />
 
         </div>
       )}
