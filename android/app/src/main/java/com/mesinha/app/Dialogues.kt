@@ -3,18 +3,19 @@ package com.mesinha.app
 import java.time.LocalDate
 
 /**
- * Par de falas exibido no widget duplo: uma fala do Corvinho e uma da Alpaquinha.
+ * Par de falas do widget duplo: uma fala do Corvinho e uma da Alpaquinha.
  */
 data class DialoguePair(val corvinho: String, val alpaquinha: String)
 
 /**
- * Pools de frases dos widgets — mantidos em sincronia com o widget web.
- * Todas usam a mesma fórmula de índice diário (muda 1x por dia).
+ * Frases PADRÃO (reserva) dos widgets, embutidas no app. São usadas quando
+ * ainda não há uma lista baixada do servidor (ver [PhraseRepository]) — por
+ * exemplo, no primeiro uso ou sem internet. A lista "ao vivo" fica em
+ * `public/widget-phrases.json` e pode ser editada sem reinstalar o app.
  */
 object Dialogues {
 
-    /** Widget duplo: Corvinho e Alpaquinha conversando. */
-    val POOL: List<DialoguePair> = listOf(
+    val DEFAULT_POOL: List<DialoguePair> = listOf(
         DialoguePair("Viram algum post novo no Mural hoje?", "Vi sim! Que memória mais fofa..."),
         DialoguePair("Qual é o plano de hoje?", "Jantar naquele lugar que a gente salvou!"),
         DialoguePair("Tem filme novo na lista pra maratonar?", "Tem! Coloca na fila e aguarda!"),
@@ -49,8 +50,7 @@ object Dialogues {
         DialoguePair("Já conferiram os lembretes de hoje?", "Sim! Tudo certo e no horário.")
     )
 
-    /** Widget só da Alpaquinha (Amanda) — recadinhos da Amanda para o Mateus. */
-    val AMANDA_TO_MATEUS: List<String> = listOf(
+    val DEFAULT_AMANDA: List<String> = listOf(
         "Bom dia, meu amor! Já pensei em você hoje 💕",
         "Mateus, não esquece que te amo, viu?",
         "Add aquele filme na lista que quero ver com você!",
@@ -83,8 +83,7 @@ object Dialogues {
         "Tamo juntos nessa mesinha, pra sempre."
     )
 
-    /** Widget só do Corvinho (Mateus) — recadinhos do Mateus para a Amanda. */
-    val MATEUS_TO_AMANDA: List<String> = listOf(
+    val DEFAULT_MATEUS: List<String> = listOf(
         "Bom dia, Amanda! Você é minha alegria 💙",
         "Amanda, tô aqui torcendo por você sempre.",
         "Separei um lugar lindo pra gente visitar!",
@@ -119,19 +118,12 @@ object Dialogues {
 
     /**
      * Índice determinístico que muda 1x por dia para um pool de tamanho [size].
-     * Replica a fórmula do widget web: `(diaDoAno + ano*365) % size`.
+     * Fórmula: `(diaDoAno + ano*365) % size`.
      */
-    private fun dailyIndex(date: LocalDate, size: Int): Int {
+    fun dailyIndex(size: Int): Int {
+        if (size <= 0) return 0
+        val date = LocalDate.now()
         val n = date.dayOfYear.toLong() + date.year.toLong() * 365L
         return Math.floorMod(n, size.toLong()).toInt()
     }
-
-    /** Par de falas do dia (widget duplo). */
-    fun today(): DialoguePair = POOL[dailyIndex(LocalDate.now(), POOL.size)]
-
-    /** Recadinho da Amanda do dia (widget da Alpaquinha). */
-    fun amandaToday(): String = AMANDA_TO_MATEUS[dailyIndex(LocalDate.now(), AMANDA_TO_MATEUS.size)]
-
-    /** Recadinho do Mateus do dia (widget do Corvinho). */
-    fun mateusToday(): String = MATEUS_TO_AMANDA[dailyIndex(LocalDate.now(), MATEUS_TO_AMANDA.size)]
 }

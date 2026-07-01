@@ -22,6 +22,7 @@ class AlpaquinhaWidgetProvider : AppWidgetProvider() {
             renderWidget(context, appWidgetManager, id)
         }
         WidgetScheduler.scheduleDailyUpdate(context, AlpaquinhaWidgetProvider::class.java, 4322)
+        PhraseRepository.maybeRefresh(context)
     }
 
     override fun onEnabled(context: Context) {
@@ -38,6 +39,7 @@ class AlpaquinhaWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            PhraseRepository.maybeRefresh(context)
         }
     }
 
@@ -47,7 +49,7 @@ class AlpaquinhaWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int
     ) {
         val views = RemoteViews(context.packageName, R.layout.widget_alpaquinha).apply {
-            setTextViewText(R.id.tv_message, Dialogues.amandaToday())
+            setTextViewText(R.id.tv_message, PhraseRepository.amandaToday(context))
             setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
         }
         appWidgetManager.updateAppWidget(appWidgetId, views)

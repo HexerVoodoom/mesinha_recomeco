@@ -22,6 +22,7 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
             renderWidget(context, appWidgetManager, id)
         }
         WidgetScheduler.scheduleDailyUpdate(context, MesinhaWidgetProvider::class.java, 4321)
+        PhraseRepository.maybeRefresh(context)
     }
 
     override fun onEnabled(context: Context) {
@@ -38,6 +39,7 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            PhraseRepository.maybeRefresh(context)
         }
     }
 
@@ -46,7 +48,7 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
-        val dialogue = Dialogues.today()
+        val dialogue = PhraseRepository.today(context)
         val views = RemoteViews(context.packageName, R.layout.widget_dialogue).apply {
             setTextViewText(R.id.tv_corvinho, dialogue.corvinho)
             setTextViewText(R.id.tv_alpaquinha, dialogue.alpaquinha)

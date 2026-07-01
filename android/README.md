@@ -77,11 +77,23 @@ android/
 └── gradlew / gradlew.bat / gradle/wrapper/
 ```
 
-## Editar as frases
+## Editar as frases (SEM reinstalar o app)
 
-Abra `app/src/main/java/com/mesinha/app/Dialogues.kt` e edite a lista `POOL`.
-Para manter o app web em sincronia, edite também o mesmo pool em
-`src/app/components/CharacterDialogueWidget.tsx`.
+As frases ficam num arquivo hospedado no site: **`public/widget-phrases.json`**
+(publicado em `https://mesinha-recomeco2.pages.dev/widget-phrases.json`).
+
+Para mudar/adicionar frases, edite esse arquivo (direto no GitHub ou no repo) e
+faça o deploy do site. O widget baixa a lista nova automaticamente (no máximo 1×
+a cada 3h, e sempre na virada do dia) e a guarda em cache. **Não precisa gerar
+nem instalar APK novo.**
+
+Estrutura do JSON:
+- `dupla`: lista de pares `{ "corvinho": "...", "alpaquinha": "..." }` (widget dos dois)
+- `amanda`: lista de textos (widget da Alpaquinha)
+- `mateus`: lista de textos (widget do Corvinho)
+
+As frases embutidas em `app/src/main/java/com/mesinha/app/Dialogues.kt` são apenas
+a **reserva** (usadas no primeiro uso ou sem internet).
 
 ## Versões
 

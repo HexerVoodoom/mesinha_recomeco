@@ -22,6 +22,7 @@ class CorvinhoWidgetProvider : AppWidgetProvider() {
             renderWidget(context, appWidgetManager, id)
         }
         WidgetScheduler.scheduleDailyUpdate(context, CorvinhoWidgetProvider::class.java, 4323)
+        PhraseRepository.maybeRefresh(context)
     }
 
     override fun onEnabled(context: Context) {
@@ -38,6 +39,7 @@ class CorvinhoWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            PhraseRepository.maybeRefresh(context)
         }
     }
 
@@ -47,7 +49,7 @@ class CorvinhoWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int
     ) {
         val views = RemoteViews(context.packageName, R.layout.widget_corvinho).apply {
-            setTextViewText(R.id.tv_message, Dialogues.mateusToday())
+            setTextViewText(R.id.tv_message, PhraseRepository.mateusToday(context))
             setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
         }
         appWidgetManager.updateAppWidget(appWidgetId, views)
