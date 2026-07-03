@@ -582,14 +582,14 @@ export function Top3ItemComponent({
                     </label>
                     <div className="relative">
                       <input
-                        id="photo-upload-top3"
+                        id={`photo-upload-top3-${item.id}`}
                         type="file"
                         accept="image/*"
                         onChange={handlePhotoUpload}
                         className="hidden"
                       />
                       <label
-                        htmlFor="photo-upload-top3"
+                        htmlFor={`photo-upload-top3-${item.id}`}
                         className="w-full px-4 py-3 rounded-xl border border-[#E8E4DF] bg-[#F8F6F3] hover:bg-[#F0EDE9] transition-colors cursor-pointer flex items-center justify-center gap-2 text-[#2B2A28]"
                       >
                         <ImageIcon className="w-5 h-5" />
