@@ -39,6 +39,8 @@ class CorvinhoWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            // Reagenda o próximo (o alarme é one-shot).
+            WidgetScheduler.scheduleDailyUpdate(context, CorvinhoWidgetProvider::class.java, 4323)
             PhraseRepository.maybeRefresh(context)
         }
     }

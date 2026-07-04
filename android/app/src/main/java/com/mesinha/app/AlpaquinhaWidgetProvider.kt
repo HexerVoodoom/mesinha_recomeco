@@ -39,6 +39,8 @@ class AlpaquinhaWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            // Reagenda o próximo (o alarme é one-shot).
+            WidgetScheduler.scheduleDailyUpdate(context, AlpaquinhaWidgetProvider::class.java, 4322)
             PhraseRepository.maybeRefresh(context)
         }
     }
