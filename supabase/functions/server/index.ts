@@ -3,23 +3,37 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import webpush from "npm:web-push";
 import * as kv from "./kv_store.tsx";
+import { sendFcmToUser } from "./fcm.tsx";
 
 const VAPID_PUBLIC_KEY = "BEeyyQPVJ900xV1F1Jo8Q2TNc2DK7jb9jyiqmQQX3QnUwzJYxy1j5BByQ0vJFDSbPTGacjS3oUtpOKCtxAF5WIY";
 const VAPID_PRIVATE_KEY = "V9PFLTWJWHdqXPGmuJZHfJds-L0nmme4kti5dD_nF5o";
 
 webpush.setVapidDetails("mailto:mateus.sprnd@gmail.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-async function sendPushToUser(user: string, payload: object): Promise<void> {
+async function sendPushToUser(user: string, payload: any): Promise<void> {
+  // 1) Web Push (Chrome / PWA instalado pelo navegador).
   const subscription = await kv.get(`push-subscription:${user}`);
-  if (!subscription) return;
-  try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload));
-    console.log(`[Push] Sent to ${user}`);
-  } catch (err: any) {
-    console.error(`[Push] Failed to send to ${user}:`, err?.statusCode, err?.message);
-    if (err?.statusCode === 410 || err?.statusCode === 404) {
-      await kv.del(`push-subscription:${user}`);
+  if (subscription) {
+    try {
+      await webpush.sendNotification(subscription, JSON.stringify(payload));
+      console.log(`[Push] Sent to ${user}`);
+    } catch (err: any) {
+      console.error(`[Push] Failed to send to ${user}:`, err?.statusCode, err?.message);
+      if (err?.statusCode === 410 || err?.statusCode === 404) {
+        await kv.del(`push-subscription:${user}`);
+      }
     }
+  }
+
+  // 2) FCM (app Android instalado). Ignorado se o secret não estiver configurado.
+  try {
+    await sendFcmToUser(
+      user,
+      String(payload?.title ?? "Mesinha"),
+      String(payload?.body ?? ""),
+    );
+  } catch (err) {
+    console.error(`[FCM] Failed to send to ${user}:`, err);
   }
 }
 
@@ -404,6 +418,26 @@ app.put("/make-server-19717bce/settings", async (c) => {
   } catch (error) {
     console.log("Error updating settings:", error);
     return c.json({ error: "Failed to update settings", details: String(error) }, 500);
+  }
+});
+
+// Registra o token FCM do aparelho sob um perfil (Amanda/Mateus).
+app.post("/make-server-19717bce/fcm-token", async (c) => {
+  try {
+    const body = await c.req.json();
+    const profile = body?.profile;
+    const token = body?.token;
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Perfil invalido" }, 400);
+    }
+    if (!token || typeof token !== "string") {
+      return c.json({ error: "Token invalido" }, 400);
+    }
+    await kv.set(`fcm-token:${profile}`, token);
+    return c.json({ success: true });
+  } catch (error) {
+    console.log("Error saving fcm token:", error);
+    return c.json({ error: "Falha ao registrar token", details: String(error) }, 500);
   }
 });
 
