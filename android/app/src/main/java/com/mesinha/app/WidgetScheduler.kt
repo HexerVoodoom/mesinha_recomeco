@@ -8,11 +8,15 @@ import android.os.Build
 import java.util.Calendar
 
 /**
- * Agenda um disparo diário à meia-noite para trocar a frase dos widgets.
+ * Agenda a troca diária de frase dos widgets (à meia-noite).
  *
- * Usa um alarme inexato e repetitivo (INTERVAL_DAY) — suficiente, já que a frase
- * só muda 1x por dia. Cada tipo de widget agenda o seu próprio alarme (com um
- * requestCode distinto) apontando para o seu próprio provider.
+ * Usa um alarme ONE-SHOT `setAndAllowWhileIdle` com `RTC_WAKEUP`, que dispara
+ * mesmo com o aparelho em Doze / bateria otimizada (sem exigir permissão de
+ * alarme exato). Como é one-shot, cada disparo REAGENDA o próximo — por isso os
+ * providers chamam [scheduleDailyUpdate] de novo ao receberem o disparo.
+ *
+ * (O `setInexactRepeating` antigo era descartado pelo Doze em vários OEMs, o que
+ * fazia o widget "congelar" a frase depois de um dia.)
  */
 object WidgetScheduler {
 
@@ -33,19 +37,19 @@ object WidgetScheduler {
         val pendingIntent =
             PendingIntent.getBroadcast(context, requestCode, intent, flags)
 
-        // Próxima meia-noite (00:00:01 do dia seguinte).
+        // Próxima meia-noite (00:00:05 do dia seguinte).
         val nextMidnight = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, 1)
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 1)
+            set(Calendar.SECOND, 5)
             set(Calendar.MILLISECOND, 0)
         }
 
-        alarmManager.setInexactRepeating(
-            AlarmManager.RTC,
+        // Dispara mesmo em Doze; não exige SCHEDULE_EXACT_ALARM.
+        alarmManager.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
             nextMidnight.timeInMillis,
-            AlarmManager.INTERVAL_DAY,
             pendingIntent
         )
     }

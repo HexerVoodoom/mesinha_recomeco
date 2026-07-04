@@ -112,6 +112,11 @@ class MainActivity : AppCompatActivity() {
 
         webView.loadUrl(MESINHA_URL)
 
+        // Autocura: ao abrir o app, força os widgets a re-renderizar (frase do dia)
+        // e buscar frases novas do servidor, mesmo que o alarme diário tenha sido
+        // descartado pela otimização de bateria.
+        refreshWidgets()
+
         // Botão "voltar" navega no histórico da WebView antes de sair do app.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -123,5 +128,20 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun refreshWidgets() {
+        val providers = listOf(
+            MesinhaWidgetProvider::class.java,
+            AlpaquinhaWidgetProvider::class.java,
+            CorvinhoWidgetProvider::class.java
+        )
+        for (cls in providers) {
+            sendBroadcast(
+                android.content.Intent(this, cls).apply {
+                    action = WidgetScheduler.ACTION_DAILY_UPDATE
+                }
+            )
+        }
     }
 }

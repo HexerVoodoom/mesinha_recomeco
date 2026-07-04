@@ -51,6 +51,8 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
             for (id in ids) {
                 renderWidget(context, manager, id)
             }
+            // Reagenda o próximo (o alarme é one-shot).
+            WidgetScheduler.scheduleDailyUpdate(context, MesinhaWidgetProvider::class.java, 4321)
             PhraseRepository.maybeRefresh(context)
         }
     }
