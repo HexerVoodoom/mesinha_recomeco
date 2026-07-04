@@ -12,16 +12,29 @@ interface ServiceAccount {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
-function getServiceAccount(): ServiceAccount | null {
+function isValidSA(j: any): j is ServiceAccount {
+  return !!(j && j.client_email && j.private_key && j.project_id);
+}
+
+// Prioriza o secret de env (FCM_SERVICE_ACCOUNT); se ausente, usa o KV
+// (chave "fcm-service-account"). Sem nenhum dos dois, o envio via FCM é ignorado.
+async function getServiceAccount(): Promise<ServiceAccount | null> {
   const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
-  if (!raw) return null;
-  try {
-    const j = JSON.parse(raw);
-    if (!j.client_email || !j.private_key || !j.project_id) return null;
-    return j as ServiceAccount;
-  } catch {
-    return null;
+  if (raw) {
+    try {
+      const j = JSON.parse(raw);
+      if (isValidSA(j)) return j;
+    } catch {
+      // cai para o KV
+    }
   }
+  try {
+    const stored = await kv.get("fcm-service-account");
+    if (isValidSA(stored)) return stored as ServiceAccount;
+  } catch {
+    // ignora
+  }
+  return null;
 }
 
 function base64url(input: ArrayBuffer | Uint8Array | string): string {
@@ -95,8 +108,8 @@ export async function sendFcmToUser(
   title: string,
   body: string,
 ): Promise<void> {
-  const sa = getServiceAccount();
-  if (!sa) return; // secret ainda não configurado
+  const sa = await getServiceAccount();
+  if (!sa) return; // service account ainda não configurado
 
   const token = await kv.get(`fcm-token:${user}`);
   if (!token || typeof token !== "string") return;
