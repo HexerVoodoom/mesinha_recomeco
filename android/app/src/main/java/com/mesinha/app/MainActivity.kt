@@ -4,7 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -14,14 +16,12 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
 
 /**
- * Tela principal do app. Carrega o PWA do Mesinha dentro de uma WebView.
- *
- * Uma WebView crua não abre o seletor de arquivos de <input type="file"> nem
- * concede microfone ao getUserMedia — é preciso um WebChromeClient implementando
- * onShowFileChooser e onPermissionRequest. Sem isso, o upload de mídia do Mural
- * "não faz nada" ao tocar e a gravação de áudio falha dentro do app instalado.
+ * Tela principal do app. Carrega o PWA do Mesinha dentro de uma WebView e liga
+ * as pontes nativas necessárias: seletor de arquivos, microfone, notificações
+ * (FCM) e a "conversa" com o PWA para saber quem está logado.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -54,9 +54,15 @@ class MainActivity : AppCompatActivity() {
             pendingWebPermission = null
         }
 
+    private val notifPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */ }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        NotificationHelper.ensureChannel(this)
+        requestNotificationPermissionIfNeeded()
 
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true        // o app é React/JS
@@ -66,15 +72,16 @@ class MainActivity : AppCompatActivity() {
             settings.allowFileAccess = false
             webViewClient = WebViewClient()          // navega dentro da WebView
 
+            // Ponte JS↔nativo: o PWA informa quem está logado para registrarmos o
+            // token FCM sob o perfil certo (Amanda/Mateus).
+            addJavascriptInterface(NativeBridge(), "MesinhaNative")
+
             webChromeClient = object : WebChromeClient() {
-                // Abre o seletor de arquivos do sistema para <input type="file">
-                // (upload de imagem/vídeo/áudio no Mural e nas listas).
                 override fun onShowFileChooser(
                     view: WebView?,
                     callback: ValueCallback<Array<Uri>>?,
                     params: FileChooserParams?
                 ): Boolean {
-                    // Descarta um seletor anterior que nunca retornou.
                     filePathCallback?.onReceiveValue(null)
                     filePathCallback = callback
                     return try {
@@ -86,8 +93,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Concede microfone ao getUserMedia (gravação de áudio no Mural),
-                // pedindo a permissão do sistema quando ainda não foi dada.
                 override fun onPermissionRequest(request: PermissionRequest) {
                     val wantsMic =
                         request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
@@ -130,6 +135,17 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     private fun refreshWidgets() {
         val providers = listOf(
             MesinhaWidgetProvider::class.java,
@@ -142,6 +158,24 @@ class MainActivity : AppCompatActivity() {
                     action = WidgetScheduler.ACTION_DAILY_UPDATE
                 }
             )
+        }
+    }
+
+    /** Exposto ao PWA como `window.MesinhaNative`. */
+    inner class NativeBridge {
+        @JavascriptInterface
+        fun setProfile(profile: String) {
+            if (profile != "Amanda" && profile != "Mateus") return
+            val prefs = getSharedPreferences("fcm", MODE_PRIVATE)
+            prefs.edit().putString("profile", profile).apply()
+            // Pega o token atual e registra sob esse perfil.
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    prefs.edit().putString("token", token).apply()
+                    FcmRegistrar.register(applicationContext, profile, token)
+                }
+            }
         }
     }
 }

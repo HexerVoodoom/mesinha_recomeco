@@ -33,6 +33,18 @@ export default function App() {
     initializeApp();
   }, []);
 
+  // Informa o app Android nativo (WebView) quem está logado, para registrar o
+  // token de notificação (FCM) sob o perfil certo. No navegador é no-op.
+  useEffect(() => {
+    if (isAuthenticated && userProfile) {
+      try {
+        (window as any).MesinhaNative?.setProfile?.(userProfile);
+      } catch (_) {
+        // sem ponte nativa (navegador comum)
+      }
+    }
+  }, [isAuthenticated, userProfile]);
+
   const handleLoginSuccess = (profile: 'Amanda' | 'Mateus') => {
     setUserProfile(profile);
     setIsAuthenticated(true);

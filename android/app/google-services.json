@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "155231442025",
+    "project_id": "mesinha-8890e",
+    "storage_bucket": "mesinha-8890e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:155231442025:android:ca9922ae1f884758573ef8",
+        "android_client_info": {
+          "package_name": "com.mesinha.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb7Z0HxhDMT4kdrjyhWwEUTRDbnRu-B6U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
