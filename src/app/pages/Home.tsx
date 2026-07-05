@@ -225,7 +225,7 @@ export default function Home() {
   // do mural sumindo quando a lista geral de 100 itens os empurra para fora
   // do limite: aqui buscamos diretamente os posts do mural, independente de
   // quantos itens de outras categorias existem.
-  const refreshCategoryItems = async (category: string) => {
+  const refreshCategoryItems = async (category: string, attempt = 0) => {
     try {
       const result = await api.getItems(category, 0, 200);
       if (!result || !Array.isArray(result.items)) return;
@@ -238,6 +238,16 @@ export default function Home() {
       });
     } catch (e) {
       console.warn('[refreshCategoryItems] failed:', e);
+      // Esta é a busca autoritativa de UMA categoria (até 200 itens) — é ela
+      // que garante que TODOS os posts do mural apareçam, inclusive os mais
+      // recentes e os mais antigos que ficam fora da janela geral de 100 itens.
+      // Se ela falhar por uma falha transitória (cold-start do edge function,
+      // rede instável), sem retry o mural fica com posts faltando até o usuário
+      // trocar de aba. Então tentamos de novo com backoff exponencial.
+      if (attempt < 4) {
+        const delay = Math.min(1000 * 2 ** attempt, 8000);
+        setTimeout(() => refreshCategoryItems(category, attempt + 1), delay);
+      }
     }
   };
 
@@ -377,8 +387,13 @@ export default function Home() {
     }
   }, [activeCategory]);
 
-  const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
-    // Show cached data immediately so the UI isn't blank while the API wakes up
+  const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0, attempt = 0) => {
+    // Show cached data immediately so the UI isn't blank while the API wakes up.
+    // `servedFromCache` marca que estamos exibindo um snapshot possivelmente
+    // desatualizado (que pode não conter os posts mais recentes) — se o refresh
+    // em segundo plano falhar, precisamos tentar de novo em vez de deixar o
+    // usuário preso nesse cache antigo silenciosamente.
+    let servedFromCache = false;
     if (!silent && offset === 0 && items.length === 0) {
       const cached = localStorage.getItem('offlineItems');
       if (cached) {
@@ -388,6 +403,7 @@ export default function Home() {
             setItems(injectPending(parsed));
             setLoading(false);
             silent = true; // API fetch continues in background, no spinner
+            servedFromCache = true;
           }
         } catch (_) {}
       }
@@ -437,7 +453,21 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Failed to load items:', error);
-      
+
+      // Falha transitória (cold-start do edge function, rede instável, timeout):
+      // tenta de novo com backoff. Sem isso, um único refresh que falha deixa o
+      // usuário preso num cache antigo — que pode não conter as postagens mais
+      // recentes — sem nunca mais tentar buscar do servidor até o próximo poll.
+      if (offset === 0 && attempt < 4) {
+        const delay = Math.min(1000 * 2 ** attempt, 8000);
+        setTimeout(() => loadItems(true, categoryFilter, 0, attempt + 1), delay);
+        // Já temos algo em tela (cache ou estado atual): não caia no fallback de
+        // dados de exemplo — o retry vai substituir por dados reais quando voltar.
+        if (servedFromCache || items.length > 0) {
+          return;
+        }
+      }
+
       // Only show error if this is not a silent update
       if (!silent) {
         // Try to load from localStorage
