@@ -1,16 +1,32 @@
-name: Build Release AAB
+name: Build & Publish Release AAB
 
-# Gera o Android App Bundle (.aab) ASSINADO para enviar à Play Store.
-# Disparo manual (Actions -> Build Release AAB -> Run workflow).
-# Requer os secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
-# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+# Gera o Android App Bundle (.aab) ASSINADO e, se o secret
+# PLAY_SERVICE_ACCOUNT_JSON estiver configurado, publica automaticamente nas
+# faixas de teste da Play Store (Interno + Fechado).
+#
+# Dispara sozinho a cada push em `main` que mexa em android/**, e também pode
+# ser disparado manualmente (Actions -> Build & Publish Release AAB -> Run
+# workflow).
+#
+# Secrets necessários:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#   ANDROID_KEY_PASSWORD  (assinatura - sempre necessários)
+#   PLAY_SERVICE_ACCOUNT_JSON  (opcional - só é preciso para publicar
+#   automaticamente; sem ele o workflow apenas gera o .aab como artifact)
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/**'
   workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      has_service_account: ${{ steps.check-secret.outputs.has_service_account }}
 
     steps:
       - name: Checkout
@@ -36,7 +52,13 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew bundleRelease --no-daemon --stacktrace
+        # versionCode = número do run do GitHub Actions: sempre novo e
+        # crescente, então nunca colide com um versionCode já usado na Play
+        # Store, mesmo que ninguém tenha editado build.gradle.kts.
+        run: |
+          ./gradlew bundleRelease --no-daemon --stacktrace \
+            -PversionCode=${{ github.run_number }} \
+            -PversionName="2.${{ github.run_number }}"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
@@ -44,3 +66,34 @@ jobs:
           name: mesinha-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      - name: Check if Play publishing is configured
+        id: check-secret
+        run: |
+          if [ -n "${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "has_service_account=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_service_account=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Internal testing
+        if: steps.check-secret.outputs.has_service_account == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.mesinha.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+      - name: Publish to Closed testing
+        if: steps.check-secret.outputs.has_service_account == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.mesinha.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          # Nome exato da faixa de teste fechado configurada no Play Console.
+          # Ajuste aqui se o nome real for diferente.
+          track: closed-testing
+          status: completed
