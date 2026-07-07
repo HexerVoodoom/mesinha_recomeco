@@ -12,8 +12,13 @@ android {
         applicationId = "com.mesinha.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        // O CI de publicação automática sobrescreve esses dois via
+        // `-PversionCode=N -PversionName=X` (usando o número do run do GitHub
+        // Actions), garantindo um versionCode sempre novo e crescente sem
+        // depender de lembrar de editar este arquivo. Builds locais/manuais
+        // sem essas properties usam os valores fixos abaixo.
+        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 2
+        versionName = (project.findProperty("versionName") as String?) ?: "2.0"
     }
 
     // Assinatura de release. Só é configurada quando a chave de upload está

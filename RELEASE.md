@@ -26,8 +26,12 @@ guarde segredos em gerenciador de senhas, GitHub Secrets ou no KV do Supabase
   - Deploy do **site** (Cloudflare Pages, automático via integração do Cloudflare)
   - Deploy do **backend** (`.github/workflows/deploy-supabase.yml`), **só se**
     o PR mexeu em `supabase/functions/**`
-- O **APK/AAB do Android nunca é gerado automaticamente** — precisa disparar
-  manualmente (ver seção 3).
+  - Build **e publicação** do app Android (`.github/workflows/android-release.yml`),
+    **só se** o PR mexeu em `android/**` — gera o `.aab` assinado e, se o
+    secret `PLAY_SERVICE_ACCOUNT_JSON` estiver configurado, já publica sozinho
+    nas faixas de **Teste Interno e Teste Fechado** da Play Store (ver seção 5).
+  - O APK **de debug** (`android-build.yml`) também dispara sozinho nas
+    mesmas condições — é só pra testar rápido, não vai pra Play Store.
 
 ---
 
@@ -106,12 +110,22 @@ pra produção, pode exigir revisão manual do Google (alguns dias).
   instala direto (ativar "instalar de fontes desconhecidas").
 
 ### 3b. AAB assinado (pra subir na Play Store)
-- **Nunca dispara sozinho** — sempre manual: GitHub → Actions →
-  **Build Release AAB** → **Run workflow** (branch `main`).
-- Requer os 4 secrets da seção 1 já configurados.
-- Resultado: artifact `mesinha-release-aab` (contém `app-release.aab`).
-- **Antes de disparar, confira/atualize a versão** (seção 4) — a Play Store
-  rejeita reenviar o mesmo `versionCode`.
+- **Dispara sozinho** a cada push em `main` que mexa em `android/**`
+  (`.github/workflows/android-release.yml`), e também pode ser disparado
+  manualmente: GitHub → Actions → **Build & Publish Release AAB** →
+  **Run workflow**.
+- Requer os 4 secrets de assinatura da seção 1.
+- **`versionCode` é automático:** o workflow usa o número do run do GitHub
+  Actions (`github.run_number`) como `versionCode` — sempre novo e crescente,
+  nunca precisa editar `build.gradle.kts` manualmente pra evitar colisão.
+  `versionName` fica como `2.<run_number>`.
+- Resultado: artifact `mesinha-release-aab` (contém `app-release.aab`) —
+  disponível mesmo que a publicação automática (abaixo) não esteja configurada.
+- **Publicação automática na Play Store:** se o secret
+  `PLAY_SERVICE_ACCOUNT_JSON` existir, o workflow já publica o `.aab` direto
+  nas faixas **internal** e **closed-testing** via Google Play Developer API
+  (ver seção 5). Sem esse secret, o passo de publicação é pulado e você
+  baixa o `.aab` do artifact pra subir manualmente.
 
 ---
 
@@ -124,19 +138,29 @@ defaultConfig {
     applicationId = "com.mesinha.app"
     minSdk = 26
     targetSdk = 35   // compileSdk também em 35
-    versionCode = 2  // <- incremente a CADA envio novo à Play Store (inteiro, sempre +1)
-    versionName = "2.0" // <- string livre, só cosmética (ex: "2.1", "2.1.0")
+    // Sobrescrito pelo CI via -PversionCode=N -PversionName=X (github.run_number).
+    // Os valores abaixo só valem pra build local/manual sem essas properties.
+    versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 2
+    versionName = (project.findProperty("versionName") as String?) ?: "2.0"
 }
 ```
 
-**Fluxo pra nova versão:**
-1. Edite `versionCode` (incrementa) e `versionName` (à vontade) em
-   `android/app/build.gradle.kts`.
-2. Commit + PR + merge em `main` (siga o padrão de commits do repo:
-   `chore(android): bump version to N (versionCode N, versionName "X.Y")`).
-3. Dispare o workflow **Build Release AAB** (seção 3b).
-4. Baixe o `.aab` do artifact e suba na faixa de teste/produção desejada no
-   Play Console.
+**Fluxo pra nova versão (automático, desde que `PLAY_SERVICE_ACCOUNT_JSON`
+esteja configurado):**
+1. Faça a mudança de código desejada, PR, merge em `main`.
+2. Pronto — o CI builda, assina, calcula um `versionCode` novo sozinho
+   (`github.run_number`) e publica direto no Teste Interno e Teste Fechado.
+3. Acompanhe em Actions → **Build & Publish Release AAB**.
+
+**Se quiser fazer manualmente** (ex: sem o secret de publicação configurado,
+ou quer promover pra faixa de Produção, que não é auto-publicada):
+1. PR + merge em `main` (o build/artifact roda automaticamente).
+2. Baixe o `.aab` do artifact `mesinha-release-aab`.
+3. Play Console → faixa desejada → criar versão → subir o `.aab`.
+
+Você **não precisa mais editar `versionCode`/`versionName` manualmente** pra
+builds feitos pelo CI — só se quiser dar um número "bonito"/semântico
+proposital, o que hoje só afeta builds locais (o CI sempre sobrescreve).
 
 ---
 
@@ -145,6 +169,21 @@ defaultConfig {
 - **Pacote:** `com.mesinha.app`
 - **Faixas configuradas:** Teste interno e Teste fechado (ambas já testadas
   e funcionando com a chave de upload atual).
+- **Publicação automática (Google Play Developer API):**
+  - Requer uma **conta de serviço** com acesso ao app no Play Console:
+    Play Console → **Configuração → Acesso à API** → vincular/criar projeto
+    Google Cloud → criar conta de serviço → voltar no Play Console e dar a
+    ela permissão de lançar versões nas faixas de teste.
+  - O JSON dessa conta de serviço vai **direto** como GitHub Secret
+    `PLAY_SERVICE_ACCOUNT_JSON` (`Settings → Secrets and variables →
+    Actions`) — nunca precisa passar por chat/arquivo, é gerado e colado
+    pelo próprio dono da conta Google.
+  - O workflow `android-release.yml` usa a action `r0adkll/upload-google-play`
+    pra publicar nas faixas `internal` e `closed-testing` (esse último nome
+    deve bater com o identificador exato da faixa fechada configurada — se o
+    Play Console usar outro nome/id, ajuste a linha `track:` no workflow).
+  - Sem esse secret configurado, o workflow continua funcionando normalmente,
+    só pula os passos de publicação (gera só o artifact do `.aab`).
 - **Categorias de assets da ficha da loja:** ícone (512×512), gráfico de
   destaque (1024×500) e capturas de tela — só as de **smartphone são
   obrigatórias** (2 a 8, 9:16, entre 320-3840px por lado). Tablet
@@ -258,12 +297,18 @@ android/
 
 ## 10. Checklist rápido — "quero soltar uma versão nova"
 
-1. `git checkout -B release/vN origin/main`
-2. Editar `android/app/build.gradle.kts` → `versionCode`/`versionName` (seção 4)
-3. (Se mudou algo no app) commit das mudanças de código também
-4. PR → merge em `main`
-5. Se mexeu em `supabase/functions/**`: aguardar o deploy automático do
-   backend (`deploy-supabase.yml`)
-6. Actions → **Build Release AAB** → Run workflow (branch `main`)
-7. Baixar o artifact `mesinha-release-aab`
-8. Play Console → app → faixa de teste desejada → criar versão → subir o `.aab`
+**Com `PLAY_SERVICE_ACCOUNT_JSON` configurado (fluxo atual):**
+1. Fazer a mudança de código, PR, merge em `main`.
+2. Pronto. O CI builda, assina, versiona e publica sozinho no Teste Interno e
+   Teste Fechado. Acompanhar em Actions → **Build & Publish Release AAB**.
+3. Quer promover pra **Produção**? Isso continua manual — Play Console →
+   Produção → criar versão → **promover** a partir de uma das faixas de teste
+   (não precisa gerar `.aab` de novo).
+
+**Sem o secret de publicação (fallback manual):**
+1. PR → merge em `main` (build automático roda de qualquer forma).
+2. Se mexeu em `supabase/functions/**`: aguardar o deploy automático do
+   backend (`deploy-supabase.yml`).
+3. Baixar o artifact `mesinha-release-aab` (Actions → **Build & Publish
+   Release AAB** → run mais recente).
+4. Play Console → app → faixa de teste desejada → criar versão → subir o `.aab`.
