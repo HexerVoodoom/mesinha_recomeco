@@ -12,3 +12,8 @@ local.properties
 captures/
 .kotlin/
 .cxx/
+
+# Chaves de assinatura (nunca versionar)
+*.jks
+*.keystore
+keystore.properties
