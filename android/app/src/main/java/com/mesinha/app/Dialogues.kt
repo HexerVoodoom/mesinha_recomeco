@@ -10,8 +10,8 @@ data class DialoguePair(val corvinho: String, val alpaquinha: String)
 /**
  * Frases PADRÃO (reserva) dos widgets, embutidas no app. São usadas quando
  * ainda não há uma lista baixada do servidor (ver [PhraseRepository]) — por
- * exemplo, no primeiro uso ou sem internet. A lista "ao vivo" fica em
- * `public/widget-phrases.json` e pode ser editada sem reinstalar o app.
+ * exemplo, no primeiro uso ou sem internet. A lista "ao vivo" fica no backend
+ * (KV `widget-phrases`) e é editada pelo próprio app em Configurações.
  */
 object Dialogues {
 

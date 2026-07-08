@@ -1,39 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { 
-  Tv,
-  Film,
-  Gamepad2,
-  UtensilsCrossed,
-  MapPin,
-  Calendar,
-  Smile,
-  AlarmClock,
-  Umbrella,
-  ChevronRight, 
-  Plus, 
-  Settings as SettingsIcon,
-  ChevronDown,
-  Filter,
-  Search,
-  Trophy,
-  Gift
-} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api, ListItem } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { isRealtimeConnected } from '../utils/realtimeChannel';
 import { useNotifications } from '../hooks/useNotifications';
-import { seedInitialData } from '../utils/seedData';
-import { localDB } from '../utils/localDB';
 import { ListItemComponent } from '../components/ListItemComponent';
 import { EmptyState } from '../components/EmptyState';
-import { LoadingSpinner } from '../components/LoadingSpinner';
 import { AddItemModal } from '../components/AddItemModal';
 import { FilterModal } from '../components/FilterModal';
 import { Top3ItemComponent } from '../components/Top3ItemComponent';
-import { MuralItemComponent } from '../components/MuralItemComponent';
+import { CategoryMenu, categories, type Category } from '../components/CategoryMenu';
+import { MuralSection } from '../components/MuralSection';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
@@ -42,50 +21,6 @@ import fabButton from "figma:asset/dd4b98f23138814cb5d5f735480190b4a56f65a0.png"
 import grainTexture from "figma:asset/870f87368b0cc75469636c24542ec183a844dabf.png";
 import headerDecoration from "figma:asset/1f94cbc6275b0a35eb5a9c6c93b92d94e2251075.png";
 import topLaceDecoration from "figma:asset/efb30badc4fa5c4da28d3bf6ea65d7d99aa6b99b.png";
-import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
-import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
-import imgIconData from "figma:asset/e6ae93276b700b8f8f931da6519affe6c2e9c5d0.png";
-import imgIconBobeiras from "figma:asset/44df7767036d0bbe143fb9ee3102554d9c29474f.png";
-import imgIconTop3 from "figma:asset/f296c57b6ed7e73b350453d968fd883591dd3581.png";
-import imgIconFilmesESeries from "figma:asset/a7e6f180afcfd6cefd1ae8165ed758a29e25da14.png";
-import imgIconPesquisar from "figma:asset/cb1c8fe4b905e0ba73cec7627c5b9f5168142c03.png";
-import imgIconOutros from "figma:asset/9598e760cce271dc861fb90f06a336792553ef6a.png";
-import imgIconLugares from "figma:asset/d4ec5ae65b7bd51ce704f9bf07164532caa53a33.png";
-import imgIconcomidas from "figma:asset/2c8cffafea0b456e1dfa9a773e633226de456ac0.png";
-import imgIconVideoGame from "figma:asset/783a5ddb42e8653aa6debba484cc8b75c211df92.png";
-import imgIconVieosCurtos from "figma:asset/b72dc3ec57224b4caa82c0bbb8e9602e4a8602e4.png";
-
-type Category = 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates' | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other';
-
-const categories = [
-  { id: 'mural' as Category, icon: Gift, label: 'Mural' },
-  { id: 'alarm' as Category, icon: AlarmClock, label: 'Lembrete' },
-  { id: 'dates' as Category, icon: Calendar, label: 'Datas' },
-  { id: 'jokes' as Category, icon: Smile, label: 'Bobeiras' },
-  { id: 'top3' as Category, icon: Trophy, label: 'Top 3' },
-  { id: 'movies' as Category, icon: Film, label: 'Filmes/Séries' },
-  { id: 'watch' as Category, icon: Tv, label: 'Vídeos Curtos' },
-  { id: 'games' as Category, icon: Gamepad2, label: 'Jogos' },
-  { id: 'food' as Category, icon: UtensilsCrossed, label: 'Comidas' },
-  { id: 'places' as Category, icon: MapPin, label: 'Lugares' },
-  { id: 'other' as Category, icon: Umbrella, label: 'Outros' },
-];
-
-// Mapeamento dos ícones personalizados do Figma
-const categoryIcons: Record<Category | 'search', string> = {
-  mural: imgIconeMural,
-  alarm: imgIconLembrete,
-  dates: imgIconData,
-  jokes: imgIconBobeiras,
-  top3: imgIconTop3,
-  movies: imgIconFilmesESeries,
-  watch: imgIconVieosCurtos,
-  games: imgIconVideoGame,
-  food: imgIconcomidas,
-  places: imgIconLugares,
-  other: imgIconOutros,
-  search: imgIconPesquisar,
-};
 
 // Chave de localStorage para itens criados localmente que ainda não foram
 // confirmados na resposta de listagem do servidor.
@@ -906,53 +841,13 @@ export default function Home() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Category Card */}
-        <div className="bg-[#F8F6F4] rounded-[32px] border-2 border-[#E9E4DF] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[21px] mb-6 relative mx-6">
-          {/* Label Badge */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E9E4DF] rounded-full px-4 py-1 flex items-center gap-2">
-            <img 
-              src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]} 
-              alt="" 
-              className="w-5 h-5 object-contain"
-            />
-            <span className="font-['Quicksand',sans-serif] font-bold text-xs text-[#2B2A28] uppercase tracking-tight">
-              {showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
-            </span>
-          </div>
-
-          {/* Category Icons Grid */}
-          <div className="grid grid-cols-6 gap-4 pt-4">
-            {categories.map(category => {
-              const Icon = category.icon;
-              const isActive = activeCategory === category.id && !showSearch;
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => handleCategoryChange(category.id)}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <div className={`transition-colors ${
-                    isActive ? 'text-[#4D989B]' : 'text-[#2B2A28]'
-                  }`}>
-                    <Icon className="w-[20px] h-[20px]" strokeWidth={1.5} />
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Search Icon */}
-            <button
-              onClick={() => setShowSearch(!showSearch)}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className={`transition-colors ${
-                showSearch ? 'text-[#4D989B]' : 'text-[#2B2A28]'
-              }`}>
-                <Search className="w-[20px] h-[20px]" strokeWidth={1.5} />
-              </div>
-            </button>
-          </div>
-        </div>
+        {/* Menu de categorias */}
+        <CategoryMenu
+          activeCategory={activeCategory}
+          showSearch={showSearch}
+          onCategoryChange={handleCategoryChange}
+          onToggleSearch={() => setShowSearch(!showSearch)}
+        />
 
         {error && (
           <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-4">
@@ -992,43 +887,13 @@ export default function Home() {
             {/* Pending Items */}
             <div className={activeCategory === 'mural' ? '' : 'space-y-2'}>
               {activeCategory === 'mural' ? (
-                <>
-                  {pendingItems.length === 0 ? (
-                    <EmptyState category={activeCategory} />
-                  ) : (
-                    <>
-                      {/* Primeiro item do mural - largura total */}
-                      <div className="mb-4">
-                        <MuralItemComponent
-                          key={pendingItems[0].id}
-                          item={pendingItems[0]}
-                          onDelete={() => handleDeleteItem(pendingItems[0].id)}
-                          currentUser={userProfile}
-                          onMarkViewed={() => handleMarkViewed(pendingItems[0].id)}
-                          onToggleLike={() => handleToggleLike(pendingItems[0].id)}
-                          isHeroItem={true}
-                        />
-                      </div>
-
-                      {/* Demais itens em grid 2 colunas */}
-                      {pendingItems.length > 1 && (
-                        <div className="grid grid-cols-2 gap-4">
-                          {pendingItems.slice(1).map(item => (
-                            <MuralItemComponent
-                              key={item.id}
-                              item={item}
-                              onDelete={() => handleDeleteItem(item.id)}
-                              currentUser={userProfile}
-                              onMarkViewed={() => handleMarkViewed(item.id)}
-                              onToggleLike={() => handleToggleLike(item.id)}
-                              isHeroItem={false}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
+                <MuralSection
+                  pendingItems={pendingItems}
+                  userProfile={userProfile}
+                  onDeleteItem={handleDeleteItem}
+                  onMarkViewed={handleMarkViewed}
+                  onToggleLike={handleToggleLike}
+                />
               ) : pendingItems.length === 0 ? (
                 <EmptyState category={activeCategory} />
               ) : (

@@ -45,7 +45,9 @@ interface NotificationSchedule {
 }
 
 export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
-  const scheduledNotifications = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Lembretes ativos, por id do item. Um ÚNICO interval (abaixo) varre este
+  // mapa a cada 30s — em vez de um interval por lembrete.
+  const schedules = useRef<Map<string, NotificationSchedule>>(new Map());
   // Última vez (data + horário) que cada lembrete disparou, para não repetir no mesmo minuto
   const lastNotified = useRef<Map<string, string>>(new Map());
 
@@ -76,94 +78,72 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
     }
   };
 
-  // Função para agendar notificação de lembrete
-  const scheduleReminder = (schedule: NotificationSchedule) => {
-    // Limpar agendamento anterior se existir
-    const existingTimeout = scheduledNotifications.current.get(schedule.itemId);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
+  const checkAndNotify = (schedule: NotificationSchedule) => {
+    const now = new Date();
+
+    // Dia da semana atual como abreviação em inglês (como salvo em reminderDays)
+    const dayByIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const mappedDay = dayByIndex[now.getDay()];
+
+    // Verificar se hoje é um dos dias configurados
+    const shouldNotifyToday = schedule.days.includes(mappedDay);
+
+    // Verificar se é o horário certo (com margem de 1 minuto)
+    const [scheduleHour, scheduleMinute] = schedule.time.split(':').map(Number);
+    const isRightTime =
+      scheduleHour === now.getHours() &&
+      Math.abs(scheduleMinute - now.getMinutes()) <= 1;
+
+    // Chave única por dia + horário do lembrete: evita repetir no mesmo minuto,
+    // mas permite disparar novamente no próximo dia configurado.
+    const fireKey = `${now.toDateString()} ${schedule.time}`;
+    const alreadyNotified = lastNotified.current.get(schedule.itemId) === fireKey;
+
+    if (shouldNotifyToday && isRightTime && !alreadyNotified) {
+      showNotification('Lembrete', schedule.title);
+      lastNotified.current.set(schedule.itemId, fireKey);
     }
-
-    if (!schedule.active) {
-      scheduledNotifications.current.delete(schedule.itemId);
-      return;
-    }
-
-    // Verificar se o lembrete é para o usuário atual
-    const isForCurrentUser = 
-      (currentUser === 'Mateus' && schedule.forMateus) ||
-      (currentUser === 'Amanda' && schedule.forAmanda);
-
-    if (!isForCurrentUser) {
-      return;
-    }
-
-    const checkAndNotify = () => {
-      const now = new Date();
-
-      // Dia da semana atual como abreviação em inglês (como salvo em reminderDays)
-      const dayByIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-      const mappedDay = dayByIndex[now.getDay()];
-
-      // Verificar se hoje é um dos dias configurados
-      const shouldNotifyToday = schedule.days.includes(mappedDay);
-
-      // Verificar se é o horário certo (com margem de 1 minuto)
-      const [scheduleHour, scheduleMinute] = schedule.time.split(':').map(Number);
-      const isRightTime =
-        scheduleHour === now.getHours() &&
-        Math.abs(scheduleMinute - now.getMinutes()) <= 1;
-
-      // Chave única por dia + horário do lembrete: evita repetir no mesmo minuto,
-      // mas permite disparar novamente no próximo dia configurado.
-      const fireKey = `${now.toDateString()} ${schedule.time}`;
-      const alreadyNotified = lastNotified.current.get(schedule.itemId) === fireKey;
-
-      if (shouldNotifyToday && isRightTime && !alreadyNotified) {
-        showNotification('Lembrete', schedule.title);
-        lastNotified.current.set(schedule.itemId, fireKey);
-      }
-    };
-
-    // Verificar a cada 30 segundos
-    const interval = setInterval(checkAndNotify, 30000);
-    scheduledNotifications.current.set(schedule.itemId, interval as any);
-
-    // Verificar imediatamente
-    checkAndNotify();
   };
+
+  // Um único interval varre todos os lembretes agendados a cada 30s.
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      schedules.current.forEach(schedule => checkAndNotify(schedule));
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Função para atualizar lembretes baseado em itens
   const updateReminders = (items: ListItem[]) => {
-    // Filtrar apenas itens da categoria alarm
-    const alarmItems = items.filter(item => item.category === 'alarm');
+    const next = new Map<string, NotificationSchedule>();
 
-    // Agendar cada lembrete
-    alarmItems.forEach(item => {
-      if (item.reminderTime && item.reminderDays && item.reminderDays.length > 0) {
-        scheduleReminder({
-          itemId: item.id,
-          time: item.reminderTime,
-          days: item.reminderDays,
-          forMateus: item.reminderForMateus || false,
-          forAmanda: item.reminderForAmanda || false,
-          title: item.title,
-          active: item.reminderActive !== false, // Por padrão é true
-        });
-      }
-    });
+    for (const item of items) {
+      if (item.category !== 'alarm') continue;
+      if (!item.reminderTime || !item.reminderDays || item.reminderDays.length === 0) continue;
+      if (item.reminderActive === false) continue;
 
-    // Remover agendamentos de itens que não existem mais
-    const currentItemIds = new Set(alarmItems.map(item => item.id));
-    Array.from(scheduledNotifications.current.keys()).forEach(id => {
-      if (!currentItemIds.has(id)) {
-        const timeout = scheduledNotifications.current.get(id);
-        if (timeout) {
-          clearTimeout(timeout);
-        }
-        scheduledNotifications.current.delete(id);
-      }
-    });
+      // Só agenda lembretes destinados ao usuário atual
+      const isForCurrentUser =
+        (currentUser === 'Mateus' && (item.reminderForMateus || false)) ||
+        (currentUser === 'Amanda' && (item.reminderForAmanda || false));
+      if (!isForCurrentUser) continue;
+
+      const schedule: NotificationSchedule = {
+        itemId: item.id,
+        time: item.reminderTime,
+        days: item.reminderDays,
+        forMateus: item.reminderForMateus || false,
+        forAmanda: item.reminderForAmanda || false,
+        title: item.title,
+        active: true,
+      };
+      next.set(item.id, schedule);
+      // Verificação imediata (mesmo comportamento do agendamento antigo)
+      checkAndNotify(schedule);
+    }
+
+    schedules.current = next;
   };
 
   // Função para notificar novo item no mural
@@ -184,16 +164,6 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
       );
     }
   };
-
-  // Limpar todos os agendamentos quando desmontar
-  useEffect(() => {
-    return () => {
-      scheduledNotifications.current.forEach(timeout => {
-        clearTimeout(timeout);
-      });
-      scheduledNotifications.current.clear();
-    };
-  }, []);
 
   return {
     updateReminders,

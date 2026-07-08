@@ -79,18 +79,14 @@ android/
 
 ## Editar as frases (SEM reinstalar o app)
 
-As frases ficam num arquivo hospedado no site: **`public/widget-phrases.json`**
-(publicado em `https://mesinha-recomeco2.pages.dev/widget-phrases.json`).
+As frases individuais são editadas **dentro do próprio app**: Configurações →
+"Falas do Corvinho" (Mateus) / "Falas da Alpaquinha" (Amanda). Elas ficam no
+backend (KV `widget-phrases`, servidas pelo endpoint `/widget-phrases`); o
+widget baixa a lista nova automaticamente (no máximo 1× a cada 3h, e sempre na
+virada do dia) e a guarda em cache. **Não precisa gerar nem instalar APK novo.**
 
-Para mudar/adicionar frases, edite esse arquivo (direto no GitHub ou no repo) e
-faça o deploy do site. O widget baixa a lista nova automaticamente (no máximo 1×
-a cada 3h, e sempre na virada do dia) e a guarda em cache. **Não precisa gerar
-nem instalar APK novo.**
-
-Estrutura do JSON:
-- `dupla`: lista de pares `{ "corvinho": "...", "alpaquinha": "..." }` (widget dos dois)
-- `amanda`: lista de textos (widget da Alpaquinha)
-- `mateus`: lista de textos (widget do Corvinho)
+As frases do widget duplo ("Conversa") são fixas, definidas no fallback do
+backend (`supabase/functions/server/index.ts`, `DEFAULT_WIDGET_PHRASES`).
 
 As frases embutidas em `app/src/main/java/com/mesinha/app/Dialogues.kt` são apenas
 a **reserva** (usadas no primeiro uso ou sem internet).

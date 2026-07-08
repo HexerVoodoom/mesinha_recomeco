@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Bell, Download, Upload, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
-import { api, Settings as SettingsType, ListItem } from '../utils/api';
+import { ArrowLeft, Bell, Calendar } from 'lucide-react';
+import { api, Settings as SettingsType } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { toast } from 'sonner';
-import { BackupSettings } from '../components/BackupSettings';
 import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
 
 export default function Settings() {
@@ -18,9 +17,7 @@ export default function Settings() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [daysRemaining, setDaysRemaining] = useState(0);
-  const [showAdvancedBackup, setShowAdvancedBackup] = useState(false);
 
   // Realtime Sync para configurações
   useRealtimeSync({
@@ -95,91 +92,6 @@ export default function Settings() {
       toast.error('Falha ao salvar configurações');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleExportBackup = async () => {
-    try {
-      toast.loading('Gerando backup...', { id: 'backup' });
-      
-      const backupData = await api.exportBackup();
-      
-      // Create a blob and download it
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Generate filename with current date
-      const date = new Date().toISOString().split('T')[0];
-      link.download = `mesinha-backup-${date}.json`;
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast.success(`Backup exportado! ${backupData.stats.totalItems} itens salvos.`, { id: 'backup' });
-    } catch (error) {
-      console.error('Failed to export backup:', error);
-      toast.error('Falha ao exportar backup', { id: 'backup' });
-    }
-  };
-
-  const handleImportBackup = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      toast.loading('Importando backup...', { id: 'import' });
-      
-      const text = await file.text();
-      const backupData = JSON.parse(text);
-      
-      // Validate backup structure
-      if (!backupData.data || !backupData.data.items || !backupData.data.settings) {
-        throw new Error('Formato de backup inválido');
-      }
-
-      // Import settings
-      if (backupData.data.settings) {
-        await syncApi.updateSettings(backupData.data.settings);
-        setSettings(backupData.data.settings);
-      }
-
-      // Import items
-      if (backupData.data.items && Array.isArray(backupData.data.items)) {
-        // Delete all existing items first
-        const existingItems = await api.getItems();
-        for (const item of existingItems) {
-          await syncApi.deleteItem(item.id);
-        }
-
-        // Create all items from backup
-        for (const item of backupData.data.items) {
-          await syncApi.createItem(item);
-        }
-      }
-
-      toast.success(`Backup importado! ${backupData.data.items.length} itens restaurados.`, { id: 'import' });
-      
-      // Reload the page to reflect changes
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Failed to import backup:', error);
-      toast.error('Falha ao importar backup. Verifique o arquivo.', { id: 'import' });
-    }
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
