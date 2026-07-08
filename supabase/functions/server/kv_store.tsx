@@ -99,8 +99,9 @@ export const countByPrefix = async (prefix: string): Promise<number> => {
   return count ?? 0;
 };
 
-// Fetches a page of values matching a prefix, ordered/filtered/paginated at the DB level
-// so memory usage is bounded by `limit` instead of the full matching row set.
+// Fetches a page of FULL values matching a prefix (inclui mídia pesada!).
+// Use apenas quando o valor completo é necessário (ex.: backup/export).
+// Para listagens, use getItemsLightPaged.
 export const getByPrefixPaged = async (
   prefix: string,
   options: { offset?: number; limit?: number; orderByJsonField?: string; ascending?: boolean; categoryFilter?: string } = {},
@@ -132,4 +133,30 @@ export const getByPrefixPaged = async (
     throw new Error(error.message);
   }
   return { items: data?.map((d) => d.value) ?? [], total: count ?? 0 };
+};
+
+// Fetches a page of "light" items (função get_items_light no Postgres).
+// A montagem dos itens acontece DENTRO do banco: mídia pesada em base64
+// (photo/muralContent, MBs por linha) nunca sai do Postgres — antes essas
+// linhas inteiras trafegavam até a edge function só para serem descartadas,
+// o que deixava GET /items com 10s+ e causava 500 por timeout.
+// A função replica o filtro (id/categoria/título não vazios), a ordenação
+// (createdAt DESC NULLS LAST) e o mapeamento (photo -> 'HAS_PHOTO',
+// muralContent só quando muralContentType === 'text').
+export const getItemsLightPaged = async (
+  options: { offset?: number; limit?: number; categoryFilter?: string } = {},
+): Promise<{ items: any[]; total: number }> => {
+  const { offset = 0, limit = 100, categoryFilter } = options;
+  const supabase = client();
+
+  const { data, error } = await supabase.rpc("get_items_light", {
+    p_category: categoryFilter ?? null,
+    p_offset: offset,
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return { items: data?.items ?? [], total: data?.total ?? 0 };
 };

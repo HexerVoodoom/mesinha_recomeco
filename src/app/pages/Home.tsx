@@ -160,7 +160,7 @@ export default function Home() {
   // do mural sumindo quando a lista geral de 100 itens os empurra para fora
   // do limite: aqui buscamos diretamente os posts do mural, independente de
   // quantos itens de outras categorias existem.
-  const refreshCategoryItems = async (category: string) => {
+  const refreshCategoryItems = async (category: string, retriesLeft = 1) => {
     try {
       const result = await api.getItems(category, 0, 200);
       if (!result || !Array.isArray(result.items)) return;
@@ -172,7 +172,12 @@ export default function Home() {
         return merged;
       });
     } catch (e) {
+      // Falha transitória (ex.: cold start do backend) não pode deixar a tela
+      // presa no cache antigo silenciosamente: tenta de novo uma vez.
       console.warn('[refreshCategoryItems] failed:', e);
+      if (retriesLeft > 0) {
+        setTimeout(() => refreshCategoryItems(category, retriesLeft - 1), 4000);
+      }
     }
   };
 
