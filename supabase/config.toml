@@ -415,4 +415,4 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.make-server-19717bce]
 enabled = true
 verify_jwt = false
-entrypoint = "./functions/server/index.tsx"
+entrypoint = "./functions/server/index.ts"

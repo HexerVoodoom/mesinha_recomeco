@@ -17,7 +17,10 @@ jobs:
         with:
           version: latest
 
+      # IMPORTANTE: o slug em produção é make-server-19717bce (é ele que o app,
+      # os widgets e o cron chamam). O entrypoint aponta para functions/server/
+      # via supabase/config.toml. Deploy no slug "server" NÃO chega à produção.
       - name: Deploy Edge Functions
-        run: supabase functions deploy server --project-ref oubdmmaqxnutbbxiqeow
+        run: supabase functions deploy make-server-19717bce --project-ref oubdmmaqxnutbbxiqeow
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
