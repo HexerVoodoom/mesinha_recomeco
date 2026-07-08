@@ -98,52 +98,15 @@ app.get("/make-server-19717bce/items", async (c) => {
     // Cap limit so a single request can't force-load an unbounded number of rows (with photos) into memory.
     const limit = Math.min(parseInt(c.req.query("limit") || "100"), 200);
 
-    const { items: rawItems, total } = await kv.getByPrefixPaged("item:", {
+    // A lista "leve" é montada dentro do Postgres (função get_items_light):
+    // filtro, ordenação por createdAt e o descarte da mídia pesada (photo ->
+    // marcador 'HAS_PHOTO'; muralContent só quando muralContentType === 'text';
+    // imagem/vídeo/áudio carregam sob demanda via GET /items/:id/full).
+    const { items, total } = await kv.getItemsLightPaged({
       offset,
       limit,
-      orderByJsonField: "createdAt",
-      ascending: false,
       categoryFilter: category || undefined,
     });
-
-    const paginatedItems = rawItems.filter(item => item?.id && item?.category && item?.title);
-
-    // Build minimal items (no photo, no muralContent) - simplified
-    const items = [];
-    for (const item of paginatedItems) {
-      items.push({
-        id: item.id,
-        title: item.title,
-        comment: item.comment || "",
-        category: item.category,
-        eventDate: item.eventDate || null,
-        photo: item.photo ? 'HAS_PHOTO' : null,
-        reminderEnabled: item.reminderEnabled || false,
-        reminderFrequency: item.reminderFrequency,
-        repeatCount: item.repeatCount,
-        createdBy: item.createdBy,
-        createdAt: item.createdAt,
-        status: item.status,
-        tags: item.tags || [],
-        videoLink: item.videoLink,
-        reminderTime: item.reminderTime,
-        reminderDays: item.reminderDays,
-        reminderForMateus: item.reminderForMateus,
-        reminderForAmanda: item.reminderForAmanda,
-        reminderActive: item.reminderActive,
-        isFavorite: item.isFavorite,
-        top3Mateus: item.top3Mateus,
-        top3Amanda: item.top3Amanda,
-        muralContentType: item.muralContentType,
-        // Texto é pequeno: inclui na listagem para o preview aparecer sem precisar
-        // abrir o post. Mídia (imagem/vídeo/áudio) fica undefined — é base64 pesado
-        // que só carrega sob demanda via GET /items/:id/full.
-        muralContent: item.muralContentType === 'text' ? item.muralContent : undefined,
-        muralThumbnail: item.muralThumbnail,
-        viewedBy: item.viewedBy,
-        updatedAt: item.updatedAt,
-      });
-    }
 
     return c.json({
       items,
@@ -720,11 +683,10 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
 
   // Buscar itens de lembrete ativos. limit baixo (50) porque alarmes são poucos
   // e o cron roda a cada minuto — queries grandes aqui desperdiçam Disk IO.
-  const { items: allItems } = await kv.getByPrefixPaged("item:", {
+  // Versão "light" basta: todos os campos de lembrete são pequenos e mantidos.
+  const { items: allItems } = await kv.getItemsLightPaged({
     offset: 0,
     limit: 50,
-    orderByJsonField: "createdAt",
-    ascending: false,
     categoryFilter: "alarm",
   });
 
