@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { api } from '../utils/api';
-import { syncService } from '../utils/syncService';
 
 import buttonBg from 'figma:asset/75c872bdf2a28b8670edf0ef3851acf422588625.png';
 import buttonImage from 'figma:asset/85f171ff8cd9cb4f7140b1d04b0f2e0ecceb0615.png';

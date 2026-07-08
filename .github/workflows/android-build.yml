@@ -6,7 +6,7 @@ name: Build Android APK
 on:
   push:
     branches:
-      - claude/character-dialogue-widget-awbipy
+      - main
     paths:
       - 'android/**'
       - '.github/workflows/android-build.yml'

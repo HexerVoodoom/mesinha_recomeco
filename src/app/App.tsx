@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
-import { Toaster, toast } from 'sonner';
+import { Toaster } from 'sonner';
 import Login from './pages/Login';
 import { LoadingScreen } from './components/LoadingScreen';
-import { localDB } from './utils/localDB';
-import { syncService } from './utils/syncService';
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,12 +12,6 @@ export default function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      try {
-        await localDB.init();
-      } catch (error) {
-        console.error('[App] Failed to initialize local database:', error);
-      }
-
       const profile = localStorage.getItem('userProfile') as 'Amanda' | 'Mateus' | null;
 
       if (profile && (profile === 'Amanda' || profile === 'Mateus')) {

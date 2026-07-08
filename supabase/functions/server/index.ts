@@ -39,12 +39,6 @@ async function sendPushToUser(user: string, payload: any): Promise<void> {
 
 const app = new Hono();
 
-// Senhas fixas
-const PASSWORDS: Record<string, string> = {
-  'Amanda': 'Mateus',
-  'Mateus': 'Amanda'
-};
-
 // Enable CORS for all routes and methods (must be first)
 app.use(
   "/*",
@@ -94,47 +88,6 @@ app.onError((err, c) => {
 // Health check endpoint
 app.get("/make-server-19717bce/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Login endpoint - simples validação de senha
-app.post("/make-server-19717bce/login", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { profile, password } = body;
-
-    console.log(`[POST /login] Login attempt for: ${profile} with password: ${password}`);
-
-    if (!profile || !password) {
-      return c.json({ error: "Perfil e senha são obrigatórios" }, 400);
-    }
-
-    // Validar se é Amanda ou Mateus
-    if (profile !== 'Amanda' && profile !== 'Mateus') {
-      return c.json({ error: "Perfil inválido" }, 400);
-    }
-
-    // Verificar senha
-    const expectedPassword = PASSWORDS[profile];
-    console.log(`[POST /login] Expected password for ${profile}: ${expectedPassword}`);
-    
-    if (expectedPassword !== password) {
-      console.log(`[POST /login] Senha incorreta para ${profile}. Expected: ${expectedPassword}, Got: ${password}`);
-      return c.json({ error: "Senha incorreta" }, 401);
-    }
-
-    console.log(`[POST /login] Login bem-sucedido para ${profile}`);
-    
-    return c.json({ 
-      success: true,
-      profile: profile
-    });
-  } catch (error) {
-    console.error("[POST /login] Login error:", error);
-    return c.json({ 
-      error: "Erro ao fazer login", 
-      details: error instanceof Error ? error.message : String(error) 
-    }, 500);
-  }
 });
 
 // Get items by category with pagination

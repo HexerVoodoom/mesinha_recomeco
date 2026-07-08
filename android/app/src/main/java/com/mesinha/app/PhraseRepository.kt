@@ -9,9 +9,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Fonte das frases dos widgets. Prioriza a lista baixada do servidor
- * (`widget-phrases.json`, editável sem reinstalar o app) e cai para as frases
- * embutidas ([Dialogues]) quando ainda não há cache ou está sem internet.
+ * Fonte das frases dos widgets. Prioriza a lista baixada do backend
+ * (endpoint `/widget-phrases`, editável pelo app em Configurações sem
+ * reinstalar) e cai para as frases embutidas ([Dialogues]) quando ainda não
+ * há cache ou está sem internet.
  *
  * O download roda em segundo plano, é limitado (throttle) e, quando chega uma
  * lista nova, dispara a re-renderização dos três widgets.

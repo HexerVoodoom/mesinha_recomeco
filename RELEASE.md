@@ -215,9 +215,9 @@ proposital, o que hoje só afeta builds locais (o CI sempre sobrescreve).
   - `fcm-service-account` — credencial de envio do Firebase (seção 2)
   - `widget-phrases` — `{ dupla, amanda, mateus }`, as falas dos widgets
     (editável via app em Configurações; ver seção 7)
-- **Login:** senhas fixas no código (`PASSWORDS` em `index.ts` e também
-  hardcoded no cliente em `src/app/utils/api.ts`): Amanda = `Mateus`,
-  Mateus = `Amanda` (a senha de cada um é o nome do parceiro).
+- **Login:** validado apenas no cliente (`api.login` em
+  `src/app/utils/api.ts`): Amanda = `Mateus`, Mateus = `Amanda` (a senha de
+  cada um é o nome do parceiro). Não há endpoint de login no servidor.
 
 ---
 
@@ -244,9 +244,10 @@ Três widgets, todos 2×4, fundo azul-tiffany translúcido, responsivos a 1×4:
   `src/app/pages/Settings.tsx`. Cada pessoa só edita a lista do seu
   personagem (`PUT /widget-phrases/:list`, valida que o perfil bate com a
   lista).
-- Falas embutidas (`Dialogues.kt` no Android e `public/widget-phrases.json`
-  no repo) servem só de **reserva** — usadas no primeiro uso do widget ou
-  quando offline, antes do primeiro fetch bem-sucedido.
+- Falas de **reserva**: `Dialogues.kt` no Android (usadas no primeiro uso do
+  widget ou offline) e `DEFAULT_WIDGET_PHRASES` no `index.ts` do backend
+  (usadas enquanto o KV `widget-phrases` não existe). Ao mudar uma, avalie
+  se a outra precisa acompanhar.
 
 ---
 
