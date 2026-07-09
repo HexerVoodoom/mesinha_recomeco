@@ -224,6 +224,7 @@ app.post("/make-server-19717bce/items", async (c) => {
       muralContentType: body.muralContentType || undefined,
       muralContent: body.muralContent || undefined,
       muralThumbnail: body.muralThumbnail || undefined,
+      caption: body.caption ? String(body.caption).substring(0, 500) : undefined,
       viewedBy: Array.isArray(body.viewedBy) ? body.viewedBy : [],
     };
 
