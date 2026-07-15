@@ -91,6 +91,11 @@ export function ItemDetailModal({
       updates.reminderDays = tempReminderDays;
       updates.reminderForMateus = tempReminderForMateus;
       updates.reminderForAmanda = tempReminderForAmanda;
+      // Configurou dias + destinatário => quer que dispare: liga o lembrete.
+      // (Sem isso o lembrete ficava salvo mas mudo até tocar no ícone de relógio.)
+      if (tempReminderDays.length > 0 && (tempReminderForMateus || tempReminderForAmanda)) {
+        updates.reminderActive = true;
+      }
     }
     
     if (item.category === 'watch') {
