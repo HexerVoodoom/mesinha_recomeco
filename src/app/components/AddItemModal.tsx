@@ -118,7 +118,9 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
       newItem.reminderDays = [];
       newItem.reminderForMateus = false;
       newItem.reminderForAmanda = false;
-      newItem.reminderActive = false;
+      // Nasce ligado: quem cria um lembrete espera que ele dispare depois de
+      // configurado (só dispara quando tiver dias + destinatário definidos).
+      newItem.reminderActive = true;
     }
     
     // Se for categoria top3, adicionar campos específicos
