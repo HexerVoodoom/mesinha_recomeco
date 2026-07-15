@@ -700,6 +700,8 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   );
 
   const fired: string[] = [];
+  // Data local (Brasília) usada na trava de "já disparou hoje".
+  const todayStr = now.toISOString().slice(0, 10);
 
   for (const item of alarmItems) {
     // Verificar se hoje é um dos dias configurados
@@ -709,6 +711,13 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
     const [h, m] = item.reminderTime.split(":").map(Number);
     const minutesDiff = Math.abs((h * 60 + m) - (currentHour * 60 + currentMinute));
     if (minutesDiff > 1) continue;
+
+    // Trava anti-duplicação: a margem de ±1min faz o mesmo lembrete casar em
+    // até 3 execuções do cron (ex.: 08:09, 08:10 e 08:11) — sem a trava, a
+    // notificação chegava 2-4x. Dispara no máximo 1x por dia por lembrete.
+    const lastFiredKey = `reminder-last-fired:${item.id}`;
+    if ((await kv.get(lastFiredKey)) === todayStr) continue;
+    await kv.set(lastFiredKey, todayStr);
 
     // Disparar para os usuários configurados
     const payload = {
