@@ -289,6 +289,27 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
 
     await kv.set(`item:${itemId}`, updatedItem);
     console.log("Item updated successfully:", itemId);
+
+    // Notifica o dono do post quando a outra pessoa curte (novo like).
+    if (Array.isArray(body.likedBy)) {
+      const oldLikers: string[] = Array.isArray(existingItem.likedBy) ? existingItem.likedBy : [];
+      const addedLikers = body.likedBy.filter((u: string) => u && !oldLikers.includes(u));
+      const owner = updatedItem.createdBy;
+      if ((owner === "Amanda" || owner === "Mateus")) {
+        const typeEmoji: Record<string, string> = { text: "📝", image: "🖼️", video: "🎥", audio: "🎵" };
+        const emoji = typeEmoji[updatedItem.muralContentType || "text"] || "📝";
+        for (const liker of addedLikers) {
+          if (liker === owner) continue; // ninguém curte o próprio post
+          sendPushToUser(owner, {
+            title: `${liker} curtiu seu post ❤️`,
+            body: `${emoji} ${updatedItem.title || "Seu post no Mural"}`,
+            tag: "mesinha-like",
+            url: "/",
+          }).catch(console.error);
+        }
+      }
+    }
+
     return c.json({ item: updatedItem });
   } catch (error) {
     console.error("Error updating item:", error);
