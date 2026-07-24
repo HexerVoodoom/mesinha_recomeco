@@ -380,7 +380,7 @@ const DEFAULT_WIDGET_PHRASES: { dupla: any[]; amanda: string[]; mateus: string[]
     { corvinho: "Lembrete: dizer 'te amo' hoje!", alpaquinha: "Isso não precisa de lembrete!" },
     { corvinho: "Viram algum vídeo curtinho hoje?", alpaquinha: "Mandei um nos Vídeos Curtos!" },
     { corvinho: "Top 3 de sabores de sorvete, rápido!", alpaquinha: "Chocolate, morango e creme! Fácil." },
-    { corvinho: "Tem jogo novo pra jogar junto?", alpaquinha: "It Takes Two ainda está esperando!" },
+    { corvinho: "Tem jogo novo pra jogar junto?", alpaquinha: "Vamos jogar Ragnarok? Eu te curo!" },
     { corvinho: "Mural cheio de memórias boas?", alpaquinha: "Cada post é uma históriazinha!" },
     { corvinho: "Aquele restaurante novo está na lista?", alpaquinha: "Já adicionei em Comidas!" },
     { corvinho: "O aniversário de vocês está marcado?", alpaquinha: "Claro! Com lembrete e tudo!" },

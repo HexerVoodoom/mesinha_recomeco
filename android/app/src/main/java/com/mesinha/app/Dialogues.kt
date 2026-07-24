@@ -31,7 +31,7 @@ object Dialogues {
         DialoguePair("Lembrete: dizer 'te amo' hoje!", "Isso não precisa de lembrete!"),
         DialoguePair("Viram algum vídeo curtinho hoje?", "Mandei um nos Vídeos Curtos!"),
         DialoguePair("Top 3 de sabores de sorvete, rápido!", "Chocolate, morango e creme! Fácil."),
-        DialoguePair("Tem jogo novo pra jogar junto?", "It Takes Two ainda está esperando!"),
+        DialoguePair("Tem jogo novo pra jogar junto?", "Vamos jogar Ragnarok? Eu te curo!"),
         DialoguePair("Mural cheio de memórias boas?", "Cada post é uma históriazinha!"),
         DialoguePair("Aquele restaurante novo está na lista?", "Já adicionei em Comidas!"),
         DialoguePair("O aniversário de vocês está marcado?", "Claro! Com lembrete e tudo!"),
