@@ -10,9 +10,9 @@ import java.net.URL
 
 /**
  * Fonte do estado do widget "Encontro hoje?": consulta o endpoint leve
- * `/meetup-today` (que já resolve "hoje" no fuso de Brasília e devolve só um
- * booleano) e guarda em cache local para o widget nunca ficar em branco sem
- * internet.
+ * `/meetup-today` (que já resolve "hoje" no fuso de Brasília e devolve
+ * confirmação + tipo do encontro) e guarda em cache local para o widget nunca
+ * ficar em branco sem internet.
  */
 object MeetupRepository {
 
@@ -24,6 +24,7 @@ object MeetupRepository {
     private const val PREFS = "meetup_today"
     private const val KEY_DATE = "date"
     private const val KEY_CONFIRMED = "confirmed"
+    private const val KEY_TYPE = "type"
     private const val KEY_LAST_FETCH = "last_fetch"
 
     // Não baixa com mais frequência que isso (o widget também se atualiza
@@ -36,6 +37,12 @@ object MeetupRepository {
         val cachedDate = prefs.getString(KEY_DATE, null) ?: return false
         if (cachedDate != todayStr()) return false // cache de um dia anterior não vale mais
         return prefs.getBoolean(KEY_CONFIRMED, false)
+    }
+
+    /** Tipo do encontro confirmado hoje ("coracao" | "videogame" | "pegadas"), ou null. */
+    fun cachedTypeToday(context: Context): String? {
+        if (!cachedConfirmedToday(context)) return null
+        return prefs(context).getString(KEY_TYPE, null)
     }
 
     /** Dispara um download em segundo plano se já passou o intervalo mínimo. */
@@ -59,17 +66,20 @@ object MeetupRepository {
         val root = JSONObject(text)
         val date = root.optString("date", todayStr())
         val confirmed = root.optBoolean("confirmed", false)
+        val type = if (root.isNull("type")) null else root.optString("type", null)
 
         val previous = prefs(context).getBoolean(KEY_CONFIRMED, false)
         val previousDate = prefs(context).getString(KEY_DATE, null)
+        val previousType = prefs(context).getString(KEY_TYPE, null)
 
-        prefs(context).edit()
-            .putString(KEY_DATE, date)
-            .putBoolean(KEY_CONFIRMED, confirmed)
-            .putLong(KEY_LAST_FETCH, System.currentTimeMillis())
-            .apply()
+        prefs(context).edit().apply {
+            putString(KEY_DATE, date)
+            putBoolean(KEY_CONFIRMED, confirmed)
+            if (type != null) putString(KEY_TYPE, type) else remove(KEY_TYPE)
+            putLong(KEY_LAST_FETCH, System.currentTimeMillis())
+        }.apply()
 
-        if (date != previousDate || confirmed != previous) {
+        if (date != previousDate || confirmed != previous || type != previousType) {
             refreshWidget(context)
         }
     }

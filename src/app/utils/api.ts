@@ -2,6 +2,10 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-19717bce`;
 
+// Campos específicos do Calendário de Encontros (categoria "meetup")
+export type MeetupPeriod = 'manha' | 'tarde' | 'noite';
+export type MeetupType = 'coracao' | 'videogame' | 'pegadas';
+
 export interface ListItem {
   id: string;
   title: string;
@@ -44,6 +48,9 @@ export interface ListItem {
   viewedBy?: string[]; // Lista de usuários que visualizaram o post
   likedBy?: string[]; // Lista de usuários que curtiram o post
   caption?: string; // Texto/legenda para posts de imagem do mural
+  // Campos específicos do Calendário de Encontros (categoria meetup)
+  meetupPeriod?: MeetupPeriod; // período do dia (manhã/tarde/noite)
+  meetupType?: MeetupType; // o que vão fazer (juntos em casa / video game cada um em casa / sair)
 }
 
 export interface Settings {

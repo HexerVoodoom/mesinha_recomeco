@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { api, ListItem } from '../utils/api';
+import { api, ListItem, MeetupPeriod, MeetupType } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { isRealtimeConnected } from '../utils/realtimeChannel';
@@ -624,9 +624,10 @@ export default function Home() {
     }
   };
 
-  // Propõe um dia no Calendário de Encontros: cria um item pendente e o
-  // servidor notifica o parceiro para que ele possa confirmar.
-  const handleProposeMeetupDay = async (dateStr: string) => {
+  // Propõe um dia no Calendário de Encontros (com período + tipo escolhidos
+  // no modal): cria um item pendente e o servidor notifica o parceiro para
+  // que ele possa confirmar.
+  const handleProposeMeetupDay = async (dateStr: string, period: MeetupPeriod, type: MeetupType) => {
     const partnerName = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
     const item: ListItem = {
       id: Date.now().toString(),
@@ -640,6 +641,8 @@ export default function Home() {
       createdAt: new Date().toISOString(),
       status: 'pending',
       tags: [],
+      meetupPeriod: period,
+      meetupType: type,
     };
 
     try {

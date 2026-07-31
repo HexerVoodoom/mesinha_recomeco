@@ -117,9 +117,9 @@ class MainActivity : AppCompatActivity() {
 
         webView.loadUrl(MESINHA_URL)
 
-        // Autocura: ao abrir o app, força os widgets a re-renderizar (frase do dia)
-        // e buscar frases novas do servidor, mesmo que o alarme diário tenha sido
-        // descartado pela otimização de bateria.
+        // Autocura: ao abrir o app, força os widgets a re-renderizar (frase do dia
+        // e coração do Calendário de Encontros) e buscar dados novos do servidor,
+        // mesmo que o alarme diário tenha sido descartado pela otimização de bateria.
         refreshWidgets()
 
         // Botão "voltar" navega no histórico da WebView antes de sair do app.
@@ -150,7 +150,8 @@ class MainActivity : AppCompatActivity() {
         val providers = listOf(
             MesinhaWidgetProvider::class.java,
             AlpaquinhaWidgetProvider::class.java,
-            CorvinhoWidgetProvider::class.java
+            CorvinhoWidgetProvider::class.java,
+            MeetupWidgetProvider::class.java
         )
         for (cls in providers) {
             sendBroadcast(

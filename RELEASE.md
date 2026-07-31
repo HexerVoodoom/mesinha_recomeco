@@ -223,19 +223,21 @@ proposital, o que hoje só afeta builds locais (o CI sempre sobrescreve).
 
 ## 7. Widgets de tela inicial (Android)
 
-Três widgets, todos 2×4, fundo azul-tiffany translúcido, responsivos a 1×4:
+Quatro widgets. Os três de frase são 2×4, fundo azul-tiffany translúcido,
+responsivos a 1×4; o quarto ("Encontro hoje?") é 1×1:
 
 | Widget | Provider | Personagem(ns) | Fonte das frases |
 |---|---|---|---|
 | Mesinha · Conversa | `MesinhaWidgetProvider.kt` | Corvinho + Alpaquinha | Fixo (não editável pelo app) |
 | Mesinha · Recado da Amanda | `AlpaquinhaWidgetProvider.kt` | Alpaquinha | Editável pela Amanda em Configurações |
 | Mesinha · Recado do Mateus | `CorvinhoWidgetProvider.kt` | Corvinho | Editável pelo Mateus em Configurações |
+| Mesinha · Encontro hoje? | `MeetupWidgetProvider.kt` | — | Calendário de Encontros (ver abaixo) |
 
 - Frase muda **1×/dia** (índice determinístico por dia-do-ano, ver
   `Dialogues.kt` / `Dialogues.dailyIndex`).
 - **Autocura:** o alarme diário usa `setAndAllowWhileIdle` + `RTC_WAKEUP`
   (resiste a Doze); além disso, toda vez que o app abre
-  (`MainActivity.refreshWidgets()`), ele força os 3 widgets a atualizar —
+  (`MainActivity.refreshWidgets()`), ele força os 4 widgets a atualizar —
   então mesmo se o alarme for morto pela bateria, abrir o app resolve.
 - **Falas editáveis:** `PhraseRepository.kt` busca de
   `GET /make-server-19717bce/widget-phrases` (cacheado em
@@ -248,6 +250,17 @@ Três widgets, todos 2×4, fundo azul-tiffany translúcido, responsivos a 1×4:
   widget ou offline) e `DEFAULT_WIDGET_PHRASES` no `index.ts` do backend
   (usadas enquanto o KV `widget-phrases` não existe). Ao mudar uma, avalie
   se a outra precisa acompanhar.
+- **"Encontro hoje?" (1×1):** `MeetupRepository.kt` busca de
+  `GET /make-server-19717bce/meetup-today` (cacheado em SharedPreferences,
+  throttle de 20min + atualização periódica via `updatePeriodMillis` de
+  30min) e devolve `{ date, confirmed, type, period }` — "hoje" já resolvido
+  no fuso de Brasília no servidor. O ícone mostrado depende de `type`:
+  coração cheio (`heart_full`) = "coracao" (juntos em casa), controle
+  (`ic_meetup_videogame`) = "videogame" (cada um joga na sua casa), pegadas
+  (`ic_meetup_footprints`) = "pegadas" (sair); sem encontro confirmado hoje,
+  mostra coração vazio (`heart_empty`). O tipo e o período são escolhidos no
+  app web ao propor o encontro (`MeetupCalendar.tsx`) e ficam salvos no item
+  (categoria `meetup`) como `meetupType`/`meetupPeriod`.
 
 ---
 
@@ -265,6 +278,8 @@ android/
 │       │   ├── MesinhaWidgetProvider.kt    # widget "Conversa"
 │       │   ├── AlpaquinhaWidgetProvider.kt # widget da Amanda
 │       │   ├── CorvinhoWidgetProvider.kt   # widget do Mateus
+│       │   ├── MeetupWidgetProvider.kt     # widget "Encontro hoje?" (1x1)
+│       │   ├── MeetupRepository.kt         # busca/cacheia estado do dia (GET /meetup-today)
 │       │   ├── Dialogues.kt                # falas de reserva + índice diário
 │       │   ├── PhraseRepository.kt         # busca/cacheia falas do backend
 │       │   ├── WidgetScheduler.kt          # alarme diário (Doze-proof)
@@ -273,9 +288,9 @@ android/
 │       │   ├── FcmSupport.kt               # canal de notificação + registro de token
 │       │   └── MesinhaMessagingService.kt  # recebe push do FCM
 │       └── res/
-│           ├── layout/          # 3 widgets (+ variante compacta do duplo)
+│           ├── layout/          # 4 widgets (+ variante compacta do duplo)
 │           ├── xml/             # *_info.xml (tamanho/config de cada widget)
-│           ├── drawable/        # personagens (corvinho/alpaquinha), balões, fundo
+│           ├── drawable/        # personagens (corvinho/alpaquinha), balões, fundo, ícones de encontro
 │           └── mipmap-*/        # ícone do launcher (o mesmo do PWA)
 ├── build.gradle.kts             # plugins de nível raiz (AGP, Kotlin, google-services)
 └── .gitignore                   # *.jks, *.keystore nunca vão pro git

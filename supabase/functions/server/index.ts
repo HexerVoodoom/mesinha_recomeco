@@ -37,6 +37,25 @@ async function sendPushToUser(user: string, payload: any): Promise<void> {
   }
 }
 
+// Rótulos do Calendário de Encontros (categoria "meetup"), usados nas
+// notificações push. Mantidos em sincronia com MeetupCalendar.tsx no cliente.
+const MEETUP_TYPE_LABELS: Record<string, string> = {
+  coracao: "ficar juntos em casa 💕",
+  videogame: "jogar video game 🎮 (cada um em casa)",
+  pegadas: "sair 👣",
+};
+const MEETUP_PERIOD_LABELS: Record<string, string> = {
+  manha: "de manhã",
+  tarde: "à tarde",
+  noite: "à noite",
+};
+
+function describeMeetup(item: any): string {
+  const type = MEETUP_TYPE_LABELS[item?.meetupType] || "se ver";
+  const period = MEETUP_PERIOD_LABELS[item?.meetupPeriod];
+  return period ? `${type} ${period}` : type;
+}
+
 const app = new Hono();
 
 // Enable CORS for all routes and methods (must be first)
@@ -226,6 +245,9 @@ app.post("/make-server-19717bce/items", async (c) => {
       muralThumbnail: body.muralThumbnail || undefined,
       caption: body.caption ? String(body.caption).substring(0, 500) : undefined,
       viewedBy: Array.isArray(body.viewedBy) ? body.viewedBy : [],
+      // Campos específicos do Calendário de Encontros (categoria meetup)
+      meetupPeriod: body.meetupPeriod || undefined,
+      meetupType: body.meetupType || undefined,
     };
 
     await kv.set(`item:${itemId}`, item);
@@ -249,7 +271,7 @@ app.post("/make-server-19717bce/items", async (c) => {
       const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
       sendPushToUser(otherUser, {
         title: `${item.createdBy} quer te ver! 💕`,
-        body: `Marcou o dia ${item.eventDate} no Calendário de Encontros. Toca para confirmar!`,
+        body: `Marcou o dia ${item.eventDate} pra ${describeMeetup(item)}. Toca para confirmar!`,
         tag: "mesinha-meetup",
         url: "/",
       }).catch(console.error);
@@ -330,7 +352,7 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
     ) {
       sendPushToUser(updatedItem.createdBy, {
         title: "Encontro confirmado! 💕",
-        body: `Vocês vão se ver no dia ${updatedItem.eventDate}!`,
+        body: `Vocês vão ${describeMeetup(updatedItem)} no dia ${updatedItem.eventDate}!`,
         tag: "mesinha-meetup",
         url: "/",
       }).catch(console.error);
@@ -713,9 +735,10 @@ function brazilNow(): Date {
   return new Date(Date.now() + BRAZIL_OFFSET_MS);
 }
 
-// Estado do dia para o widget nativo "Encontro hoje?" (coração cheio/vazio):
-// devolve só se HOJE (fuso de Brasília, igual ao resto do app) está confirmado
-// no Calendário de Encontros — sem expor a lista inteira de itens ao widget.
+// Estado do dia para o widget nativo "Encontro hoje?": devolve se HOJE (fuso
+// de Brasília, igual ao resto do app) está confirmado no Calendário de
+// Encontros e, se estiver, o tipo (coração/video game/pegadas) pra escolher o
+// ícone certo — sem expor a lista inteira de itens ao widget.
 app.get("/make-server-19717bce/meetup-today", async (c) => {
   try {
     const todayStr = brazilNow().toISOString().slice(0, 10);
@@ -724,8 +747,13 @@ app.get("/make-server-19717bce/meetup-today", async (c) => {
       limit: 50,
       categoryFilter: "meetup",
     });
-    const confirmed = items.some((item: any) => item.eventDate === todayStr && item.status === "done");
-    return c.json({ date: todayStr, confirmed });
+    const todayItem = items.find((item: any) => item.eventDate === todayStr && item.status === "done");
+    return c.json({
+      date: todayStr,
+      confirmed: !!todayItem,
+      type: todayItem?.meetupType || null,
+      period: todayItem?.meetupPeriod || null,
+    });
   } catch (error) {
     console.error("[GET /meetup-today] Error:", error);
     return c.json({
@@ -803,6 +831,37 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
 
     fired.push(item.title);
     console.log(`[Reminders] Fired "${item.title}" at ${item.reminderTime} for day ${todayDay}`);
+  }
+
+  // Lembrete diário do Calendário de Encontros: se hoje tem um encontro
+  // confirmado, avisa os dois às 08:00 (Brasília) — só uma vez por dia,
+  // mesma trava anti-duplicação (margem de ±1min) usada pros alarmes acima.
+  const MEETUP_REMINDER_MINUTES = 8 * 60; // 08:00
+  const nowMinutes = currentHour * 60 + currentMinute;
+  if (Math.abs(nowMinutes - MEETUP_REMINDER_MINUTES) <= 1) {
+    const meetupReminderKey = "meetup-reminder-last-fired";
+    if ((await kv.get(meetupReminderKey)) !== todayStr) {
+      const { items: meetupItems } = await kv.getItemsLightPaged({
+        offset: 0,
+        limit: 50,
+        categoryFilter: "meetup",
+      });
+      const todayMeetup = meetupItems.find((item: any) => item.eventDate === todayStr && item.status === "done");
+      if (todayMeetup) {
+        const payload = {
+          title: "Hoje é dia de encontro! 💕",
+          body: `Vocês combinaram ${describeMeetup(todayMeetup)}.`,
+          tag: "mesinha-meetup-today",
+          url: "/",
+        };
+        await Promise.all([
+          sendPushToUser("Amanda", payload),
+          sendPushToUser("Mateus", payload),
+        ]);
+        console.log(`[Reminders] Meetup reminder fired for ${todayStr}`);
+      }
+      await kv.set(meetupReminderKey, todayStr);
+    }
   }
 
   const brazilTimeStr = `${String(currentHour).padStart(2,"0")}:${String(currentMinute).padStart(2,"0")} (Brasília)`;
