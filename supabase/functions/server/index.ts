@@ -244,6 +244,17 @@ app.post("/make-server-19717bce/items", async (c) => {
       }).catch(console.error);
     }
 
+    // Notifica o parceiro quando um dia é proposto no Calendário de Encontros
+    if (item.category === "meetup" && item.createdBy && item.eventDate) {
+      const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      sendPushToUser(otherUser, {
+        title: `${item.createdBy} quer te ver! 💕`,
+        body: `Marcou o dia ${item.eventDate} no Calendário de Encontros. Toca para confirmar!`,
+        tag: "mesinha-meetup",
+        url: "/",
+      }).catch(console.error);
+    }
+
     return c.json({ item });
   } catch (error) {
     console.error("Error creating item:", error);
@@ -308,6 +319,21 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
           }).catch(console.error);
         }
       }
+    }
+
+    // Notifica quem propôs o dia quando o parceiro confirma o encontro.
+    if (
+      updatedItem.category === "meetup" &&
+      existingItem.status !== "done" &&
+      updatedItem.status === "done" &&
+      updatedItem.createdBy
+    ) {
+      sendPushToUser(updatedItem.createdBy, {
+        title: "Encontro confirmado! 💕",
+        body: `Vocês vão se ver no dia ${updatedItem.eventDate}!`,
+        tag: "mesinha-meetup",
+        url: "/",
+      }).catch(console.error);
     }
 
     return c.json({ item: updatedItem });
@@ -686,6 +712,28 @@ const BRAZIL_OFFSET_MS = -3 * 60 * 60 * 1000;
 function brazilNow(): Date {
   return new Date(Date.now() + BRAZIL_OFFSET_MS);
 }
+
+// Estado do dia para o widget nativo "Encontro hoje?" (coração cheio/vazio):
+// devolve só se HOJE (fuso de Brasília, igual ao resto do app) está confirmado
+// no Calendário de Encontros — sem expor a lista inteira de itens ao widget.
+app.get("/make-server-19717bce/meetup-today", async (c) => {
+  try {
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const { items } = await kv.getItemsLightPaged({
+      offset: 0,
+      limit: 50,
+      categoryFilter: "meetup",
+    });
+    const confirmed = items.some((item: any) => item.eventDate === todayStr && item.status === "done");
+    return c.json({ date: todayStr, confirmed });
+  } catch (error) {
+    console.error("[GET /meetup-today] Error:", error);
+    return c.json({
+      error: "Failed to check meetup status",
+      details: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
+});
 
 app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   // Validar autorização

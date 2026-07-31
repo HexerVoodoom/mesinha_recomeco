@@ -73,6 +73,20 @@
                 android:resource="@xml/widget_corvinho_info" />
         </receiver>
 
+        <!-- Widget 4: "Encontro hoje?" (1x1) — coração cheio/vazio conforme o Calendário de Encontros. -->
+        <receiver
+            android:name=".MeetupWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_meetup">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_meetup_info" />
+        </receiver>
+
         <!-- Reagenda a troca diária quando o aparelho reinicia. -->
         <receiver
             android:name=".BootReceiver"

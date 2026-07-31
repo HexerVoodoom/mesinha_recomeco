@@ -4,14 +4,18 @@ App Android nativo do Mesinha. Ele faz duas coisas:
 
 1. **App** (`MainActivity`): abre o PWA do Mesinha dentro de uma WebView, então
    no celular você tem o ícone do Mesinha junto dos outros apps.
-2. **Widgets de tela inicial** — três opções no menu de widgets, todas **2×4** e
-   com a frase mudando **1× por dia** (ver `Dialogues.kt`):
-   - **Mesinha · Conversa** (`MesinhaWidgetProvider`): Corvinho à esquerda,
-     Alpaquinha à direita e dois balões de fala (32 pares de frases).
-   - **Mesinha · Recado da Amanda** (`AlpaquinhaWidgetProvider`): só a Alpaquinha,
-     com recadinhos da Amanda para o Mateus (30 frases).
-   - **Mesinha · Recado do Mateus** (`CorvinhoWidgetProvider`): só o Corvinho,
-     com recadinhos do Mateus para a Amanda (30 frases).
+2. **Widgets de tela inicial** — quatro opções no menu de widgets:
+   - **Mesinha · Conversa** (`MesinhaWidgetProvider`, 2×4): Corvinho à esquerda,
+     Alpaquinha à direita e dois balões de fala, mudando 1× por dia (32 pares
+     de frases, ver `Dialogues.kt`).
+   - **Mesinha · Recado da Amanda** (`AlpaquinhaWidgetProvider`, 2×4): só a
+     Alpaquinha, com recadinhos da Amanda para o Mateus (30 frases).
+   - **Mesinha · Recado do Mateus** (`CorvinhoWidgetProvider`, 2×4): só o
+     Corvinho, com recadinhos do Mateus para a Amanda (30 frases).
+   - **Mesinha · Encontro hoje?** (`MeetupWidgetProvider`, 1×1): coração cheio
+     quando o dia de hoje está confirmado no Calendário de Encontros do app,
+     vazio quando ainda não está (consulta o endpoint `/meetup-today`, que já
+     resolve "hoje" no fuso de Brasília).
 
 ## Pré-requisitos
 
@@ -49,8 +53,10 @@ echo "sdk.dir=/caminho/para/Android/Sdk" > local.properties
 
 1. Instale o app no celular.
 2. Pressione e segure num espaço vazio da tela inicial ▸ **Widgets**.
-3. Procure por **Mesinha** ▸ arraste o widget **2×4** para a tela.
-4. A frase do dia aparece e troca sozinha à meia-noite. Tocar no widget abre o app.
+3. Procure por **Mesinha** ▸ arraste o widget desejado para a tela (os três de
+   conversa/recado são **2×4**; o "Encontro hoje?" é **1×1**).
+4. Frase do dia e coração atualizam sozinhos (frase à meia-noite; coração a
+   cada ~30min ou quando alguém confirma um encontro). Tocar no widget abre o app.
 
 ## Estrutura
 
