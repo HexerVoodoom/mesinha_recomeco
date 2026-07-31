@@ -2,17 +2,21 @@ package com.mesinha.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -139,6 +143,28 @@ class MainActivity : AppCompatActivity() {
                         pendingGeoCallback = callback
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                     }
+                }
+            }
+
+            // Sem isso, a WebView não sabe o que fazer com um link de download
+            // (ex.: o APK mais recente em Configurações) — delega pro
+            // DownloadManager do sistema, que baixa e notifica quando terminar
+            // (tocar na notificação abre o instalador de pacotes).
+            setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+                try {
+                    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    val request = DownloadManager.Request(Uri.parse(url)).apply {
+                        addRequestHeader("User-Agent", userAgent)
+                        setMimeType(mimeType)
+                        setTitle(fileName)
+                        setDescription("Baixando atualização do Mesinha...")
+                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        setDestinationInExternalFilesDir(this@MainActivity, Environment.DIRECTORY_DOWNLOADS, fileName)
+                    }
+                    (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                    Toast.makeText(this@MainActivity, "Baixando... veja o progresso nas notificações", Toast.LENGTH_LONG).show()
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, "Não foi possível iniciar o download", Toast.LENGTH_LONG).show()
                 }
             }
         }

@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Bell, Calendar, Search } from 'lucide-react';
+import { ArrowLeft, Bell, Calendar, Search, Download } from 'lucide-react';
 import { api, Settings as SettingsType } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { toast } from 'sonner';
 import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
+
+// URL fixa: sempre baixa o APK da GitHub Release mais recente (gerada
+// automaticamente pelo workflow "Build & Publish Release AAB" a cada merge
+// em main que mexe em android/**). Funciona tanto no navegador quanto dentro
+// do app nativo (a WebView já sabe lidar com o download, ver MainActivity.kt).
+const LATEST_APK_URL = 'https://github.com/HexerVoodoom/mesinha_recomeco/releases/latest/download/app-release.apk';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -137,6 +143,18 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {/* Baixar a versão mais recente do app (APK direto, sem Play Store) */}
+          <a
+            href={LATEST_APK_URL}
+            className="w-full bg-card rounded-xl p-6 border border-border flex items-center gap-3 hover:bg-muted/30 transition-colors"
+          >
+            <Download className="w-6 h-6" />
+            <div className="flex-1 text-left">
+              <div className="text-base font-medium">Baixar versão mais recente</div>
+              <div className="text-sm text-muted-foreground">Instala o APK mais atual direto no celular</div>
+            </div>
+          </a>
 
           {/* Busca: movida para cá, dentro do menu oculto */}
           <button

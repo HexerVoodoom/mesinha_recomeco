@@ -1,8 +1,11 @@
 name: Build & Publish Release AAB
 
-# Gera o Android App Bundle (.aab) ASSINADO e, se o secret
-# PLAY_SERVICE_ACCOUNT_JSON estiver configurado, publica automaticamente nas
-# faixas de teste da Play Store (Interno + Fechado).
+# Gera o Android App Bundle (.aab) e o APK (.apk) de release, ambos ASSINADOS.
+# O .aab vai pro artifact e, se o secret PLAY_SERVICE_ACCOUNT_JSON estiver
+# configurado, publica automaticamente nas faixas de teste da Play Store
+# (Interno + Fechado). O .apk é publicado numa GitHub Release fixa ("latest")
+# — é o que a tela de Configurações do app linka como "baixar a versão mais
+# recente" (instalação direta, sem passar pela Play Store).
 #
 # Dispara sozinho a cada push em `main` que mexa em android/**, e também pode
 # ser disparado manualmente (Actions -> Build & Publish Release AAB -> Run
@@ -21,6 +24,9 @@ on:
     paths:
       - 'android/**'
   workflow_dispatch: {}
+
+permissions:
+  contents: write # necessário pra publicar a GitHub Release com o APK
 
 jobs:
   build:
@@ -45,7 +51,7 @@ jobs:
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
 
-      - name: Build signed AAB
+      - name: Build signed AAB + APK
         working-directory: android
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
@@ -55,8 +61,9 @@ jobs:
         # versionCode = número do run do GitHub Actions: sempre novo e
         # crescente, então nunca colide com um versionCode já usado na Play
         # Store, mesmo que ninguém tenha editado build.gradle.kts.
+        # bundleRelease -> .aab (Play Store); assembleRelease -> .apk (download direto).
         run: |
-          ./gradlew bundleRelease --no-daemon --stacktrace \
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace \
             -PversionCode=${{ github.run_number }} \
             -PversionName="2.${{ github.run_number }}"
 
@@ -66,6 +73,30 @@ jobs:
           name: mesinha-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesinha-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      # GitHub Release fixa (tag "latest"): dá uma URL estável e pública pro
+      # APK mais recente, sem precisar de login no GitHub — é a que a tela de
+      # Configurações do app usa. Cada run substitui o APK anexado.
+      - name: Publish latest APK as GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: latest
+          name: "Mesinha (build ${{ github.run_number }})"
+          body: |
+            Build automático a partir de `main` (versionCode ${{ github.run_number }}).
+
+            Baixe `app-release.apk` e instale direto no celular (pode ser preciso permitir "instalar de fontes desconhecidas").
+          files: android/app/build/outputs/apk/release/app-release.apk
+          make_latest: true
 
       - name: Check if Play publishing is configured
         id: check-secret
