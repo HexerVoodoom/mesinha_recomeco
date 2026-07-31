@@ -2,16 +2,21 @@ package com.mesinha.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -57,6 +62,17 @@ class MainActivity : AppCompatActivity() {
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */ }
 
+    // Pedido de geolocalização da página (aba Mapa) aguardando o diálogo do sistema.
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: GeolocationPermissions.Callback? = null
+
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            pendingGeoOrigin?.let { origin -> pendingGeoCallback?.invoke(origin, granted, false) }
+            pendingGeoOrigin = null
+            pendingGeoCallback = null
+        }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +86,7 @@ class MainActivity : AppCompatActivity() {
             settings.databaseEnabled = true
             settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             settings.allowFileAccess = false
+            settings.setGeolocationEnabled(true) // navigator.geolocation na aba Mapa
             webViewClient = WebViewClient()          // navega dentro da WebView
 
             // Ponte JS↔nativo: o PWA informa quem está logado para registrarmos o
@@ -110,6 +127,44 @@ class MainActivity : AppCompatActivity() {
                         pendingWebPermission = request
                         micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
+                }
+
+                override fun onGeolocationPermissionsShowPrompt(
+                    origin: String,
+                    callback: GeolocationPermissions.Callback
+                ) {
+                    val hasFineLocation = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasFineLocation) {
+                        callback.invoke(origin, true, false)
+                    } else {
+                        pendingGeoOrigin = origin
+                        pendingGeoCallback = callback
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
+                }
+            }
+
+            // Sem isso, a WebView não sabe o que fazer com um link de download
+            // (ex.: o APK mais recente em Configurações) — delega pro
+            // DownloadManager do sistema, que baixa e notifica quando terminar
+            // (tocar na notificação abre o instalador de pacotes).
+            setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+                try {
+                    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    val request = DownloadManager.Request(Uri.parse(url)).apply {
+                        addRequestHeader("User-Agent", userAgent)
+                        setMimeType(mimeType)
+                        setTitle(fileName)
+                        setDescription("Baixando atualização do Mesinha...")
+                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        setDestinationInExternalFilesDir(this@MainActivity, Environment.DIRECTORY_DOWNLOADS, fileName)
+                    }
+                    (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                    Toast.makeText(this@MainActivity, "Baixando... veja o progresso nas notificações", Toast.LENGTH_LONG).show()
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, "Não foi possível iniciar o download", Toast.LENGTH_LONG).show()
                 }
             }
         }

@@ -215,6 +215,9 @@ proposital, o que hoje só afeta builds locais (o CI sempre sobrescreve).
   - `fcm-service-account` — credencial de envio do Firebase (seção 2)
   - `widget-phrases` — `{ dupla, amanda, mateus }`, as falas dos widgets
     (editável via app em Configurações; ver seção 7)
+  - `location:<Amanda|Mateus>` — sessão de compartilhamento de localização
+    (aba Mapa, ver seção 8): `{ lat, lng, updatedAt, expiresAt }`, dura 1h a
+    partir do início e some sozinha (o `GET /location` já filtra expiradas)
 - **Login:** validado apenas no cliente (`api.login` em
   `src/app/utils/api.ts`): Amanda = `Mateus`, Mateus = `Amanda` (a senha de
   cada um é o nome do parceiro). Não há endpoint de login no servidor.
@@ -264,7 +267,45 @@ responsivos a 1×4; o quarto ("Encontro hoje?") é 1×1:
 
 ---
 
-## 8. App Android — estrutura de arquivos
+## 8. Mapa (compartilhamento de localização em tempo real)
+
+Aba "Mapa" (dentro do slider de ferramentas do `CategoryMenu`, junto com
+"Encontros"): qualquer um dos dois toca em "Compartilhar minha localização
+por 1h", o app pede permissão de geolocalização, começa a mandar a posição
+pro servidor e notifica o parceiro pra também ativar. Enquanto os dois
+estiverem compartilhando, o mapa mostra as duas posições em tempo real.
+
+- **Frontend:**
+  - `src/app/hooks/useLocationSharing.ts` — fica montado na `Home` (não só
+    dentro da aba Mapa) pra continuar rodando o `navigator.geolocation.watchPosition`
+    e o timer de 1h mesmo trocando de categoria dentro do app. Manda posição
+    nova no máximo 1x a cada ~12s (throttle).
+  - `src/app/components/MapView.tsx` — mapa em si (Leaflet + OpenStreetMap,
+    sem precisar de API key), marcadores em emoji (🦙 Amanda / 🐦‍⬛ Mateus),
+    auto-enquadra os dois pontos quando ambos estão compartilhando.
+  - Sincronização em tempo real via o mesmo canal de broadcast do resto do
+    app (`realtimeChannel.ts`, eventos `location_updated`/`location_stopped`)
+    — a posição do parceiro atualiza no mapa sem precisar dar refresh.
+- **Backend:** `POST /location/start` (inicia sessão de 1h + notifica o
+  parceiro), `PUT /location` (atualiza lat/lng, só aceito com sessão ainda
+  válida), `GET /location` (estado atual dos dois, usado no primeiro load),
+  `DELETE /location` (para de compartilhar). Ver seção 6 para a chave do KV.
+- **Limitação conhecida:** o compartilhamento depende do app/aba continuar
+  aberto (é um `watchPosition` de JavaScript, não um serviço nativo em
+  background) — se o sistema operacional suspender a aba/app, o
+  compartilhamento para até reabrir. Isso é esperado num PWA/WebView sem
+  serviço de localização em background nativo.
+- **Android (WebView):** geolocalização dentro do WebView **não funciona por
+  padrão** — precisa de `settings.setGeolocationEnabled(true)` e implementar
+  `WebChromeClient.onGeolocationPermissionsShowPrompt(...)` pedindo a
+  permissão nativa `ACCESS_FINE_LOCATION` (ambos em `MainActivity.kt`, mesmo
+  padrão já usado pro microfone). Sem isso, `navigator.geolocation` fica
+  pendurado/falha silenciosamente dentro do app instalado (funciona normal
+  num navegador comum, então esse detalhe só importa pro APK/AAB nativo).
+
+---
+
+## 9. App Android — estrutura de arquivos
 
 ```
 android/
@@ -301,7 +342,7 @@ android/
 
 ---
 
-## 9. Branches importantes
+## 10. Branches importantes
 
 - **`main`** — produção. Todo merge aqui dispara os deploys automáticos.
 - **`backup/pwa-pre-android-20260630`** — snapshot da versão só-PWA, antes de
@@ -311,7 +352,7 @@ android/
 
 ---
 
-## 10. Checklist rápido — "quero soltar uma versão nova"
+## 11. Checklist rápido — "quero soltar uma versão nova"
 
 **Com `PLAY_SERVICE_ACCOUNT_JSON` configurado (fluxo atual):**
 1. Fazer a mudança de código, PR, merge em `main`.

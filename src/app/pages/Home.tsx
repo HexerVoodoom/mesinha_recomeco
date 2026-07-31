@@ -16,6 +16,8 @@ import { MuralSection } from '../components/MuralSection';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { MeetupCalendar } from '../components/MeetupCalendar';
+import { MapView } from '../components/MapView';
+import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
 import fabButton from "figma:asset/dd4b98f23138814cb5d5f735480190b4a56f65a0.png";
@@ -134,6 +136,7 @@ export default function Home() {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   // Paginação - 7 itens por página
   const [currentPage, setCurrentPage] = useState<Record<Category, number>>({
@@ -186,6 +189,10 @@ export default function Home() {
 
   // Sistema de notificações
   const { updateReminders, notifyNewMuralItem } = useNotifications(userProfile);
+
+  // Compartilhamento de localização (aba "Mapa"). Fica montado aqui (não só
+  // dentro da tela do mapa) pra continuar rodando por 1h mesmo trocando de aba.
+  const locationSharing = useLocationSharing(userProfile);
 
   // Atualizar lembretes quando os itens mudarem
   useEffect(() => {
@@ -294,6 +301,7 @@ export default function Home() {
     if ((location.state as any)?.openSearch) {
       setShowSearch(true);
       setShowMeetupCalendar(false);
+      setShowMap(false);
       navigate('.', { replace: true, state: null });
     }
   }, [location.state]);
@@ -853,6 +861,7 @@ export default function Home() {
     setActiveCategory(categoryId);
     setShowSearch(false);
     setShowMeetupCalendar(false);
+    setShowMap(false);
     // Resetar página quando trocar de categoria se ainda não foi carregada
     if (!loadedCategories.has(categoryId)) {
       setCurrentPage(prev => ({ ...prev, [categoryId]: 1 }));
@@ -861,7 +870,14 @@ export default function Home() {
 
   const handleToggleMeetupCalendar = () => {
     setShowSearch(false);
+    setShowMap(false);
     setShowMeetupCalendar(prev => !prev);
+  };
+
+  const handleToggleMap = () => {
+    setShowSearch(false);
+    setShowMeetupCalendar(false);
+    setShowMap(prev => !prev);
   };
 
   return (
@@ -946,8 +962,10 @@ export default function Home() {
           activeCategory={activeCategory}
           showSearch={showSearch}
           showMeetupCalendar={showMeetupCalendar}
+          showMap={showMap}
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
+          onOpenMap={handleToggleMap}
         />
 
         {error && (
@@ -981,6 +999,8 @@ export default function Home() {
             onConfirmDay={handleConfirmMeetupDay}
             onCancelDay={handleCancelMeetupDay}
           />
+        ) : showMap ? (
+          <MapView userProfile={userProfile} {...locationSharing} />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -1088,8 +1108,8 @@ export default function Home() {
         )}
       </main>
 
-      {/* FAB - escondido quando busca ou calendário de encontros está ativo */}
-      {!showSearch && !showMeetupCalendar && (
+      {/* FAB - escondido quando busca, calendário de encontros ou mapa está ativo */}
+      {!showSearch && !showMeetupCalendar && !showMap && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}

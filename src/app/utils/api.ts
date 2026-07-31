@@ -53,6 +53,15 @@ export interface ListItem {
   meetupType?: MeetupType; // o que vão fazer (juntos em casa / video game cada um em casa / sair)
 }
 
+// Compartilhamento de localização em tempo real (aba "Mapa")
+export interface LocationShare {
+  profile: 'Amanda' | 'Mateus';
+  lat: number;
+  lng: number;
+  updatedAt: string;
+  expiresAt: string; // sessão de 1h a partir do início do compartilhamento
+}
+
 export interface Settings {
   coupleName: string;
   themeColor: string;
@@ -267,6 +276,32 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ phrases, profile }),
     });
+  },
+
+  // Compartilhamento de localização em tempo real (aba "Mapa")
+  startLocationShare: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<{ location: LocationShare }> => {
+    return await fetchAPI('/location/start', {
+      method: 'POST',
+      body: JSON.stringify({ profile, lat, lng }),
+    });
+  },
+
+  updateLocation: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<{ location: LocationShare }> => {
+    return await fetchAPI('/location', {
+      method: 'PUT',
+      body: JSON.stringify({ profile, lat, lng }),
+    });
+  },
+
+  stopLocationShare: async (profile: 'Amanda' | 'Mateus'): Promise<void> => {
+    await fetchAPI('/location', {
+      method: 'DELETE',
+      body: JSON.stringify({ profile }),
+    });
+  },
+
+  getLocations: async (): Promise<{ Amanda: LocationShare | null; Mateus: LocationShare | null }> => {
+    return await fetchAPI('/location');
   },
 };
 

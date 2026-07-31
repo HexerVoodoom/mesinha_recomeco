@@ -1,4 +1,4 @@
-import { api, ListItem, Settings } from './api';
+import { api, ListItem, Settings, LocationShare } from './api';
 import { broadcastSync } from './realtimeChannel';
 
 // API wrapper com sincronização
@@ -27,5 +27,24 @@ export const syncApi = {
     const updatedSettings = await api.updateSettings(settings);
     broadcastSync({ type: 'settings_updated', data: updatedSettings });
     return updatedSettings;
+  },
+
+  // Localização (Mapa) com sync — broadcast imediato pro parceiro ver a
+  // posição em tempo real, além do PUT persistido no servidor.
+  startLocationShare: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<LocationShare> => {
+    const { location } = await api.startLocationShare(profile, lat, lng);
+    broadcastSync({ type: 'location_updated', data: location });
+    return location;
+  },
+
+  updateLocation: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<LocationShare> => {
+    const { location } = await api.updateLocation(profile, lat, lng);
+    broadcastSync({ type: 'location_updated', data: location });
+    return location;
+  },
+
+  stopLocationShare: async (profile: 'Amanda' | 'Mateus'): Promise<void> => {
+    await api.stopLocationShare(profile);
+    broadcastSync({ type: 'location_stopped', data: { profile } });
   },
 };
