@@ -4,6 +4,7 @@ import {
   Gamepad2,
   UtensilsCrossed,
   MapPin,
+  MapPinned,
   Calendar,
   Smile,
   AlarmClock,
@@ -59,22 +60,44 @@ const categoryIcons: Record<Category | 'search', string> = {
   search: imgIconPesquisar,
 };
 
+// Ferramentas extras (fora da grade de categorias), num slider horizontal
+// pra sempre dar pra encaixar mais uma sem espremer os ícones existentes.
+const tools = [
+  { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
+  { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
+];
+type ToolId = (typeof tools)[number]['id'];
+
 interface CategoryMenuProps {
   activeCategory: Category;
   showSearch: boolean;
   showMeetupCalendar: boolean;
+  showMap: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
+  onOpenMap: () => void;
 }
 
-/** Cartão com o badge da categoria ativa e a grade de ícones de navegação. */
-export function CategoryMenu({ activeCategory, showSearch, showMeetupCalendar, onCategoryChange, onOpenMeetupCalendar }: CategoryMenuProps) {
+/** Cartão com o badge da categoria ativa, a grade de ícones de navegação e o slider de ferramentas. */
+export function CategoryMenu({
+  activeCategory,
+  showSearch,
+  showMeetupCalendar,
+  showMap,
+  onCategoryChange,
+  onOpenMeetupCalendar,
+  onOpenMap,
+}: CategoryMenuProps) {
+  const activeTool: ToolId | null = showMeetupCalendar ? 'meetup' : showMap ? 'map' : null;
+  const activeToolMeta = tools.find(t => t.id === activeTool);
+  const toolHandlers: Record<ToolId, () => void> = { meetup: onOpenMeetupCalendar, map: onOpenMap };
+
   return (
     <div className="bg-[#F8F6F4] rounded-[32px] border-2 border-[#E9E4DF] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[21px] mb-6 relative mx-6">
       {/* Label Badge */}
       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E9E4DF] rounded-full px-4 py-1 flex items-center gap-2">
-        {showMeetupCalendar ? (
-          <CalendarHeart className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} />
+        {activeToolMeta ? (
+          <activeToolMeta.icon className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} />
         ) : (
           <img
             src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]}
@@ -83,7 +106,7 @@ export function CategoryMenu({ activeCategory, showSearch, showMeetupCalendar, o
           />
         )}
         <span className="font-['Quicksand',sans-serif] font-bold text-xs text-[#2B2A28] uppercase tracking-tight">
-          {showMeetupCalendar ? 'Encontros' : showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
+          {activeToolMeta ? activeToolMeta.label : showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
         </span>
       </div>
 
@@ -91,7 +114,7 @@ export function CategoryMenu({ activeCategory, showSearch, showMeetupCalendar, o
       <div className="grid grid-cols-6 gap-4 pt-4">
         {categories.map(category => {
           const Icon = category.icon;
-          const isActive = activeCategory === category.id && !showSearch && !showMeetupCalendar;
+          const isActive = activeCategory === category.id && !activeTool && !showSearch;
           return (
             <button
               key={category.id}
@@ -106,18 +129,26 @@ export function CategoryMenu({ activeCategory, showSearch, showMeetupCalendar, o
             </button>
           );
         })}
+      </div>
 
-        {/* Calendário de Encontros: propor e confirmar os dias em que vão se ver */}
-        <button
-          onClick={onOpenMeetupCalendar}
-          className="flex flex-col items-center gap-1"
-        >
-          <div className={`transition-colors ${
-            showMeetupCalendar ? 'text-[#4D989B]' : 'text-[#2B2A28]'
-          }`}>
-            <CalendarHeart className="w-[20px] h-[20px]" strokeWidth={1.5} />
-          </div>
-        </button>
+      {/* Slider de ferramentas: espaço pra crescer sem mexer na grade acima */}
+      <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pt-4 mt-3 border-t border-[#E9E4DF] -mx-1 px-1 hide-scrollbar">
+        {tools.map(tool => {
+          const Icon = tool.icon;
+          const isActive = activeTool === tool.id;
+          return (
+            <button
+              key={tool.id}
+              onClick={toolHandlers[tool.id]}
+              className={`shrink-0 snap-start flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-colors ${
+                isActive ? 'border-primary bg-primary/10 text-primary' : 'border-[#E9E4DF] text-[#2B2A28]'
+              }`}
+            >
+              <Icon className="w-4 h-4" strokeWidth={1.5} />
+              <span className="text-xs font-medium whitespace-nowrap">{tool.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

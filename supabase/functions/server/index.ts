@@ -694,6 +694,110 @@ app.delete("/make-server-19717bce/push-subscription", async (c) => {
   }
 });
 
+// ── Compartilhamento de localização em tempo real (aba "Mapa") ───────────────
+//
+// Estado efêmero (não é um "item"): cada perfil tem no máximo uma sessão de
+// compartilhamento ativa por vez, guardada em `location:<profile>` com um
+// `expiresAt` de 1h a partir do início. O cliente também transmite as
+// atualizações de posição via Supabase Realtime Broadcast (baixa latência);
+// este endpoint é a fonte de verdade persistida — usada no primeiro load do
+// mapa e como fallback caso o broadcast realtime seja perdido.
+
+const LOCATION_SHARE_DURATION_MS = 60 * 60 * 1000; // 1 hora
+
+function isLocationFresh(loc: any): boolean {
+  return !!loc && typeof loc.expiresAt === "string" && new Date(loc.expiresAt).getTime() > Date.now();
+}
+
+// Inicia (ou reinicia) uma sessão de compartilhamento de 1h para o perfil e
+// notifica o parceiro para que ele também ative o mapa.
+app.post("/make-server-19717bce/location/start", async (c) => {
+  try {
+    const { profile, lat, lng } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + LOCATION_SHARE_DURATION_MS).toISOString();
+    const location = {
+      profile,
+      lat: typeof lat === "number" ? lat : null,
+      lng: typeof lng === "number" ? lng : null,
+      updatedAt: now.toISOString(),
+      expiresAt,
+    };
+    await kv.set(`location:${profile}`, location);
+
+    const otherUser = profile === "Amanda" ? "Mateus" : "Amanda";
+    sendPushToUser(otherUser, {
+      title: `${profile} quer compartilhar a localização! 📍`,
+      body: "Abre o Mapa no app pra ver em tempo real (e compartilhar a sua também) por 1h.",
+      tag: "mesinha-location",
+      url: "/",
+    }).catch(console.error);
+
+    return c.json({ location });
+  } catch (error) {
+    console.error("[POST /location/start] Error:", error);
+    return c.json({ error: "Failed to start location sharing", details: String(error) }, 500);
+  }
+});
+
+// Atualiza a posição atual — só é aceito enquanto a sessão de 1h não expirou.
+app.put("/make-server-19717bce/location", async (c) => {
+  try {
+    const { profile, lat, lng } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      return c.json({ error: "lat/lng inválidos" }, 400);
+    }
+    const existing = await kv.get(`location:${profile}`);
+    if (!isLocationFresh(existing)) {
+      return c.json({ error: "Sessão de compartilhamento expirada ou inexistente" }, 410);
+    }
+    const location = { ...existing, lat, lng, updatedAt: new Date().toISOString() };
+    await kv.set(`location:${profile}`, location);
+    return c.json({ location });
+  } catch (error) {
+    console.error("[PUT /location] Error:", error);
+    return c.json({ error: "Failed to update location", details: String(error) }, 500);
+  }
+});
+
+// Estado atual dos dois — usado ao abrir o Mapa (o realtime cobre o resto).
+app.get("/make-server-19717bce/location", async (c) => {
+  try {
+    const [amanda, mateus] = await Promise.all([
+      kv.get("location:Amanda"),
+      kv.get("location:Mateus"),
+    ]);
+    return c.json({
+      Amanda: isLocationFresh(amanda) ? amanda : null,
+      Mateus: isLocationFresh(mateus) ? mateus : null,
+    });
+  } catch (error) {
+    console.error("[GET /location] Error:", error);
+    return c.json({ error: "Failed to fetch locations", details: String(error) }, 500);
+  }
+});
+
+// Para de compartilhar (usuário tocou em "Parar" ou fechou a tela do mapa).
+app.delete("/make-server-19717bce/location", async (c) => {
+  try {
+    const { profile } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    await kv.del(`location:${profile}`);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /location] Error:", error);
+    return c.json({ error: "Failed to stop location sharing", details: String(error) }, 500);
+  }
+});
+
 // ── Cron endpoint: dispara Web Push para lembretes do horário atual ──────────
 //
 // Chamado a cada minuto por pg_cron ou serviço externo.

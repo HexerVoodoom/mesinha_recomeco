@@ -10,11 +10,13 @@ export function isRealtimeConnected(): boolean {
   return isSubscribed;
 }
 
-export type SyncEvent = 
+export type SyncEvent =
   | { type: 'item_created'; data: any }
   | { type: 'item_updated'; data: any }
   | { type: 'item_deleted'; data: { id: string } }
-  | { type: 'settings_updated'; data: any };
+  | { type: 'settings_updated'; data: any }
+  | { type: 'location_updated'; data: import('./api').LocationShare }
+  | { type: 'location_stopped'; data: { profile: 'Amanda' | 'Mateus' } };
 
 type SyncCallback = (event: SyncEvent) => void;
 const callbacks: Set<SyncCallback> = new Set();

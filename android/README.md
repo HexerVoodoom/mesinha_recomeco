@@ -3,7 +3,11 @@
 App Android nativo do Mesinha. Ele faz duas coisas:
 
 1. **App** (`MainActivity`): abre o PWA do Mesinha dentro de uma WebView, então
-   no celular você tem o ícone do Mesinha junto dos outros apps.
+   no celular você tem o ícone do Mesinha junto dos outros apps. Também liga
+   as pontes nativas que o PWA precisa dentro da WebView (que não funcionam
+   por padrão): seletor de arquivo, microfone (Mural), notificações (FCM) e
+   geolocalização (aba Mapa — `onGeolocationPermissionsShowPrompt` pedindo
+   `ACCESS_FINE_LOCATION`).
 2. **Widgets de tela inicial** — quatro opções no menu de widgets:
    - **Mesinha · Conversa** (`MesinhaWidgetProvider`, 2×4): Corvinho à esquerda,
      Alpaquinha à direita e dois balões de fala, mudando 1× por dia (32 pares

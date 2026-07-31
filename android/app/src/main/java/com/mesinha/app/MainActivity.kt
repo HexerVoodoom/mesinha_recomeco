@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -57,6 +58,17 @@ class MainActivity : AppCompatActivity() {
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */ }
 
+    // Pedido de geolocalização da página (aba Mapa) aguardando o diálogo do sistema.
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: GeolocationPermissions.Callback? = null
+
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            pendingGeoOrigin?.let { origin -> pendingGeoCallback?.invoke(origin, granted, false) }
+            pendingGeoOrigin = null
+            pendingGeoCallback = null
+        }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +82,7 @@ class MainActivity : AppCompatActivity() {
             settings.databaseEnabled = true
             settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             settings.allowFileAccess = false
+            settings.setGeolocationEnabled(true) // navigator.geolocation na aba Mapa
             webViewClient = WebViewClient()          // navega dentro da WebView
 
             // Ponte JS↔nativo: o PWA informa quem está logado para registrarmos o
@@ -109,6 +122,22 @@ class MainActivity : AppCompatActivity() {
                         pendingWebPermission?.deny()
                         pendingWebPermission = request
                         micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+
+                override fun onGeolocationPermissionsShowPrompt(
+                    origin: String,
+                    callback: GeolocationPermissions.Callback
+                ) {
+                    val hasFineLocation = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasFineLocation) {
+                        callback.invoke(origin, true, false)
+                    } else {
+                        pendingGeoOrigin = origin
+                        pendingGeoCallback = callback
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                     }
                 }
             }
