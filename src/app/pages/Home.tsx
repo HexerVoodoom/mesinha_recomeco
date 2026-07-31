@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { api, ListItem } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
@@ -15,6 +15,7 @@ import { CategoryMenu, categories, type Category } from '../components/CategoryM
 import { MuralSection } from '../components/MuralSection';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
+import { MeetupCalendar } from '../components/MeetupCalendar';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
 import fabButton from "figma:asset/dd4b98f23138814cb5d5f735480190b4a56f65a0.png";
@@ -62,6 +63,7 @@ function loadPendingFromStorage(): Map<string, ListItem> {
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeCategory, setActiveCategory] = useState<Category>('mural');
   const [items, setItems] = useState<ListItem[]>([]);
   // Itens recém-criados nesta sessão que ainda podem não aparecer numa resposta
@@ -131,6 +133,7 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
 
   // Paginação - 7 itens por página
   const [currentPage, setCurrentPage] = useState<Record<Category, number>>({
@@ -196,11 +199,22 @@ export default function Home() {
       if (event.type === 'item_created' && event.data?.category === 'mural') {
         notifyNewMuralItem(event.data);
         toast.success('Nova publicação no Mural! 💕', { duration: 3000 });
+      } else if (event.type === 'item_created' && event.data?.category === 'meetup') {
+        if (event.data?.createdBy && event.data.createdBy !== userProfile) {
+          toast.success(`${event.data.createdBy} propôs um dia no calendário! 💕`, { duration: 3000 });
+        }
+      } else if (event.type === 'item_updated' && event.data?.category === 'meetup') {
+        if (event.data?.status === 'done' && event.data?.createdBy === userProfile) {
+          toast.success('Seu encontro foi confirmado! 💕', { duration: 3000 });
+        }
       } else if (event.type === 'item_created') {
         toast.success('Lista atualizada! 💕', { duration: 2000 });
       }
       // Sempre rebusca da API para garantir dados atualizados
       loadItems(true);
+      if (event.data?.category === 'meetup') {
+        refreshCategoryItems('meetup');
+      }
     },
     enabled: true,
   });
@@ -273,6 +287,17 @@ export default function Home() {
     };
   }, [headerPressTimer]);
 
+  // A busca foi movida para dentro do menu oculto de configurações. Ao voltar
+  // de lá com o pedido de abrir a busca, abrimos aqui e limpamos o state da
+  // navegação para não reabrir em um refresh/voltar futuro.
+  useEffect(() => {
+    if ((location.state as any)?.openSearch) {
+      setShowSearch(true);
+      setShowMeetupCalendar(false);
+      navigate('.', { replace: true, state: null });
+    }
+  }, [location.state]);
+
   useEffect(() => {
     let isActive = true;
 
@@ -316,6 +341,15 @@ export default function Home() {
       refreshCategoryItems('mural');
     }
   }, [activeCategory]);
+
+  // Calendário de Encontros: garante que todos os dias propostos/confirmados
+  // estejam carregados (mesmo que a paginação geral de itens os deixe de fora),
+  // igual ao que já é feito para o mural.
+  useEffect(() => {
+    if (showMeetupCalendar) {
+      refreshCategoryItems('meetup');
+    }
+  }, [showMeetupCalendar]);
 
   const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
     // Show cached data immediately so the UI isn't blank while the API wakes up
@@ -590,6 +624,50 @@ export default function Home() {
     }
   };
 
+  // Propõe um dia no Calendário de Encontros: cria um item pendente e o
+  // servidor notifica o parceiro para que ele possa confirmar.
+  const handleProposeMeetupDay = async (dateStr: string) => {
+    const partnerName = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
+    const item: ListItem = {
+      id: Date.now().toString(),
+      title: 'Encontro',
+      comment: '',
+      category: 'meetup',
+      eventDate: dateStr,
+      photo: null,
+      reminderEnabled: false,
+      createdBy: userProfile,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      tags: [],
+    };
+
+    try {
+      const createdItem = await syncApi.createItem(item);
+      trackPendingItem(createdItem);
+      setItems(prev => {
+        const updated = prev.some(i => i.id === createdItem.id) ? prev : [...prev, createdItem];
+        saveItemsToStorage(updated);
+        return updated;
+      });
+      toast.success(`Proposta enviada para ${partnerName}! 💕`);
+    } catch (error) {
+      console.error('Failed to propose meetup day:', error);
+      toast.error('Erro ao propor o encontro. Tente novamente.');
+    }
+  };
+
+  // Confirma um dia proposto pelo parceiro: o encontro passa a valer para os dois.
+  const handleConfirmMeetupDay = async (item: ListItem) => {
+    await handleUpdateItem(item.id, { status: 'done' });
+    toast.success('Encontro confirmado! 💕');
+  };
+
+  // Cancela uma proposta própria, recusa a do parceiro, ou remove um encontro já confirmado.
+  const handleCancelMeetupDay = async (item: ListItem) => {
+    await handleDeleteItem(item.id);
+  };
+
   const handleUpdateItem = async (id: string, updates: Partial<ListItem>) => {
     // Snapshot do item para toast e feedback offline — não use `items` diretamente
     // dentro do try/catch assíncrono: o closure seria obsoleto se loadItems ou
@@ -617,24 +695,27 @@ export default function Home() {
         return fallback;
       });
 
-      // Feedback específico para lembretes ou genérico
+      // Feedback específico para lembretes ou genérico (o Calendário de
+      // Encontros mostra seu próprio toast na chamada de handleConfirmMeetupDay)
       if (itemSnapshot?.category === 'alarm' && 'reminderActive' in updates) {
         toast.info(updates.reminderActive ? 'Lembrete ativado localmente (modo offline)' : 'Lembrete desativado localmente (modo offline)');
-      } else {
+      } else if (itemSnapshot?.category !== 'meetup') {
         toast.info('Item atualizado localmente (modo offline)');
       }
       return;
     }
 
-    // Feedback específico para lembretes ou genérico
+    // Feedback específico para lembretes ou genérico (o Calendário de
+    // Encontros mostra seu próprio toast na chamada de handleConfirmMeetupDay)
     if (itemSnapshot?.category === 'alarm' && 'reminderActive' in updates) {
       toast.success(updates.reminderActive ? 'Lembrete ativado!' : 'Lembrete desativado!');
-    } else {
+    } else if (itemSnapshot?.category !== 'meetup') {
       toast.success('Item atualizado!');
     }
   };
 
   const handleDeleteItem = async (id: string) => {
+    const itemSnapshot = items.find(i => i.id === id);
     untrackPendingItem(id); // não re-injetar um item que foi excluído
 
     try {
@@ -650,7 +731,12 @@ export default function Home() {
       return filtered;
     });
     setExpandedItemId(null);
-    toast.success('Item removido!');
+
+    if (itemSnapshot?.category === 'meetup') {
+      toast.success('Encontro removido do calendário.');
+    } else {
+      toast.success('Item removido!');
+    }
   };
 
   const handleMarkAsDone = async (id: string) => {
@@ -763,10 +849,16 @@ export default function Home() {
   const handleCategoryChange = (categoryId: Category) => {
     setActiveCategory(categoryId);
     setShowSearch(false);
+    setShowMeetupCalendar(false);
     // Resetar página quando trocar de categoria se ainda não foi carregada
     if (!loadedCategories.has(categoryId)) {
       setCurrentPage(prev => ({ ...prev, [categoryId]: 1 }));
     }
+  };
+
+  const handleToggleMeetupCalendar = () => {
+    setShowSearch(false);
+    setShowMeetupCalendar(prev => !prev);
   };
 
   return (
@@ -850,8 +942,9 @@ export default function Home() {
         <CategoryMenu
           activeCategory={activeCategory}
           showSearch={showSearch}
+          showMeetupCalendar={showMeetupCalendar}
           onCategoryChange={handleCategoryChange}
-          onToggleSearch={() => setShowSearch(!showSearch)}
+          onOpenMeetupCalendar={handleToggleMeetupCalendar}
         />
 
         {error && (
@@ -877,6 +970,14 @@ export default function Home() {
         
         {loading ? (
           <div className="text-center py-12 text-muted-foreground px-6">Carregando...</div>
+        ) : showMeetupCalendar ? (
+          <MeetupCalendar
+            items={items}
+            userProfile={userProfile}
+            onProposeDay={handleProposeMeetupDay}
+            onConfirmDay={handleConfirmMeetupDay}
+            onCancelDay={handleCancelMeetupDay}
+          />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -984,8 +1085,8 @@ export default function Home() {
         )}
       </main>
 
-      {/* FAB - escondido quando busca está ativa */}
-      {!showSearch && (
+      {/* FAB - escondido quando busca ou calendário de encontros está ativo */}
+      {!showSearch && !showMeetupCalendar && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}

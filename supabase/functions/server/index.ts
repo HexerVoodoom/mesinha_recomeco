@@ -244,6 +244,17 @@ app.post("/make-server-19717bce/items", async (c) => {
       }).catch(console.error);
     }
 
+    // Notifica o parceiro quando um dia é proposto no Calendário de Encontros
+    if (item.category === "meetup" && item.createdBy && item.eventDate) {
+      const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      sendPushToUser(otherUser, {
+        title: `${item.createdBy} quer te ver! 💕`,
+        body: `Marcou o dia ${item.eventDate} no Calendário de Encontros. Toca para confirmar!`,
+        tag: "mesinha-meetup",
+        url: "/",
+      }).catch(console.error);
+    }
+
     return c.json({ item });
   } catch (error) {
     console.error("Error creating item:", error);
@@ -308,6 +319,21 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
           }).catch(console.error);
         }
       }
+    }
+
+    // Notifica quem propôs o dia quando o parceiro confirma o encontro.
+    if (
+      updatedItem.category === "meetup" &&
+      existingItem.status !== "done" &&
+      updatedItem.status === "done" &&
+      updatedItem.createdBy
+    ) {
+      sendPushToUser(updatedItem.createdBy, {
+        title: "Encontro confirmado! 💕",
+        body: `Vocês vão se ver no dia ${updatedItem.eventDate}!`,
+        tag: "mesinha-meetup",
+        url: "/",
+      }).catch(console.error);
     }
 
     return c.json({ item: updatedItem });

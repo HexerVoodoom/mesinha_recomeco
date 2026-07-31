@@ -8,7 +8,7 @@ import {
   Smile,
   AlarmClock,
   Umbrella,
-  Search,
+  CalendarHeart,
   Trophy,
   Gift,
 } from 'lucide-react';
@@ -62,23 +62,28 @@ const categoryIcons: Record<Category | 'search', string> = {
 interface CategoryMenuProps {
   activeCategory: Category;
   showSearch: boolean;
+  showMeetupCalendar: boolean;
   onCategoryChange: (categoryId: Category) => void;
-  onToggleSearch: () => void;
+  onOpenMeetupCalendar: () => void;
 }
 
 /** Cartão com o badge da categoria ativa e a grade de ícones de navegação. */
-export function CategoryMenu({ activeCategory, showSearch, onCategoryChange, onToggleSearch }: CategoryMenuProps) {
+export function CategoryMenu({ activeCategory, showSearch, showMeetupCalendar, onCategoryChange, onOpenMeetupCalendar }: CategoryMenuProps) {
   return (
     <div className="bg-[#F8F6F4] rounded-[32px] border-2 border-[#E9E4DF] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[21px] mb-6 relative mx-6">
       {/* Label Badge */}
       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E9E4DF] rounded-full px-4 py-1 flex items-center gap-2">
-        <img
-          src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]}
-          alt=""
-          className="w-5 h-5 object-contain"
-        />
+        {showMeetupCalendar ? (
+          <CalendarHeart className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} />
+        ) : (
+          <img
+            src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]}
+            alt=""
+            className="w-5 h-5 object-contain"
+          />
+        )}
         <span className="font-['Quicksand',sans-serif] font-bold text-xs text-[#2B2A28] uppercase tracking-tight">
-          {showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
+          {showMeetupCalendar ? 'Encontros' : showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
         </span>
       </div>
 
@@ -86,7 +91,7 @@ export function CategoryMenu({ activeCategory, showSearch, onCategoryChange, onT
       <div className="grid grid-cols-6 gap-4 pt-4">
         {categories.map(category => {
           const Icon = category.icon;
-          const isActive = activeCategory === category.id && !showSearch;
+          const isActive = activeCategory === category.id && !showSearch && !showMeetupCalendar;
           return (
             <button
               key={category.id}
@@ -102,15 +107,15 @@ export function CategoryMenu({ activeCategory, showSearch, onCategoryChange, onT
           );
         })}
 
-        {/* Search Icon */}
+        {/* Calendário de Encontros: propor e confirmar os dias em que vão se ver */}
         <button
-          onClick={onToggleSearch}
+          onClick={onOpenMeetupCalendar}
           className="flex flex-col items-center gap-1"
         >
           <div className={`transition-colors ${
-            showSearch ? 'text-[#4D989B]' : 'text-[#2B2A28]'
+            showMeetupCalendar ? 'text-[#4D989B]' : 'text-[#2B2A28]'
           }`}>
-            <Search className="w-[20px] h-[20px]" strokeWidth={1.5} />
+            <CalendarHeart className="w-[20px] h-[20px]" strokeWidth={1.5} />
           </div>
         </button>
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Bell, Calendar } from 'lucide-react';
+import { ArrowLeft, Bell, Calendar, Search } from 'lucide-react';
 import { api, Settings as SettingsType } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
@@ -137,6 +137,18 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {/* Busca: movida para cá, dentro do menu oculto */}
+          <button
+            onClick={() => navigate('/', { state: { openSearch: true } })}
+            className="w-full bg-card rounded-xl p-6 border border-border flex items-center gap-3 hover:bg-muted/30 transition-colors"
+          >
+            <Search className="w-6 h-6" />
+            <div className="flex-1 text-left">
+              <div className="text-base font-medium">Buscar</div>
+              <div className="text-sm text-muted-foreground">Procurar itens por tag</div>
+            </div>
+          </button>
 
           {/* Notifications */}
           <div className="bg-card rounded-xl p-6 border border-border">
