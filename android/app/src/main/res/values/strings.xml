@@ -8,9 +8,11 @@
     <string name="widget_label">Conversa do dia</string>
     <string name="widget_label_amanda">Da Amanda ❤</string>
     <string name="widget_label_mateus">Do Mateus ❤</string>
+    <string name="widget_meetup_label">Encontro hoje?</string>
 
     <!-- Nomes dos widgets no menu de seleção -->
     <string name="widget_name_dupla">Mesinha · Conversa</string>
     <string name="widget_name_amanda">Mesinha · Recado da Amanda</string>
     <string name="widget_name_mateus">Mesinha · Recado do Mateus</string>
+    <string name="widget_name_meetup">Mesinha · Encontro hoje?</string>
 </resources>

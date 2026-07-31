@@ -713,6 +713,28 @@ function brazilNow(): Date {
   return new Date(Date.now() + BRAZIL_OFFSET_MS);
 }
 
+// Estado do dia para o widget nativo "Encontro hoje?" (coração cheio/vazio):
+// devolve só se HOJE (fuso de Brasília, igual ao resto do app) está confirmado
+// no Calendário de Encontros — sem expor a lista inteira de itens ao widget.
+app.get("/make-server-19717bce/meetup-today", async (c) => {
+  try {
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const { items } = await kv.getItemsLightPaged({
+      offset: 0,
+      limit: 50,
+      categoryFilter: "meetup",
+    });
+    const confirmed = items.some((item: any) => item.eventDate === todayStr && item.status === "done");
+    return c.json({ date: todayStr, confirmed });
+  } catch (error) {
+    console.error("[GET /meetup-today] Error:", error);
+    return c.json({
+      error: "Failed to check meetup status",
+      details: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
+});
+
 app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   // Validar autorização
   const authHeader = c.req.header("Authorization") || "";
