@@ -8,8 +8,11 @@ import android.content.Intent
 import android.widget.RemoteViews
 
 /**
- * Widget "Encontro hoje?" (1x1, quadrado): coração cheio quando o dia de hoje
- * está confirmado no Calendário de Encontros do app, vazio quando ainda não.
+ * Widget "Encontro hoje?" (1x1, quadrado): quando o dia de hoje está
+ * confirmado no Calendário de Encontros do app, mostra o ícone do tipo
+ * combinado (coração = juntos em casa, controle = video game cada um em
+ * casa, pegadas = sair); quando não há nada confirmado, mostra o coração
+ * vazio.
  */
 class MeetupWidgetProvider : AppWidgetProvider() {
 
@@ -52,9 +55,15 @@ class MeetupWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int
     ) {
         val confirmed = MeetupRepository.cachedConfirmedToday(context)
-        val heart = if (confirmed) R.drawable.heart_full else R.drawable.heart_empty
+        val icon = if (!confirmed) {
+            R.drawable.heart_empty
+        } else when (MeetupRepository.cachedTypeToday(context)) {
+            "videogame" -> R.drawable.ic_meetup_videogame
+            "pegadas" -> R.drawable.ic_meetup_footprints
+            else -> R.drawable.heart_full // "coracao" ou tipo desconhecido/antigo
+        }
         val views = RemoteViews(context.packageName, R.layout.widget_meetup).apply {
-            setImageViewResource(R.id.iv_heart, heart)
+            setImageViewResource(R.id.iv_heart, icon)
             setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
         }
         appWidgetManager.updateAppWidget(appWidgetId, views)

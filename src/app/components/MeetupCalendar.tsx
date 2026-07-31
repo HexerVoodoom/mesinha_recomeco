@@ -7,6 +7,12 @@ import {
   Heart,
   Check,
   Clock,
+  Sunrise,
+  Sun,
+  Moon,
+  Gamepad2,
+  Footprints,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   startOfMonth,
@@ -20,13 +26,12 @@ import {
   subWeeks,
   format,
   isSameMonth,
-  isSameDay,
   isToday,
   isBefore,
   startOfDay,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ListItem } from '../utils/api';
+import { ListItem, MeetupPeriod, MeetupType } from '../utils/api';
 
 type Profile = 'Amanda' | 'Mateus';
 type ViewMode = 'month' | 'week';
@@ -34,7 +39,7 @@ type ViewMode = 'month' | 'week';
 interface MeetupCalendarProps {
   items: ListItem[];
   userProfile: Profile;
-  onProposeDay: (dateStr: string) => void;
+  onProposeDay: (dateStr: string, period: MeetupPeriod, type: MeetupType) => void;
   onConfirmDay: (item: ListItem) => void;
   onCancelDay: (item: ListItem) => void;
 }
@@ -43,15 +48,37 @@ const WEEKDAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 type DayState = 'none' | 'mine-pending' | 'partner-pending' | 'confirmed';
 
+const PERIOD_OPTIONS: { id: MeetupPeriod; label: string; icon: LucideIcon }[] = [
+  { id: 'manha', label: 'Manhã', icon: Sunrise },
+  { id: 'tarde', label: 'Tarde', icon: Sun },
+  { id: 'noite', label: 'Noite', icon: Moon },
+];
+
+// "Coração" = ficar juntos em casa; "Video game" = jogar juntos, cada um na
+// sua casa; "Pegadas" = sair (encontro fora de casa).
+const TYPE_OPTIONS: { id: MeetupType; label: string; icon: LucideIcon }[] = [
+  { id: 'coracao', label: 'Juntos em casa', icon: Heart },
+  { id: 'videogame', label: 'Video game (cada um em casa)', icon: Gamepad2 },
+  { id: 'pegadas', label: 'Sair', icon: Footprints },
+];
+
 function toDateStr(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+function periodOf(id?: MeetupPeriod | null) {
+  return PERIOD_OPTIONS.find(p => p.id === id);
+}
+
+function typeOf(id?: MeetupType | null) {
+  return TYPE_OPTIONS.find(t => t.id === id);
+}
+
 /**
  * Calendário compartilhado de encontros: cada um toca num dia livre para
- * propor um encontro (o parceiro recebe uma notificação); tocando de novo no
- * dia proposto pelo parceiro, confirma o encontro. Suporta visão por mês e
- * por semana.
+ * propor um encontro (escolhendo período e tipo), o parceiro recebe uma
+ * notificação; tocando de novo no dia proposto, confirma o encontro. Suporta
+ * visão por mês e por semana.
  */
 export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay, onCancelDay }: MeetupCalendarProps) {
   const partner: Profile = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
@@ -60,6 +87,11 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState<Date>(today);
   const [selectedDay, setSelectedDay] = useState<{ dateStr: string; item?: ListItem } | null>(null);
+
+  // Modal de proposta: dia livre tocado, aguardando escolha de período + tipo.
+  const [proposeDate, setProposeDate] = useState<string | null>(null);
+  const [draftPeriod, setDraftPeriod] = useState<MeetupPeriod | null>(null);
+  const [draftType, setDraftType] = useState<MeetupType | null>(null);
 
   const meetupsByDate = useMemo(() => {
     const map = new Map<string, ListItem>();
@@ -95,15 +127,28 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
     const dateStr = toDateStr(date);
     const item = meetupsByDate.get(dateStr);
     if (!item) {
-      onProposeDay(dateStr);
+      setDraftPeriod(null);
+      setDraftType(null);
+      setProposeDate(dateStr);
       return;
     }
     setSelectedDay({ dateStr, item });
   };
 
   const closeSheet = () => setSelectedDay(null);
+  const closeProposeSheet = () => {
+    setProposeDate(null);
+    setDraftPeriod(null);
+    setDraftType(null);
+  };
 
-  const dayState = (date: Date, item: ListItem | undefined): DayState => {
+  const handleSubmitPropose = () => {
+    if (!proposeDate || !draftPeriod || !draftType) return;
+    onProposeDay(proposeDate, draftPeriod, draftType);
+    closeProposeSheet();
+  };
+
+  const dayState = (item: ListItem | undefined): DayState => {
     if (!item) return 'none';
     if (item.status === 'done') return 'confirmed';
     return item.createdBy === userProfile ? 'mine-pending' : 'partner-pending';
@@ -159,10 +204,11 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
         {days.map(date => {
           const dateStr = toDateStr(date);
           const item = meetupsByDate.get(dateStr);
-          const state = dayState(date, item);
+          const state = dayState(item);
           const outOfMonth = viewMode === 'month' && !isSameMonth(date, cursor);
           const isPast = isBefore(date, today);
           const disabled = isPast;
+          const TypeIcon = item ? (typeOf(item.meetupType)?.icon || Heart) : null;
 
           const stateClasses: Record<DayState, string> = {
             none: 'bg-transparent text-[#2B2A28] hover:bg-muted/30',
@@ -183,8 +229,12 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                 }`}
               >
                 {format(date, 'd')}
-                {state === 'confirmed' && (
-                  <Heart className="absolute -top-1 -right-1 w-3.5 h-3.5 fill-primary text-white bg-white rounded-full p-[1px]" />
+                {TypeIcon && (
+                  <TypeIcon
+                    className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full p-[1px] ${
+                      state === 'confirmed' ? 'bg-white text-primary fill-white' : 'bg-white text-[#2B2A28]'
+                    }`}
+                  />
                 )}
               </button>
             </div>
@@ -206,7 +256,103 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
           <span className="w-4 h-4 rounded-md bg-primary" />
           Encontro confirmado 💕
         </div>
+        <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+          {TYPE_OPTIONS.map(({ id, label, icon: Icon }) => (
+            <div key={id} className="flex items-center gap-1">
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Modal de proposta: escolher período + tipo do encontro */}
+      <AnimatePresence>
+        {proposeDate && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeProposeSheet}
+              className="fixed inset-0 bg-black/40 z-40"
+              style={{ maxWidth: 390, margin: '0 auto' }}
+            />
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={closeProposeSheet}
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center"
+              style={{ maxWidth: 390 }}
+            >
+              <X className="w-5 h-5" />
+            </motion.button>
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full bg-card rounded-t-3xl shadow-2xl z-50 pb-8"
+              style={{ maxWidth: 390 }}
+            >
+              <div className="px-6 py-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Heart className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                  <h2 className="text-xl font-medium">
+                    {format(new Date(`${proposeDate}T00:00:00`), "d 'de' MMMM", { locale: ptBR })}
+                  </h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-5">Propor um encontro para {partner}</p>
+
+                <label className="text-xs font-bold uppercase tracking-tight text-muted-foreground mb-2 block">
+                  Período
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-5">
+                  {PERIOD_OPTIONS.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setDraftPeriod(id)}
+                      className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-colors ${
+                        draftPeriod === id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-[#2B2A28]'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs font-medium">{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <label className="text-xs font-bold uppercase tracking-tight text-muted-foreground mb-2 block">
+                  O que vamos fazer?
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                  {TYPE_OPTIONS.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setDraftType(id)}
+                      className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-colors ${
+                        draftType === id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-[#2B2A28]'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs font-medium text-center leading-tight">{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleSubmitPropose}
+                  disabled={!draftPeriod || !draftType}
+                  className="w-full px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Propor encontro
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Bottom sheet de ação do dia selecionado */}
       <AnimatePresence>
@@ -239,12 +385,34 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
               style={{ maxWidth: 390 }}
             >
               <div className="px-6 py-6">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-1">
                   <Heart className="w-5 h-5 text-primary" strokeWidth={1.5} />
                   <h2 className="text-xl font-medium">
                     {format(new Date(`${selectedDay.dateStr}T00:00:00`), "d 'de' MMMM", { locale: ptBR })}
                   </h2>
                 </div>
+
+                {/* Período + tipo escolhidos na proposta */}
+                {selectedDay.item && (periodOf(selectedDay.item.meetupPeriod) || typeOf(selectedDay.item.meetupType)) && (
+                  <div className="flex items-center gap-3 mb-4">
+                    {periodOf(selectedDay.item.meetupPeriod) && (() => {
+                      const { icon: Icon, label } = periodOf(selectedDay.item!.meetupPeriod)!;
+                      return (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/40 text-sm text-[#2B2A28]">
+                          <Icon className="w-4 h-4" /> {label}
+                        </div>
+                      );
+                    })()}
+                    {typeOf(selectedDay.item.meetupType) && (() => {
+                      const { icon: Icon, label } = typeOf(selectedDay.item!.meetupType)!;
+                      return (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/40 text-sm text-[#2B2A28]">
+                          <Icon className="w-4 h-4" /> {label}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {selectedDay.item?.status === 'done' ? (
                   <>

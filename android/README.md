@@ -12,10 +12,12 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      Alpaquinha, com recadinhos da Amanda para o Mateus (30 frases).
    - **Mesinha · Recado do Mateus** (`CorvinhoWidgetProvider`, 2×4): só o
      Corvinho, com recadinhos do Mateus para a Amanda (30 frases).
-   - **Mesinha · Encontro hoje?** (`MeetupWidgetProvider`, 1×1): coração cheio
-     quando o dia de hoje está confirmado no Calendário de Encontros do app,
-     vazio quando ainda não está (consulta o endpoint `/meetup-today`, que já
-     resolve "hoje" no fuso de Brasília).
+   - **Mesinha · Encontro hoje?** (`MeetupWidgetProvider`, 1×1): quando o dia
+     de hoje está confirmado no Calendário de Encontros do app, mostra o ícone
+     do tipo combinado (coração = juntos em casa, controle = video game cada
+     um em casa, pegadas = sair); coração vazio quando ainda não há nada
+     confirmado. Consulta o endpoint `/meetup-today`, que já resolve "hoje" no
+     fuso de Brasília e devolve o tipo do encontro.
 
 ## Pré-requisitos
 
