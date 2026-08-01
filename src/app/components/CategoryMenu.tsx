@@ -1,3 +1,4 @@
+import { useRef, useState, type ComponentType } from 'react';
 import {
   Tv,
   Film,
@@ -60,13 +61,33 @@ const categoryIcons: Record<Category | 'search', string> = {
   search: imgIconPesquisar,
 };
 
-// Ferramentas extras (fora da grade de categorias), num slider horizontal
-// pra sempre dar pra encaixar mais uma sem espremer os ícones existentes.
+// Ferramentas extras, que entram na mesma grade de ícones (não são categoria
+// de lista, mas usam o mesmo slot visual).
 const tools = [
   { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
 ];
 type ToolId = (typeof tools)[number]['id'];
+
+type MenuEntry =
+  | { kind: 'category'; id: Category; icon: ComponentType<{ className?: string; strokeWidth?: number }> }
+  | { kind: 'tool'; id: ToolId; icon: ComponentType<{ className?: string; strokeWidth?: number }> };
+
+// Grade original de 6x2 (12 ícones). Quando sobra mais que 12 (categorias +
+// ferramentas), a grade vira um slide: a página 1 continua exatamente como
+// era, e o que não coube nasce numa página 2 (por enquanto só o Mapa) — dá
+// pra ir enchendo essa segunda página com mais ferramentas no futuro.
+const PAGE_SIZE = 12;
+
+function paginate(entries: MenuEntry[]): (MenuEntry | null)[][] {
+  const pages: (MenuEntry | null)[][] = [];
+  for (let i = 0; i < entries.length; i += PAGE_SIZE) {
+    const page: (MenuEntry | null)[] = entries.slice(i, i + PAGE_SIZE);
+    while (page.length < PAGE_SIZE) page.push(null);
+    pages.push(page);
+  }
+  return pages;
+}
 
 interface CategoryMenuProps {
   activeCategory: Category;
@@ -78,7 +99,7 @@ interface CategoryMenuProps {
   onOpenMap: () => void;
 }
 
-/** Cartão com o badge da categoria ativa, a grade de ícones de navegação e o slider de ferramentas. */
+/** Cartão com o badge da categoria ativa e a grade de ícones (6x2, com slide pra mais páginas). */
 export function CategoryMenu({
   activeCategory,
   showSearch,
@@ -91,6 +112,21 @@ export function CategoryMenu({
   const activeTool: ToolId | null = showMeetupCalendar ? 'meetup' : showMap ? 'map' : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
   const toolHandlers: Record<ToolId, () => void> = { meetup: onOpenMeetupCalendar, map: onOpenMap };
+
+  const entries: MenuEntry[] = [
+    ...categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
+    ...tools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
+  ];
+  const pages = paginate(entries);
+
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el || el.clientWidth === 0) return;
+    setPageIndex(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   return (
     <div className="bg-[#F8F6F4] rounded-[32px] border-2 border-[#E9E4DF] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[21px] mb-6 relative mx-6">
@@ -110,46 +146,54 @@ export function CategoryMenu({
         </span>
       </div>
 
-      {/* Category Icons Grid */}
-      <div className="grid grid-cols-6 gap-4 pt-4">
-        {categories.map(category => {
-          const Icon = category.icon;
-          const isActive = activeCategory === category.id && !activeTool && !showSearch;
-          return (
-            <button
-              key={category.id}
-              onClick={() => onCategoryChange(category.id)}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className={`transition-colors ${
-                isActive ? 'text-[#4D989B]' : 'text-[#2B2A28]'
-              }`}>
-                <Icon className="w-[20px] h-[20px]" strokeWidth={1.5} />
-              </div>
-            </button>
-          );
-        })}
+      {/* Grade de ícones (categorias + ferramentas), com slide entre páginas de 12 */}
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar pt-4"
+      >
+        {pages.map((page, i) => (
+          <div key={i} className="grid grid-cols-6 gap-4 w-full shrink-0 snap-start">
+            {page.map((entry, slot) => {
+              if (!entry) return <div key={`empty-${slot}`} />;
+              const Icon = entry.icon;
+              const isActive = entry.kind === 'category'
+                ? activeCategory === entry.id && !activeTool && !showSearch
+                : activeTool === entry.id;
+              const onClick = entry.kind === 'category'
+                ? () => onCategoryChange(entry.id)
+                : toolHandlers[entry.id];
+              return (
+                <button
+                  key={`${entry.kind}-${entry.id}`}
+                  onClick={onClick}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div className={`transition-colors ${
+                    isActive ? 'text-[#4D989B]' : 'text-[#2B2A28]'
+                  }`}>
+                    <Icon className="w-[20px] h-[20px]" strokeWidth={1.5} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
-      {/* Slider de ferramentas: espaço pra crescer sem mexer na grade acima */}
-      <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pt-4 mt-3 border-t border-[#E9E4DF] -mx-1 px-1 hide-scrollbar">
-        {tools.map(tool => {
-          const Icon = tool.icon;
-          const isActive = activeTool === tool.id;
-          return (
-            <button
-              key={tool.id}
-              onClick={toolHandlers[tool.id]}
-              className={`shrink-0 snap-start flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-colors ${
-                isActive ? 'border-primary bg-primary/10 text-primary' : 'border-[#E9E4DF] text-[#2B2A28]'
+      {/* Bolinhas indicando a página atual — só aparece quando há mais de uma */}
+      {pages.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {pages.map((_, i) => (
+            <span
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                i === pageIndex ? 'bg-[#4D989B]' : 'bg-[#E9E4DF]'
               }`}
-            >
-              <Icon className="w-4 h-4" strokeWidth={1.5} />
-              <span className="text-xs font-medium whitespace-nowrap">{tool.label}</span>
-            </button>
-          );
-        })}
-      </div>
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
