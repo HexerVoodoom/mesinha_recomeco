@@ -635,12 +635,12 @@ export default function Home() {
   // Propõe um dia no Calendário de Encontros (com período + tipo escolhidos
   // no modal): cria um item pendente e o servidor notifica o parceiro para
   // que ele possa confirmar.
-  const handleProposeMeetupDay = async (dateStr: string, period: MeetupPeriod, type: MeetupType) => {
+  const handleProposeMeetupDay = async (dateStr: string, period: MeetupPeriod, type: MeetupType, comment: string) => {
     const partnerName = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
     const item: ListItem = {
       id: Date.now().toString(),
       title: 'Encontro',
-      comment: '',
+      comment,
       category: 'meetup',
       eventDate: dateStr,
       photo: null,
