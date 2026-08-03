@@ -269,9 +269,10 @@ app.post("/make-server-19717bce/items", async (c) => {
     // Notifica o parceiro quando um dia é proposto no Calendário de Encontros
     if (item.category === "meetup" && item.createdBy && item.eventDate) {
       const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      const commentSnippet = item.comment ? ` "${String(item.comment).slice(0, 80)}"` : "";
       sendPushToUser(otherUser, {
         title: `${item.createdBy} quer te ver! 💕`,
-        body: `Marcou o dia ${item.eventDate} pra ${describeMeetup(item)}. Toca para confirmar!`,
+        body: `Marcou o dia ${item.eventDate} pra ${describeMeetup(item)}.${commentSnippet} Toca para confirmar!`,
         tag: "mesinha-meetup",
         url: "/",
       }).catch(console.error);

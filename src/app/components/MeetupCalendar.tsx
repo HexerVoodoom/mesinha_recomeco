@@ -12,6 +12,7 @@ import {
   Moon,
   Gamepad2,
   Footprints,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -39,7 +40,7 @@ type ViewMode = 'month' | 'week';
 interface MeetupCalendarProps {
   items: ListItem[];
   userProfile: Profile;
-  onProposeDay: (dateStr: string, period: MeetupPeriod, type: MeetupType) => void;
+  onProposeDay: (dateStr: string, period: MeetupPeriod, type: MeetupType, comment: string) => void;
   onConfirmDay: (item: ListItem) => void;
   onCancelDay: (item: ListItem) => void;
 }
@@ -92,6 +93,7 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
   const [proposeDate, setProposeDate] = useState<string | null>(null);
   const [draftPeriod, setDraftPeriod] = useState<MeetupPeriod | null>(null);
   const [draftType, setDraftType] = useState<MeetupType | null>(null);
+  const [draftComment, setDraftComment] = useState('');
 
   const meetupsByDate = useMemo(() => {
     const map = new Map<string, ListItem>();
@@ -129,6 +131,7 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
     if (!item) {
       setDraftPeriod(null);
       setDraftType(null);
+      setDraftComment('');
       setProposeDate(dateStr);
       return;
     }
@@ -140,11 +143,12 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
     setProposeDate(null);
     setDraftPeriod(null);
     setDraftType(null);
+    setDraftComment('');
   };
 
   const handleSubmitPropose = () => {
     if (!proposeDate || !draftPeriod || !draftType) return;
-    onProposeDay(proposeDate, draftPeriod, draftType);
+    onProposeDay(proposeDate, draftPeriod, draftType, draftComment.trim());
     closeProposeSheet();
   };
 
@@ -341,6 +345,17 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                   ))}
                 </div>
 
+                <label className="text-xs font-bold uppercase tracking-tight text-muted-foreground mb-2 block">
+                  Comentário (opcional)
+                </label>
+                <textarea
+                  value={draftComment}
+                  onChange={(e) => setDraftComment(e.target.value.slice(0, 300))}
+                  placeholder={`Escreve um recadinho pra ${partner} ver antes de confirmar...`}
+                  rows={2}
+                  className="w-full mb-6 px-4 py-3 rounded-xl border-2 border-border bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-sm resize-none"
+                />
+
                 <button
                   onClick={handleSubmitPropose}
                   disabled={!draftPeriod || !draftType}
@@ -411,6 +426,14 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                         </div>
                       );
                     })()}
+                  </div>
+                )}
+
+                {/* Comentário deixado por quem propôs, pra o outro ver antes de confirmar */}
+                {selectedDay.item?.comment && (
+                  <div className="flex items-start gap-2 mb-4 px-4 py-3 rounded-xl bg-muted/40">
+                    <MessageSquare className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                    <p className="text-sm text-[#2B2A28] whitespace-pre-wrap">{selectedDay.item.comment}</p>
                   </div>
                 )}
 
