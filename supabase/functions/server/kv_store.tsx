@@ -135,7 +135,8 @@ export const getByPrefixPaged = async (
   return { items: data?.map((d) => d.value) ?? [], total: count ?? 0 };
 };
 
-// Posts do mural criados dentro de uma faixa de datas [startDate, endDate),
+// Posts do mural criados dentro de uma faixa [start, end) de createdAt (ISO,
+// data ou timestamp completo — a comparação é lexicográfica sobre o ISO),
 // em projeção leve (sem photo/muralContent — mídia pesada nunca sai do banco).
 // Range curto no campo indexado (idx_kv_items_createdat) => query barata.
 // Usado pelo "Neste dia" (memórias de anos anteriores na mesma data).

@@ -37,8 +37,11 @@ export function ChoreItemComponent({ item, userProfile, onUpdate, onDelete }: Ch
       choreDoneCount: (item.choreDoneCount || 0) + 1,
       choreLastDoneBy: userProfile,
       choreLastDoneAt: now,
-      // Rodízio: a vez passa pro outro. Sem rodízio, o dono continua o mesmo.
-      choreAssignee: rotates ? (assignee === 'Amanda' ? 'Mateus' : 'Amanda') : assignee,
+      // Rodízio: a vez passa pra quem NÃO fez agora. Girar a partir de
+      // `assignee` estaria errado quando alguém adianta a tarefa fora da sua
+      // vez ("Fiz eu mesmo(a)") — a vez voltaria pra quem acabou de fazer.
+      // Sem rodízio, o dono continua o mesmo.
+      choreAssignee: rotates ? (userProfile === 'Amanda' ? 'Mateus' : 'Amanda') : assignee,
     });
   };
 

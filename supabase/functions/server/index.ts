@@ -343,7 +343,10 @@ app.post("/make-server-19717bce/items", async (c) => {
       }).catch(console.error);
     }
 
-    return c.json({ item });
+    // Cápsula lacrada: guarda o conteúdo mas devolve a versão trancada — senão
+    // o aparelho de quem escreveu fica com a carta em cache (e a mostra como
+    // "aberta") e o conteúdo ainda vaza pro parceiro pelo broadcast de sync.
+    return c.json({ item: isCapsuleLocked(item) ? lockCapsule(item) : item });
   } catch (error) {
     console.error("Error creating item:", error);
     return c.json({ 
@@ -951,10 +954,13 @@ app.post("/make-server-19717bce/question-of-the-day/answer", async (c) => {
         tag: "mesinha-question",
         url: "/",
       };
+      // A resposta JÁ foi gravada: uma falha no push não pode virar 500 (o
+      // cliente mostraria erro e a revelação nunca apareceria, já que numa
+      // nova tentativa `wasRevealed` seria true e o push não sairia de novo).
       await Promise.all([
         sendPushToUser("Amanda", payload),
         sendPushToUser("Mateus", payload),
-      ]);
+      ]).catch(console.error);
     } else if (!nowRevealed) {
       // Primeiro a responder: chama o outro (sem entregar a resposta).
       sendPushToUser(other, {
@@ -1160,8 +1166,14 @@ app.delete("/make-server-19717bce/cards", async (c) => {
 
 const STREAK_FREEZE_DAYS = 1;
 
+// Dia (calendário de Brasília) de um createdAt em UTC. Fatiar o ISO direto
+// jogaria tudo que foi feito depois das 21h pro dia seguinte — a sequência e a
+// retrospectiva ficariam um dia adiantadas em relação ao `todayStr` do resto
+// do app (que já é o de Brasília).
 function dayStr(iso: string): string {
-  return String(iso).slice(0, 10);
+  const t = new Date(String(iso)).getTime();
+  if (Number.isNaN(t)) return String(iso).slice(0, 10);
+  return new Date(t + BRAZIL_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 function computeStreak(activeDays: Set<string>, todayStr: string): { current: number; longest: number; frozen: boolean } {
@@ -1303,12 +1315,20 @@ app.post("/make-server-19717bce/nudge", async (c) => {
       ? message.trim().substring(0, NUDGE_MAX_LEN)
       : "tá pensando em você agora 💭";
 
-    await sendPushToUser(to, {
-      title: `💌 ${from} te cutucou!`,
-      body,
-      tag: "mesinha-nudge",
-      url: "/",
-    });
+    try {
+      await sendPushToUser(to, {
+        title: `💌 ${from} te cutucou!`,
+        body,
+        tag: "mesinha-nudge",
+        url: "/",
+      });
+    } catch (err) {
+      // A trava de 3 min já foi gravada: se o envio falhou, libera de novo em
+      // vez de deixar a pessoa 3 minutos travada por uma cutucada que nem saiu.
+      console.error("[POST /nudge] Push failed:", err);
+      await kv.del(lastKey).catch(() => {});
+      return c.json({ error: "Não deu pra cutucar agora. Tenta de novo!" }, 500);
+    }
 
     return c.json({ success: true, to });
   } catch (error) {
@@ -1333,8 +1353,12 @@ app.get("/make-server-19717bce/memories/on-this-day", async (c) => {
     const [year, month, day] = todayStr.split("-").map(Number);
     const memories: any[] = [];
     for (let back = 1; back <= 4; back++) {
-      const start = new Date(Date.UTC(year - back, month - 1, day)).toISOString().slice(0, 10);
-      const end = new Date(Date.UTC(year - back, month - 1, day + 1)).toISOString().slice(0, 10);
+      // createdAt é UTC, mas o "dia" é o de Brasília: o dia D vai de
+      // D 03:00Z a D+1 03:00Z. Comparar com a data pura (D..D+1 em UTC) jogava
+      // os posts feitos depois das 21h pro dia seguinte — a memória de uma
+      // noite de aniversário só apareceria um dia atrasada.
+      const start = new Date(Date.UTC(year - back, month - 1, day) - BRAZIL_OFFSET_MS).toISOString();
+      const end = new Date(Date.UTC(year - back, month - 1, day + 1) - BRAZIL_OFFSET_MS).toISOString();
       const rows = await kv.getMuralLightByDateRange(start, end);
       for (const row of rows) {
         // Posts de texto guardam o conteúdo em muralContent (pequeno) — busca o
