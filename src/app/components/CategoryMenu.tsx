@@ -36,6 +36,7 @@ import imgIconLugares from "figma:asset/d4ec5ae65b7bd51ce704f9bf07164532caa53a33
 import imgIconcomidas from "figma:asset/2c8cffafea0b456e1dfa9a773e633226de456ac0.png";
 import imgIconVideoGame from "figma:asset/783a5ddb42e8653aa6debba484cc8b75c211df92.png";
 import imgIconVieosCurtos from "figma:asset/b72dc3ec57224b4caa82c0bbb8e9602e4a8602e4.png";
+import { isFeatureUnlocked, type FeatureId } from '../utils/featureSchedule';
 
 export type Category =
   | 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates'
@@ -63,6 +64,34 @@ export const categories = [
 // Categorias que nasceram depois da grade original — vão pra página 2 junto
 // das ferramentas, preservando a página 1 como sempre foi.
 const PAGE_2_CATEGORIES: Category[] = ['capsule', 'chore', 'bucket', 'gratitude'];
+
+// Categorias e ferramentas que entram pelo calendário de lançamento (uma a
+// cada 15 dias). Enquanto não abrem, o ícone simplesmente não existe na grade
+// — sem cadeado nem "em breve", porque a graça é ser surpresa. O que não está
+// mapeado aqui (Mural, Encontros, Mapa...) aparece sempre.
+const SCHEDULED_CATEGORIES: Partial<Record<Category, FeatureId>> = {
+  capsule: 'capsule',
+  chore: 'chore',
+  bucket: 'bucket',
+  gratitude: 'gratitude',
+};
+
+const SCHEDULED_TOOLS: Partial<Record<ToolId, FeatureId>> = {
+  mood: 'mood',
+  question: 'question',
+  garden: 'garden',
+  roleta: 'roleta',
+  cartas: 'cartas',
+  nudge: 'nudge',
+};
+
+/** Categorias visíveis hoje — usada aqui e pelo swipe entre categorias. */
+export function visibleCategories() {
+  return categories.filter(c => {
+    const feature = SCHEDULED_CATEGORIES[c.id];
+    return !feature || isFeatureUnlocked(feature);
+  });
+}
 
 // Mapeamento dos ícones personalizados do Figma. Categorias sem PNG (ex.:
 // capsule) caem no ícone lucide correspondente no badge.
@@ -176,11 +205,17 @@ export function CategoryMenu({
   // Ordem da grade: a página 1 fica EXATAMENTE como sempre foi (11 categorias
   // + Encontros); tudo que veio depois mora nas páginas seguintes — sem
   // quebrar a memória muscular de ninguém.
-  const page1Categories = categories.filter(c => !PAGE_2_CATEGORIES.includes(c.id));
-  const laterCategories = categories.filter(c => PAGE_2_CATEGORIES.includes(c.id));
+  // Só o que já foi liberado pelo calendário de lançamento entra na grade.
+  const shown = visibleCategories();
+  const page1Categories = shown.filter(c => !PAGE_2_CATEGORIES.includes(c.id));
+  const laterCategories = shown.filter(c => PAGE_2_CATEGORIES.includes(c.id));
+  const visibleTools = tools.filter(t => {
+    const feature = SCHEDULED_TOOLS[t.id];
+    return !feature || isFeatureUnlocked(feature);
+  });
   const entries: MenuEntry[] = [
     ...page1Categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
-    ...tools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
+    ...visibleTools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
     ...laterCategories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
   ];
   const pages = paginate(entries);

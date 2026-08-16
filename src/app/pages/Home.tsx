@@ -11,7 +11,9 @@ import { EmptyState } from '../components/EmptyState';
 import { AddItemModal } from '../components/AddItemModal';
 import { FilterModal } from '../components/FilterModal';
 import { Top3ItemComponent } from '../components/Top3ItemComponent';
-import { CategoryMenu, categories, type Category } from '../components/CategoryMenu';
+import { CategoryMenu, categories, visibleCategories, type Category } from '../components/CategoryMenu';
+import { isFeatureUnlocked } from '../utils/featureSchedule';
+import { FeatureAnnouncement } from '../components/FeatureAnnouncement';
 import { MuralSection } from '../components/MuralSection';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
@@ -922,11 +924,14 @@ export default function Home() {
   };
 
   const handleSwipe = (offset: number) => {
-    const currentIndex = categories.findIndex(cat => cat.id === activeCategory);
+    // Só navega entre as categorias já liberadas pelo calendário de
+    // lançamento — as que ainda não abriram não existem pro usuário.
+    const shown = visibleCategories();
+    const currentIndex = shown.findIndex(cat => cat.id === activeCategory);
     const newIndex = currentIndex + offset;
 
-    if (newIndex >= 0 && newIndex < categories.length) {
-      setActiveCategory(categories[newIndex].id);
+    if (currentIndex !== -1 && newIndex >= 0 && newIndex < shown.length) {
+      setActiveCategory(shown[newIndex].id);
     }
   };
 
@@ -1040,6 +1045,9 @@ export default function Home() {
 
       {/* Notification Permission Banner */}
       <NotificationPermissionBanner />
+
+      {/* Aviso de novidade — aparece 1x no dia em que uma feature é liberada */}
+      <FeatureAnnouncement />
       
       {/* Header */}
       <header className="bg-transparent pt-16 pb-4 px-6 relative">
@@ -1065,7 +1073,7 @@ export default function Home() {
             <div className="font-normal text-[20px] mb-1">- Mesinha -</div>
             <div className="font-bold text-[28px]">Amanda & Mateus</div>
           </h1>
-          {togetherSince && (() => {
+          {togetherSince && isFeatureUnlocked('counter') && (() => {
             const [y, m, d] = togetherSince.split('-').map(Number);
             const start = new Date(y, (m || 1) - 1, d || 1);
             const today = new Date();
@@ -1185,14 +1193,14 @@ export default function Home() {
             <div className={activeCategory === 'mural' ? '' : 'space-y-2'}>
               {activeCategory === 'mural' ? (
                 <>
-                  <OnThisDayCard />
+                  {isFeatureUnlocked('onthisday') && <OnThisDayCard />}
                   <MuralSection
                     pendingItems={pendingItems}
                     userProfile={userProfile}
                     onDeleteItem={handleDeleteItem}
                     onMarkViewed={handleMarkViewed}
                     onToggleLike={handleToggleLike}
-                    onSetReaction={handleSetReaction}
+                    onSetReaction={isFeatureUnlocked('reactions') ? handleSetReaction : undefined}
                   />
                 </>
               ) : pendingItems.length === 0 ? (

@@ -8,7 +8,9 @@ interface MuralSectionProps {
   onDeleteItem: (id: string) => void;
   onMarkViewed: (id: string) => void;
   onToggleLike: (id: string) => void;
-  onSetReaction: (id: string, emoji: string | null) => void;
+  // Ausente enquanto as reações não foram liberadas pelo calendário de
+  // lançamento — o card cai no coração simples nesse caso.
+  onSetReaction?: (id: string, emoji: string | null) => void;
 }
 
 /**
@@ -31,7 +33,7 @@ export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkVi
           currentUser={userProfile}
           onMarkViewed={() => onMarkViewed(pendingItems[0].id)}
           onToggleLike={() => onToggleLike(pendingItems[0].id)}
-          onSetReaction={(emoji) => onSetReaction(pendingItems[0].id, emoji)}
+          onSetReaction={onSetReaction ? (emoji) => onSetReaction(pendingItems[0].id, emoji) : undefined}
           isHeroItem={true}
         />
       </div>
@@ -47,7 +49,7 @@ export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkVi
               currentUser={userProfile}
               onMarkViewed={() => onMarkViewed(item.id)}
               onToggleLike={() => onToggleLike(item.id)}
-              onSetReaction={(emoji) => onSetReaction(item.id, emoji)}
+              onSetReaction={onSetReaction ? (emoji) => onSetReaction(item.id, emoji) : undefined}
               isHeroItem={false}
             />
           ))}

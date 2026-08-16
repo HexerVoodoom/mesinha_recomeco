@@ -6,6 +6,7 @@ import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { toast } from 'sonner';
 import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
+import { isFeatureUnlocked } from '../utils/featureSchedule';
 
 // URL fixa: sempre baixa o APK da GitHub Release mais recente (gerada
 // automaticamente pelo workflow "Build & Publish Release AAB" a cada merge
@@ -158,7 +159,9 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Juntos há X dias — contador vivo a partir da data configurada */}
+          {/* Juntos há X dias — contador vivo a partir da data configurada.
+              Escondido até o calendário de lançamento liberar a feature. */}
+          {isFeatureUnlocked('counter') && (
           <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
             <div className="flex items-start gap-3">
               <Heart className="w-6 h-6 text-primary mt-0.5" />
@@ -188,6 +191,7 @@ export default function Settings() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Baixar a versão mais recente do app (APK direto, sem Play Store) */}
           <a

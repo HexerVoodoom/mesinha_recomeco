@@ -107,6 +107,42 @@ Todos prefixados em `/make-server-19717bce`:
 
 ---
 
+## Calendário de Lançamento das Features
+
+Todas as features novas já estão no código em `main`, mas cada uma fica
+**invisível** até a data dela — uma nova a cada 15 dias, pra ser surpresa. Não
+existe cadeado nem "em breve": o ícone simplesmente não aparece na grade até
+abrir, e no dia aparece um aviso de novidade (uma única vez por aparelho).
+
+**Arquivo:** `src/app/utils/featureSchedule.ts`
+
+Para ajustar, mexa em duas constantes:
+
+- `LAUNCH_ANCHOR` — data em que a primeira feature entra no ar
+- `INTERVAL_DAYS` — intervalo entre uma e a próxima (padrão: 15)
+
+A ordem de lançamento é a ordem da lista `FEATURE_SCHEDULE`; o campo `step` é
+a posição na fila (0 = já no ar na data da âncora). Para adiantar uma feature,
+basta baixar o `step` dela.
+
+| Peça | Como respeita o calendário |
+|---|---|
+| Ícones da grade | `CategoryMenu` filtra por `SCHEDULED_CATEGORIES` / `SCHEDULED_TOOLS` |
+| Swipe entre categorias | `visibleCategories()` (exportada pelo `CategoryMenu`) |
+| Card "Neste dia", contador, reações | Gate direto com `isFeatureUnlocked()` na `Home` |
+| Contador em Configurações | Gate com `isFeatureUnlocked('counter')` |
+| Aviso de novidade | `FeatureAnnouncement`, com `seenFeatureAnnouncements` no localStorage |
+
+O gate é **de interface**: o backend responde normalmente a todas as rotas
+desde o merge. Isso é proposital — se uma feature for adiantada, ela funciona
+na hora, sem precisar de deploy do servidor.
+
+Quem instala o app pela primeira vez depois de várias features já terem
+aberto **não recebe a fila de avisos atrasados** (`backfillAnnouncementsOnFirstRun`)
+— só vê os avisos das que abrirem dali pra frente.
+
+---
+
 ## Categorias de Item
 
 | Categoria | Uso |
