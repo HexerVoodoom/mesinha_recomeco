@@ -142,6 +142,11 @@ export default function Home() {
   const [showMap, setShowMap] = useState(false);
   const [showNudgeModal, setShowNudgeModal] = useState(false);
   const [showRouletteModal, setShowRouletteModal] = useState(false);
+  // Data de início do relacionamento (settings.togetherSince) — mostrada como
+  // "juntos há X dias" embaixo do título. Cache local pra aparecer sem delay.
+  const [togetherSince, setTogetherSince] = useState<string | null>(() => {
+    try { return localStorage.getItem('togetherSince'); } catch (_) { return null; }
+  });
 
   // Paginação - 7 itens por página
   const [currentPage, setCurrentPage] = useState<Record<Category, number>>({
@@ -355,6 +360,21 @@ export default function Home() {
       refreshCategoryItems('mural');
     }
   }, [activeCategory]);
+
+  // Busca a data "juntos desde" das configurações (uma vez por sessão) e
+  // guarda em cache local pro contador do header aparecer sem delay.
+  useEffect(() => {
+    api.getSettings()
+      .then(s => {
+        const since = s?.togetherSince || null;
+        setTogetherSince(since);
+        try {
+          if (since) localStorage.setItem('togetherSince', since);
+          else localStorage.removeItem('togetherSince');
+        } catch (_) {}
+      })
+      .catch(() => { /* contador é bônus — silencioso se offline */ });
+  }, []);
 
   // Calendário de Encontros: garante que todos os dias propostos/confirmados
   // estejam carregados (mesmo que a paginação geral de itens os deixe de fora),
@@ -943,6 +963,19 @@ export default function Home() {
             <div className="font-normal text-[20px] mb-1">- Mesinha -</div>
             <div className="font-bold text-[28px]">Amanda & Mateus</div>
           </h1>
+          {togetherSince && (() => {
+            const [y, m, d] = togetherSince.split('-').map(Number);
+            const start = new Date(y, (m || 1) - 1, d || 1);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const days = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            if (days < 0) return null;
+            return (
+              <p className="font-['Quicksand',sans-serif] text-sm text-[#8A847D] mt-1">
+                juntos há <span className="font-bold text-[#4D989B]">{days}</span> dias 💗
+              </p>
+            );
+          })()}
           
           {/* Progress indicator */}
           {headerPressProgress > 0 && (

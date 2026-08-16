@@ -131,9 +131,15 @@ export function CategoryMenu({
     nudge: onOpenNudge,
   };
 
+  // Ordem da grade: a página 1 fica EXATAMENTE como sempre foi (11 categorias
+  // + Encontros); tudo que veio depois (Mapa, Roleta, Cutucada, Cápsula) mora
+  // na página 2 — sem quebrar a memória muscular de ninguém.
+  const page1Categories = categories.filter(c => c.id !== 'capsule');
+  const capsuleMeta = categories.find(c => c.id === 'capsule');
   const entries: MenuEntry[] = [
-    ...categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
+    ...page1Categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
     ...tools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
+    ...(capsuleMeta ? [{ kind: 'category' as const, id: capsuleMeta.id, icon: capsuleMeta.icon }] : []),
   ];
   const pages = paginate(entries);
 
