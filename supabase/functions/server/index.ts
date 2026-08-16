@@ -367,23 +367,42 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
     await kv.set(`item:${itemId}`, updatedItem);
     console.log("Item updated successfully:", itemId);
 
-    // Notifica o dono do post quando a outra pessoa curte (novo like).
-    if (Array.isArray(body.likedBy)) {
+    // Notifica o dono do post quando a outra pessoa reage/curte.
+    // Reação (emoji) tem prioridade: quem mandou reação nesta atualização não
+    // recebe também o push genérico de like (o like acompanha a reação).
+    const typeEmoji: Record<string, string> = { text: "📝", image: "🖼️", video: "🎥", audio: "🎵" };
+    const postEmoji = typeEmoji[updatedItem.muralContentType || "text"] || "📝";
+    const owner = updatedItem.createdBy;
+    const reactionPushed = new Set<string>();
+
+    if (body.reactions && typeof body.reactions === "object" && (owner === "Amanda" || owner === "Mateus")) {
+      const oldReactions = (existingItem.reactions && typeof existingItem.reactions === "object") ? existingItem.reactions : {};
+      for (const [user, emoji] of Object.entries(body.reactions)) {
+        if (user === owner) continue; // ninguém reage ao próprio post
+        if (typeof emoji !== "string" || !emoji) continue;
+        if (oldReactions[user] === emoji) continue; // reação inalterada
+        reactionPushed.add(user);
+        sendPushToUser(owner, {
+          title: `${user} reagiu ${emoji} ao seu post`,
+          body: `${postEmoji} ${updatedItem.title || "Seu post no Mural"}`,
+          tag: "mesinha-like",
+          url: "/",
+        }).catch(console.error);
+      }
+    }
+
+    if (Array.isArray(body.likedBy) && (owner === "Amanda" || owner === "Mateus")) {
       const oldLikers: string[] = Array.isArray(existingItem.likedBy) ? existingItem.likedBy : [];
       const addedLikers = body.likedBy.filter((u: string) => u && !oldLikers.includes(u));
-      const owner = updatedItem.createdBy;
-      if ((owner === "Amanda" || owner === "Mateus")) {
-        const typeEmoji: Record<string, string> = { text: "📝", image: "🖼️", video: "🎥", audio: "🎵" };
-        const emoji = typeEmoji[updatedItem.muralContentType || "text"] || "📝";
-        for (const liker of addedLikers) {
-          if (liker === owner) continue; // ninguém curte o próprio post
-          sendPushToUser(owner, {
-            title: `${liker} curtiu seu post ❤️`,
-            body: `${emoji} ${updatedItem.title || "Seu post no Mural"}`,
-            tag: "mesinha-like",
-            url: "/",
-          }).catch(console.error);
-        }
+      for (const liker of addedLikers) {
+        if (liker === owner) continue; // ninguém curte o próprio post
+        if (reactionPushed.has(liker)) continue; // já avisou pela reação
+        sendPushToUser(owner, {
+          title: `${liker} curtiu seu post ❤️`,
+          body: `${postEmoji} ${updatedItem.title || "Seu post no Mural"}`,
+          tag: "mesinha-like",
+          url: "/",
+        }).catch(console.error);
       }
     }
 

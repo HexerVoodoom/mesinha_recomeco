@@ -812,9 +812,31 @@ export default function Home() {
       ? likedBy.filter(user => user !== userProfile) // Remove like
       : [...likedBy, userProfile]; // Adiciona like
     
-    await handleUpdateItem(id, { 
-      likedBy: newLikedBy 
+    await handleUpdateItem(id, {
+      likedBy: newLikedBy
     });
+  };
+
+  // Reação com emoji (mural): uma por pessoa, substituível; null remove.
+  // Reagir implica curtir (mantém likedBy em sincronia — o push de like do
+  // servidor continua valendo e vira um push com o emoji da reação).
+  const handleSetReaction = async (id: string, emoji: string | null) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    if (item.createdBy === userProfile) return; // não reage ao próprio post
+
+    const reactions = { ...(item.reactions || {}) };
+    const likedBy = item.likedBy || [];
+    let newLikedBy: string[];
+    if (emoji) {
+      reactions[userProfile] = emoji;
+      newLikedBy = likedBy.includes(userProfile) ? likedBy : [...likedBy, userProfile];
+    } else {
+      delete reactions[userProfile];
+      newLikedBy = likedBy.filter(user => user !== userProfile);
+    }
+
+    await handleUpdateItem(id, { reactions, likedBy: newLikedBy });
   };
 
   const filteredItems = items.filter(item => {
@@ -1065,6 +1087,7 @@ export default function Home() {
                     onDeleteItem={handleDeleteItem}
                     onMarkViewed={handleMarkViewed}
                     onToggleLike={handleToggleLike}
+                    onSetReaction={handleSetReaction}
                   />
                 </>
               ) : pendingItems.length === 0 ? (

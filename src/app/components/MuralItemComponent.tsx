@@ -15,11 +15,17 @@ interface MuralItemComponentProps {
   currentUser: string;
   isHeroItem?: boolean;
   onToggleLike?: () => void;
+  // Reação com emoji (null remove a reação atual)
+  onSetReaction?: (emoji: string | null) => void;
 }
 
-export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, isHeroItem = false, onToggleLike }: MuralItemComponentProps) {
+// Emojis do seletor de reação (❤️ primeiro = o "like" clássico)
+const REACTION_EMOJIS = ['❤️', '😂', '😍', '🥺', '🔥', '👏'];
+
+export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, isHeroItem = false, onToggleLike, onSetReaction }: MuralItemComponentProps) {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [fullItem, setFullItem] = useState<ListItem | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
 
@@ -65,9 +71,16 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
 
   // Verifica se o usuário atual curtiu o post
   const isLikedByCurrentUser = item.likedBy?.includes(currentUser) || false;
-  
+
   // Só pode curtir se não foi o criador
   const canLike = item.createdBy !== currentUser;
+
+  // Reação do usuário atual (like antigo sem emoji conta como ❤️)
+  const myReaction = item.reactions?.[currentUser] || (isLikedByCurrentUser ? '❤️' : null);
+  // Reações a exibir no card: emojis de quem reagiu/curtiu (like antigo vira ❤️)
+  const displayReactions = (item.likedBy || []).map(
+    user => item.reactions?.[user] || '❤️',
+  );
 
   // Determine background color based on creator
   const isAmanda = item.createdBy === 'Amanda';
@@ -371,26 +384,68 @@ export function MuralItemComponent({ item, onDelete, onMarkViewed, currentUser, 
               </span>
             </div>
             
-            {/* Like button - só aparece se pode curtir */}
-            {canLike && onToggleLike && (
-              <motion.button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleLike();
-                }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-1.5 rounded-full hover:bg-white/50 transition-colors"
-              >
-                <Heart 
-                  className={`w-5 h-5 transition-colors ${
-                    isLikedByCurrentUser 
-                      ? 'fill-red-500 text-red-500' 
-                      : 'text-[#8A847D]'
-                  }`}
-                />
-              </motion.button>
-            )}
+            <div className="relative flex items-center gap-1">
+              {/* Reações recebidas (para o dono do post ver) */}
+              {!canLike && displayReactions.length > 0 && (
+                <span className="text-base leading-none">
+                  {displayReactions.join(' ')}
+                </span>
+              )}
+
+              {/* Seletor de reação — abre ao tocar no coração */}
+              {canLike && onSetReaction && showReactionPicker && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute bottom-full right-0 mb-2 bg-white rounded-full shadow-lg border border-[#E9E4DF] px-2 py-1.5 flex gap-1 z-20"
+                >
+                  {REACTION_EMOJIS.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSetReaction(emoji === myReaction ? null : emoji);
+                        setShowReactionPicker(false);
+                      }}
+                      className={`text-lg leading-none p-1 rounded-full transition-transform hover:scale-125 ${
+                        emoji === myReaction ? 'bg-[#4D989B]/15' : ''
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+
+              {/* Botão de reagir/curtir - só aparece se pode curtir */}
+              {canLike && (onSetReaction || onToggleLike) && (
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onSetReaction) {
+                      setShowReactionPicker(prev => !prev);
+                    } else if (onToggleLike) {
+                      onToggleLike();
+                    }
+                  }}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="p-1.5 rounded-full hover:bg-white/50 transition-colors"
+                >
+                  {myReaction && myReaction !== '❤️' ? (
+                    <span className="text-lg leading-none">{myReaction}</span>
+                  ) : (
+                    <Heart
+                      className={`w-5 h-5 transition-colors ${
+                        isLikedByCurrentUser
+                          ? 'fill-red-500 text-red-500'
+                          : 'text-[#8A847D]'
+                      }`}
+                    />
+                  )}
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
 

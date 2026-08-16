@@ -8,13 +8,14 @@ interface MuralSectionProps {
   onDeleteItem: (id: string) => void;
   onMarkViewed: (id: string) => void;
   onToggleLike: (id: string) => void;
+  onSetReaction: (id: string, emoji: string | null) => void;
 }
 
 /**
  * Grade do mural: primeiro post em largura total (hero) e os demais em duas
  * colunas.
  */
-export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkViewed, onToggleLike }: MuralSectionProps) {
+export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkViewed, onToggleLike, onSetReaction }: MuralSectionProps) {
   if (pendingItems.length === 0) {
     return <EmptyState category="mural" />;
   }
@@ -30,6 +31,7 @@ export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkVi
           currentUser={userProfile}
           onMarkViewed={() => onMarkViewed(pendingItems[0].id)}
           onToggleLike={() => onToggleLike(pendingItems[0].id)}
+          onSetReaction={(emoji) => onSetReaction(pendingItems[0].id, emoji)}
           isHeroItem={true}
         />
       </div>
@@ -45,6 +47,7 @@ export function MuralSection({ pendingItems, userProfile, onDeleteItem, onMarkVi
               currentUser={userProfile}
               onMarkViewed={() => onMarkViewed(item.id)}
               onToggleLike={() => onToggleLike(item.id)}
+              onSetReaction={(emoji) => onSetReaction(item.id, emoji)}
               isHeroItem={false}
             />
           ))}
