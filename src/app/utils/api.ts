@@ -47,10 +47,59 @@ export interface ListItem {
   muralThumbnail?: string; // Miniatura leve (imagem), incluída na listagem para preview sem precisar tocar
   viewedBy?: string[]; // Lista de usuários que visualizaram o post
   likedBy?: string[]; // Lista de usuários que curtiram o post
+  reactions?: Record<string, string>; // Reação com emoji por usuário (ex: { Amanda: '😂' }); reagir implica curtir
   caption?: string; // Texto/legenda para posts de imagem do mural
   // Campos específicos do Calendário de Encontros (categoria meetup)
   meetupPeriod?: MeetupPeriod; // período do dia (manhã/tarde/noite)
   meetupType?: MeetupType; // o que vão fazer (juntos em casa / video game cada um em casa / sair)
+  // Cápsula do Tempo (categoria capsule): true enquanto o servidor esconde o
+  // conteúdo (a data de abertura em eventDate ainda não chegou)
+  capsuleLocked?: boolean;
+  // Check-in de humor (categoria mood)
+  moodEmoji?: string;
+  // Tarefas de casa (categoria chore)
+  choreAssignee?: 'Amanda' | 'Mateus';
+  choreRotates?: boolean; // ao concluir, passa a vez pro outro
+  choreDoneCount?: number;
+  choreLastDoneBy?: string;
+  choreLastDoneAt?: string;
+}
+
+// Pergunta do Dia — o servidor esconde a resposta do outro (com o sentinel
+// '__HIDDEN__') até os dois responderem.
+export interface QuestionOfTheDay {
+  id: string;
+  question: string;
+  date: string;
+  revealed: boolean;
+  answerAmanda: string | null;
+  answerMateus: string | null;
+}
+
+export const HIDDEN_ANSWER = '__HIDDEN__';
+
+// Jogos: baralho de cartas escrito por vocês (+ as padrão de reserva)
+export type CardType = 'verdade' | 'desafio' | 'prefere';
+export type CardDeck = Record<CardType, string[]>;
+
+// Jardim: sequência, progresso e retrospectiva, tudo derivado dos itens
+export interface GardenStats {
+  date: string;
+  totalItems: number;
+  streak: { current: number; longest: number; frozen: boolean };
+  level: number;
+  nextLevelAt: number;
+  itemsCounted: number;
+  /** Dias com pelo menos um registro no ano corrente (exibido na retrospectiva). */
+  activeDays: number;
+  byCategory: Record<string, number>;
+  byPerson: Record<string, number>;
+  thisYear: {
+    year: string;
+    total: number;
+    byMonth: Record<string, number>;
+    busiestMonth: { month: string; count: number } | null;
+  };
 }
 
 // Compartilhamento de localização em tempo real (aba "Mapa")
@@ -66,6 +115,22 @@ export interface Settings {
   coupleName: string;
   themeColor: string;
   notificationsEnabled: boolean;
+  // Data de início do relacionamento (YYYY-MM-DD) — alimenta o contador "juntos há X dias"
+  togetherSince?: string | null;
+}
+
+// Memória do "Neste dia" — post do mural desta mesma data em anos anteriores
+export interface OnThisDayMemory {
+  id: string;
+  title?: string | null;
+  caption?: string | null;
+  comment?: string | null;
+  createdBy: string;
+  createdAt: string;
+  muralContentType?: 'text' | 'image' | 'video' | 'audio' | null;
+  muralThumbnail?: string | null;
+  muralContent?: string | null; // preenchido só para posts de texto
+  yearsAgo: number;
 }
 
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> => {
@@ -302,6 +367,74 @@ export const api = {
 
   getLocations: async (): Promise<{ Amanda: LocationShare | null; Mateus: LocationShare | null }> => {
     return await fetchAPI('/location');
+  },
+
+  // Cutucada: push imediato pro outro. O servidor aplica rate limit (429 com
+  // mensagem amigável se cutucar de novo rápido demais).
+  sendNudge: async (from: 'Amanda' | 'Mateus', message?: string): Promise<{ success: boolean; to: string }> => {
+    return await fetchAPI('/nudge', {
+      method: 'POST',
+      body: JSON.stringify({ from, message }),
+    });
+  },
+
+  // "Neste dia": posts do mural desta mesma data em anos anteriores (cacheado por dia no servidor)
+  getOnThisDay: async (): Promise<{ date: string; memories: OnThisDayMemory[] }> => {
+    return await fetchAPI('/memories/on-this-day');
+  },
+
+  // Pergunta do Dia
+  getQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus'): Promise<QuestionOfTheDay> => {
+    return await fetchAPI(`/question-of-the-day?profile=${profile}&_t=${Date.now()}`);
+  },
+
+  answerQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus', answer: string): Promise<QuestionOfTheDay> => {
+    return await fetchAPI('/question-of-the-day/answer', {
+      method: 'POST',
+      body: JSON.stringify({ profile, answer }),
+    });
+  },
+
+  getQuestionBank: async (): Promise<{ questions: string[]; pending: number; defaultsCount: number }> => {
+    return await fetchAPI('/question-bank');
+  },
+
+  addQuestionToBank: async (profile: 'Amanda' | 'Mateus', question: string): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI('/question-bank', {
+      method: 'POST',
+      body: JSON.stringify({ profile, question }),
+    });
+  },
+
+  removeQuestionFromBank: async (question: string): Promise<void> => {
+    await fetchAPI('/question-bank', {
+      method: 'DELETE',
+      body: JSON.stringify({ question }),
+    });
+  },
+
+  // Jardim: sequência, nível e retrospectiva (cacheado por dia no servidor)
+  getGarden: async (): Promise<GardenStats> => {
+    return await fetchAPI('/garden');
+  },
+
+  // Jogos: baralho de cartas (as de vocês + as padrão)
+  getCards: async (): Promise<{ custom: CardDeck; defaults: CardDeck }> => {
+    return await fetchAPI('/cards');
+  },
+
+  addCard: async (profile: 'Amanda' | 'Mateus', type: CardType, text: string): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI('/cards', {
+      method: 'POST',
+      body: JSON.stringify({ profile, type, text }),
+    });
+  },
+
+  removeCard: async (type: CardType, text: string): Promise<void> => {
+    await fetchAPI('/cards', {
+      method: 'DELETE',
+      body: JSON.stringify({ type, text }),
+    });
   },
 };
 

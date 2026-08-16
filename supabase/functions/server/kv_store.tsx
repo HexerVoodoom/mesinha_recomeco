@@ -135,6 +135,63 @@ export const getByPrefixPaged = async (
   return { items: data?.map((d) => d.value) ?? [], total: count ?? 0 };
 };
 
+// Posts do mural criados dentro de uma faixa [start, end) de createdAt (ISO,
+// data ou timestamp completo — a comparação é lexicográfica sobre o ISO),
+// em projeção leve (sem photo/muralContent — mídia pesada nunca sai do banco).
+// Range curto no campo indexado (idx_kv_items_createdat) => query barata.
+// Usado pelo "Neste dia" (memórias de anos anteriores na mesma data).
+export const getMuralLightByDateRange = async (
+  startDate: string,
+  endDate: string,
+): Promise<any[]> => {
+  const supabase = client();
+  const { data, error } = await supabase
+    .from("kv_store_19717bce")
+    .select(
+      "id:value->>id, title:value->>title, caption:value->>caption, comment:value->>comment, createdBy:value->>createdBy, createdAt:value->>createdAt, muralContentType:value->>muralContentType, muralThumbnail:value->>muralThumbnail, likedBy:value->likedBy",
+    )
+    .like("key", "item:%")
+    .eq("value->>category", "mural")
+    .gte("value->>createdAt", startDate)
+    .lt("value->>createdAt", endDate)
+    .limit(10);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data ?? [];
+};
+
+// Digest de atividade: só (categoria, autor, data) de cada item — três campos
+// de texto por linha, sem trazer nenhuma mídia pela rede. Alimenta a sequência
+// (streak), o jardim e a retrospectiva.
+//
+// ATENÇÃO ao custo: extrair um campo de JSONB obriga o Postgres a
+// descomprimir (detoast) a linha inteira, e neste banco cada item pesa ~1,3MB
+// por causa do base64. Medido em produção: 158 itens => ~20k buffers (~156MB)
+// lidos, 103ms. Por isso o `since` limita a varredura a uma janela recente
+// (usa o índice idx_kv_items_createdat) e o chamador cacheia o resultado.
+// A correção de raiz é mover a mídia pro Storage (ver PROJETO.md).
+export const getActivityDigest = async (limit = 5000, since?: string): Promise<any[]> => {
+  const supabase = client();
+  let query = supabase
+    .from("kv_store_19717bce")
+    .select("category:value->>category, createdBy:value->>createdBy, createdAt:value->>createdAt")
+    .like("key", "item:%");
+
+  // Range no campo indexado: descarta itens antigos sem precisar descomprimi-los.
+  query = since
+    ? query.gte("value->>createdAt", since)
+    : query.not("value->>createdAt", "is", null);
+
+  const { data, error } = await query
+    .order(`value->>'createdAt'` as any, { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data ?? [];
+};
+
 // Fetches a page of "light" items (função get_items_light no Postgres).
 // A montagem dos itens acontece DENTRO do banco: mídia pesada em base64
 // (photo/muralContent, MBs por linha) nunca sai do Postgres — antes essas

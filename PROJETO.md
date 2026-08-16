@@ -82,15 +82,64 @@ Todos prefixados em `/make-server-19717bce`:
 | POST | `/push-subscription` | Registra subscription push de um usuário |
 | DELETE | `/push-subscription` | Remove subscription push |
 | POST | `/trigger-reminders` | Dispara lembretes (chamado pelo pg_cron) |
+| POST | `/nudge` | Cutucada: push imediato pro outro (rate limit de 3 min por pessoa) |
+| GET | `/memories/on-this-day` | Posts do mural desta data em anos anteriores (cache diário em KV) |
+| GET | `/question-of-the-day` | Pergunta do dia (cria na 1ª chamada); esconde a resposta do outro até os dois responderem |
+| POST | `/question-of-the-day/answer` | Responde a pergunta de hoje |
+| GET/POST/DELETE | `/question-bank` | Banco de perguntas escritas pelo casal |
+| GET/POST/DELETE | `/cards` | Baralho de cartas dos jogos (verdade / desafio / o que prefere) |
+| GET | `/garden` | Sequência, nível do jardim e retrospectiva (cache diário, invalidado por contagem) |
 
 ### Padrões de chave no KV
 
 | Prefixo | Conteúdo |
 |---|---|
 | `item:` | Todos os itens (listas, mural, alarmes…) |
-| `settings` | Configurações globais do app |
+| `settings` | Configurações globais do app (inclui `togetherSince` do contador "juntos há X") |
 | `push-subscription:Amanda` | Subscription push da Amanda |
 | `push-subscription:Mateus` | Subscription push do Mateus |
+| `nudge-last:<perfil>` | Timestamp da última cutucada (rate limit) |
+| `on-this-day:<data>` | Cache diário das memórias do "Neste dia" |
+| `question-bank` | Perguntas do dia escritas pelo casal |
+| `question-used` | Últimas 60 perguntas usadas (evita repetir) |
+| `card-deck` | Cartas dos jogos escritas pelo casal, por tipo |
+| `garden:<data>` | Cache diário da sequência/retrospectiva |
+
+---
+
+## Calendário de Lançamento das Features
+
+Todas as features novas já estão no código em `main`, mas cada uma fica
+**invisível** até a data dela — uma nova a cada 15 dias, pra ser surpresa. Não
+existe cadeado nem "em breve": o ícone simplesmente não aparece na grade até
+abrir, e no dia aparece um aviso de novidade (uma única vez por aparelho).
+
+**Arquivo:** `src/app/utils/featureSchedule.ts`
+
+Para ajustar, mexa em duas constantes:
+
+- `LAUNCH_ANCHOR` — data em que a primeira feature entra no ar
+- `INTERVAL_DAYS` — intervalo entre uma e a próxima (padrão: 15)
+
+A ordem de lançamento é a ordem da lista `FEATURE_SCHEDULE`; o campo `step` é
+a posição na fila (0 = já no ar na data da âncora). Para adiantar uma feature,
+basta baixar o `step` dela.
+
+| Peça | Como respeita o calendário |
+|---|---|
+| Ícones da grade | `CategoryMenu` filtra por `SCHEDULED_CATEGORIES` / `SCHEDULED_TOOLS` |
+| Swipe entre categorias | `visibleCategories()` (exportada pelo `CategoryMenu`) |
+| Card "Neste dia", contador, reações | Gate direto com `isFeatureUnlocked()` na `Home` |
+| Contador em Configurações | Gate com `isFeatureUnlocked('counter')` |
+| Aviso de novidade | `FeatureAnnouncement`, com `seenFeatureAnnouncements` no localStorage |
+
+O gate é **de interface**: o backend responde normalmente a todas as rotas
+desde o merge. Isso é proposital — se uma feature for adiantada, ela funciona
+na hora, sem precisar de deploy do servidor.
+
+Quem instala o app pela primeira vez depois de várias features já terem
+aberto **não recebe a fila de avisos atrasados** (`backfillAnnouncementsOnFirstRun`)
+— só vê os avisos das que abrirem dali pra frente.
 
 ---
 
@@ -101,6 +150,12 @@ Todos prefixados em `/make-server-19717bce`:
 | `mural` | Posts do mural (text, image, video, audio) |
 | `alarm` | Lembretes com horário, dias e destinatário |
 | `lista` | Listas compartilhadas |
+| `capsule` | Cápsula do tempo: carta/foto que só abre na data (`eventDate`). O conteúdo é escondido **no servidor** enquanto lacrada (`capsuleLocked: true` na resposta); push ao lacrar e no dia da abertura (cron 08:00) |
+| `mood` | Check-in de humor. Id determinístico `mood-<perfil>-<data>` (upsert) => 1 registro por pessoa por dia e push no máximo 1x/dia |
+| `question` | Pergunta do dia. Id `question-<data>`, com `answerAmanda`/`answerMateus` |
+| `chore` | Tarefa de casa com rodízio (`choreAssignee`, `choreRotates`, `choreDoneCount`, `choreLastDoneBy/At`) |
+| `bucket` | Lista de sonhos (com barra de progresso) |
+| `gratitude` | Registros de gratidão |
 | _(outros)_ | Extensível |
 
 ---

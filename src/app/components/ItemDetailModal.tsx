@@ -95,6 +95,14 @@ export function ItemDetailModal({
       // (Sem isso o lembrete ficava salvo mas mudo até tocar no ícone de relógio.)
       if (tempReminderDays.length > 0 && (tempReminderForMateus || tempReminderForAmanda)) {
         updates.reminderActive = true;
+      } else {
+        // Salva mesmo assim, mas avisa: lembrete sem dia ou sem destinatário
+        // nunca dispara (classe de bug documentada no PROJETO.md — o alarme
+        // "16 de março" ficou mudo por meses sem ninguém perceber).
+        const missing = tempReminderDays.length === 0
+          ? 'escolhe pelo menos um dia da semana'
+          : 'escolhe pra quem ele toca';
+        toast.warning(`Esse lembrete ainda não vai tocar: ${missing}.`);
       }
     }
     

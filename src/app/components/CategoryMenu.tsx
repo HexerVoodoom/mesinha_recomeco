@@ -13,6 +13,16 @@ import {
   CalendarHeart,
   Trophy,
   Gift,
+  Dices,
+  HeartHandshake,
+  Hourglass,
+  SmilePlus,
+  MessageCircleQuestion,
+  Brush,
+  ListChecks,
+  Sparkles,
+  Sprout,
+  Spade,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -26,10 +36,12 @@ import imgIconLugares from "figma:asset/d4ec5ae65b7bd51ce704f9bf07164532caa53a33
 import imgIconcomidas from "figma:asset/2c8cffafea0b456e1dfa9a773e633226de456ac0.png";
 import imgIconVideoGame from "figma:asset/783a5ddb42e8653aa6debba484cc8b75c211df92.png";
 import imgIconVieosCurtos from "figma:asset/b72dc3ec57224b4caa82c0bbb8e9602e4a8602e4.png";
+import { isFeatureUnlocked, type FeatureId } from '../utils/featureSchedule';
 
 export type Category =
   | 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates'
-  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other';
+  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other' | 'capsule'
+  | 'chore' | 'bucket' | 'gratitude';
 
 export const categories = [
   { id: 'mural' as Category, icon: Gift, label: 'Mural' },
@@ -43,10 +55,47 @@ export const categories = [
   { id: 'food' as Category, icon: UtensilsCrossed, label: 'Comidas' },
   { id: 'places' as Category, icon: MapPin, label: 'Lugares' },
   { id: 'other' as Category, icon: Umbrella, label: 'Outros' },
+  { id: 'capsule' as Category, icon: Hourglass, label: 'Cápsula' },
+  { id: 'chore' as Category, icon: Brush, label: 'Tarefas' },
+  { id: 'bucket' as Category, icon: ListChecks, label: 'Sonhos' },
+  { id: 'gratitude' as Category, icon: Sparkles, label: 'Gratidão' },
 ];
 
-// Mapeamento dos ícones personalizados do Figma
-const categoryIcons: Record<Category | 'search', string> = {
+// Categorias que nasceram depois da grade original — vão pra página 2 junto
+// das ferramentas, preservando a página 1 como sempre foi.
+const PAGE_2_CATEGORIES: Category[] = ['capsule', 'chore', 'bucket', 'gratitude'];
+
+// Categorias e ferramentas que entram pelo calendário de lançamento (uma a
+// cada 15 dias). Enquanto não abrem, o ícone simplesmente não existe na grade
+// — sem cadeado nem "em breve", porque a graça é ser surpresa. O que não está
+// mapeado aqui (Mural, Encontros, Mapa...) aparece sempre.
+const SCHEDULED_CATEGORIES: Partial<Record<Category, FeatureId>> = {
+  capsule: 'capsule',
+  chore: 'chore',
+  bucket: 'bucket',
+  gratitude: 'gratitude',
+};
+
+const SCHEDULED_TOOLS: Partial<Record<ToolId, FeatureId>> = {
+  mood: 'mood',
+  question: 'question',
+  garden: 'garden',
+  roleta: 'roleta',
+  cartas: 'cartas',
+  nudge: 'nudge',
+};
+
+/** Categorias visíveis hoje — usada aqui e pelo swipe entre categorias. */
+export function visibleCategories() {
+  return categories.filter(c => {
+    const feature = SCHEDULED_CATEGORIES[c.id];
+    return !feature || isFeatureUnlocked(feature);
+  });
+}
+
+// Mapeamento dos ícones personalizados do Figma. Categorias sem PNG (ex.:
+// capsule) caem no ícone lucide correspondente no badge.
+const categoryIcons: Partial<Record<Category | 'search', string>> = {
   mural: imgIconeMural,
   alarm: imgIconLembrete,
   dates: imgIconData,
@@ -62,10 +111,17 @@ const categoryIcons: Record<Category | 'search', string> = {
 };
 
 // Ferramentas extras, que entram na mesma grade de ícones (não são categoria
-// de lista, mas usam o mesmo slot visual).
+// de lista, mas usam o mesmo slot visual). "meetup" e "map" trocam a tela;
+// "roleta" e "nudge" abrem modais por cima da tela atual.
 const tools = [
   { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
+  { id: 'mood' as const, icon: SmilePlus, label: 'Humor' },
+  { id: 'question' as const, icon: MessageCircleQuestion, label: 'Pergunta do Dia' },
+  { id: 'garden' as const, icon: Sprout, label: 'Nosso Jardim' },
+  { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
+  { id: 'cartas' as const, icon: Spade, label: 'Jogos' },
+  { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
 ];
 type ToolId = (typeof tools)[number]['id'];
 
@@ -94,9 +150,18 @@ interface CategoryMenuProps {
   showSearch: boolean;
   showMeetupCalendar: boolean;
   showMap: boolean;
+  showMood: boolean;
+  showQuestion: boolean;
+  showGarden: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
+  onOpenMood: () => void;
+  onOpenQuestion: () => void;
+  onOpenGarden: () => void;
+  onOpenRoulette: () => void;
+  onOpenGames: () => void;
+  onOpenNudge: () => void;
 }
 
 /** Cartão com o badge da categoria ativa e a grade de ícones (6x2, com slide pra mais páginas). */
@@ -105,17 +170,53 @@ export function CategoryMenu({
   showSearch,
   showMeetupCalendar,
   showMap,
+  showMood,
+  showQuestion,
+  showGarden,
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
+  onOpenMood,
+  onOpenQuestion,
+  onOpenGarden,
+  onOpenRoulette,
+  onOpenGames,
+  onOpenNudge,
 }: CategoryMenuProps) {
-  const activeTool: ToolId | null = showMeetupCalendar ? 'meetup' : showMap ? 'map' : null;
+  // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
+  const activeTool: ToolId | null = showMeetupCalendar ? 'meetup'
+    : showMap ? 'map'
+    : showMood ? 'mood'
+    : showQuestion ? 'question'
+    : showGarden ? 'garden'
+    : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
-  const toolHandlers: Record<ToolId, () => void> = { meetup: onOpenMeetupCalendar, map: onOpenMap };
+  const toolHandlers: Record<ToolId, () => void> = {
+    meetup: onOpenMeetupCalendar,
+    map: onOpenMap,
+    mood: onOpenMood,
+    question: onOpenQuestion,
+    garden: onOpenGarden,
+    roleta: onOpenRoulette,
+    cartas: onOpenGames,
+    nudge: onOpenNudge,
+  };
 
+  // Ordem da grade: a página 1 fica EXATAMENTE como sempre foi (11 categorias
+  // + Encontros); tudo que veio depois mora nas páginas seguintes — sem
+  // quebrar a memória muscular de ninguém.
+  // Só o que já foi liberado pelo calendário de lançamento entra na grade.
+  const shown = visibleCategories();
+  const page1Categories = shown.filter(c => !PAGE_2_CATEGORIES.includes(c.id));
+  const laterCategories = shown.filter(c => PAGE_2_CATEGORIES.includes(c.id));
+  const visibleTools = tools.filter(t => {
+    const feature = SCHEDULED_TOOLS[t.id];
+    return !feature || isFeatureUnlocked(feature);
+  });
   const entries: MenuEntry[] = [
-    ...categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
-    ...tools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
+    ...page1Categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
+    ...visibleTools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
+    ...laterCategories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
   ];
   const pages = paginate(entries);
 
@@ -134,13 +235,17 @@ export function CategoryMenu({
       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E9E4DF] rounded-full px-4 py-1 flex items-center gap-2">
         {activeToolMeta ? (
           <activeToolMeta.icon className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} />
-        ) : (
+        ) : (showSearch ? categoryIcons.search : categoryIcons[activeCategory]) ? (
           <img
             src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]}
             alt=""
             className="w-5 h-5 object-contain"
           />
-        )}
+        ) : (() => {
+          // Categoria sem PNG do Figma (ex.: Cápsula): usa o ícone lucide dela
+          const meta = categories.find(c => c.id === activeCategory);
+          return meta ? <meta.icon className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} /> : null;
+        })()}
         <span className="font-['Quicksand',sans-serif] font-bold text-xs text-[#2B2A28] uppercase tracking-tight">
           {activeToolMeta ? activeToolMeta.label : showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
         </span>

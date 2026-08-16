@@ -11,12 +11,23 @@ import { EmptyState } from '../components/EmptyState';
 import { AddItemModal } from '../components/AddItemModal';
 import { FilterModal } from '../components/FilterModal';
 import { Top3ItemComponent } from '../components/Top3ItemComponent';
-import { CategoryMenu, categories, type Category } from '../components/CategoryMenu';
+import { CategoryMenu, categories, visibleCategories, type Category } from '../components/CategoryMenu';
+import { isFeatureUnlocked } from '../utils/featureSchedule';
+import { FeatureAnnouncement } from '../components/FeatureAnnouncement';
 import { MuralSection } from '../components/MuralSection';
 import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { MeetupCalendar } from '../components/MeetupCalendar';
 import { MapView } from '../components/MapView';
+import { NudgeModal } from '../components/NudgeModal';
+import { DateRouletteModal } from '../components/DateRouletteModal';
+import { OnThisDayCard } from '../components/OnThisDayCard';
+import { MoodPanel, moodItemId } from '../components/MoodPanel';
+import { QuestionPanel } from '../components/QuestionPanel';
+import { ChoreItemComponent, ChoreBalance } from '../components/ChoreItemComponent';
+import { BucketProgress } from '../components/BucketProgress';
+import { GardenPanel } from '../components/GardenPanel';
+import { GamesModal } from '../components/GamesModal';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -137,6 +148,17 @@ export default function Home() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showNudgeModal, setShowNudgeModal] = useState(false);
+  const [showRouletteModal, setShowRouletteModal] = useState(false);
+  const [showMood, setShowMood] = useState(false);
+  const [showQuestion, setShowQuestion] = useState(false);
+  const [showGarden, setShowGarden] = useState(false);
+  const [showGamesModal, setShowGamesModal] = useState(false);
+  // Data de início do relacionamento (settings.togetherSince) — mostrada como
+  // "juntos há X dias" embaixo do título. Cache local pra aparecer sem delay.
+  const [togetherSince, setTogetherSince] = useState<string | null>(() => {
+    try { return localStorage.getItem('togetherSince'); } catch (_) { return null; }
+  });
 
   // Paginação - 7 itens por página
   const [currentPage, setCurrentPage] = useState<Record<Category, number>>({
@@ -151,6 +173,10 @@ export default function Home() {
     top3: 1,
     mural: 1,
     other: 1,
+    capsule: 1,
+    chore: 1,
+    bucket: 1,
+    gratitude: 1,
   });
   const [loadedCategories, setLoadedCategories] = useState<Set<Category>>(new Set(['mural']));
   const ITEMS_PER_PAGE = 7;
@@ -350,6 +376,21 @@ export default function Home() {
     }
   }, [activeCategory]);
 
+  // Busca a data "juntos desde" das configurações (uma vez por sessão) e
+  // guarda em cache local pro contador do header aparecer sem delay.
+  useEffect(() => {
+    api.getSettings()
+      .then(s => {
+        const since = s?.togetherSince || null;
+        setTogetherSince(since);
+        try {
+          if (since) localStorage.setItem('togetherSince', since);
+          else localStorage.removeItem('togetherSince');
+        } catch (_) {}
+      })
+      .catch(() => { /* contador é bônus — silencioso se offline */ });
+  }, []);
+
   // Calendário de Encontros: garante que todos os dias propostos/confirmados
   // estejam carregados (mesmo que a paginação geral de itens os deixe de fora),
   // igual ao que já é feito para o mural.
@@ -358,6 +399,14 @@ export default function Home() {
       refreshCategoryItems('meetup');
     }
   }, [showMeetupCalendar]);
+
+  // Humor: o calendário de status precisa dos registros dos dois (que a
+  // paginação geral pode não ter trazido), igual ao mural e aos encontros.
+  useEffect(() => {
+    if (showMood) {
+      refreshCategoryItems('mood');
+    }
+  }, [showMood]);
 
   const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
     // Show cached data immediately so the UI isn't blank while the API wakes up
@@ -561,6 +610,10 @@ export default function Home() {
       reminderForMateus: newItem.reminderForMateus,
       reminderForAmanda: newItem.reminderForAmanda,
       reminderActive: newItem.reminderActive,
+      // Tarefas de casa (rodízio)
+      choreAssignee: newItem.choreAssignee,
+      choreRotates: newItem.choreRotates,
+      choreDoneCount: newItem.choreDoneCount,
       // Mural specific fields
       muralContentType: newItem.muralContentType,
       muralContent: newItem.muralContent,
@@ -786,9 +839,31 @@ export default function Home() {
       ? likedBy.filter(user => user !== userProfile) // Remove like
       : [...likedBy, userProfile]; // Adiciona like
     
-    await handleUpdateItem(id, { 
-      likedBy: newLikedBy 
+    await handleUpdateItem(id, {
+      likedBy: newLikedBy
     });
+  };
+
+  // Reação com emoji (mural): uma por pessoa, substituível; null remove.
+  // Reagir implica curtir (mantém likedBy em sincronia — o push de like do
+  // servidor continua valendo e vira um push com o emoji da reação).
+  const handleSetReaction = async (id: string, emoji: string | null) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    if (item.createdBy === userProfile) return; // não reage ao próprio post
+
+    const reactions = { ...(item.reactions || {}) };
+    const likedBy = item.likedBy || [];
+    let newLikedBy: string[];
+    if (emoji) {
+      reactions[userProfile] = emoji;
+      newLikedBy = likedBy.includes(userProfile) ? likedBy : [...likedBy, userProfile];
+    } else {
+      delete reactions[userProfile];
+      newLikedBy = likedBy.filter(user => user !== userProfile);
+    }
+
+    await handleUpdateItem(id, { reactions, likedBy: newLikedBy });
   };
 
   const filteredItems = items.filter(item => {
@@ -849,35 +924,93 @@ export default function Home() {
   };
 
   const handleSwipe = (offset: number) => {
-    const currentIndex = categories.findIndex(cat => cat.id === activeCategory);
+    // Só navega entre as categorias já liberadas pelo calendário de
+    // lançamento — as que ainda não abriram não existem pro usuário.
+    const shown = visibleCategories();
+    const currentIndex = shown.findIndex(cat => cat.id === activeCategory);
     const newIndex = currentIndex + offset;
 
-    if (newIndex >= 0 && newIndex < categories.length) {
-      setActiveCategory(categories[newIndex].id);
+    if (currentIndex !== -1 && newIndex >= 0 && newIndex < shown.length) {
+      setActiveCategory(shown[newIndex].id);
     }
+  };
+
+  // As telas de ferramenta (Encontros, Mapa, Humor, Pergunta do Dia) e a busca
+  // são mutuamente exclusivas — só uma ocupa a área principal por vez.
+  const closeAllPanels = () => {
+    setShowSearch(false);
+    setShowMeetupCalendar(false);
+    setShowMap(false);
+    setShowMood(false);
+    setShowQuestion(false);
+    setShowGarden(false);
   };
 
   const handleCategoryChange = (categoryId: Category) => {
     setActiveCategory(categoryId);
-    setShowSearch(false);
-    setShowMeetupCalendar(false);
-    setShowMap(false);
+    closeAllPanels();
     // Resetar página quando trocar de categoria se ainda não foi carregada
     if (!loadedCategories.has(categoryId)) {
       setCurrentPage(prev => ({ ...prev, [categoryId]: 1 }));
     }
   };
 
-  const handleToggleMeetupCalendar = () => {
-    setShowSearch(false);
-    setShowMap(false);
-    setShowMeetupCalendar(prev => !prev);
+  /** Abre o painel pedido fechando os demais; tocar no ativo fecha (toggle). */
+  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question' | 'garden') => {
+    const isOpen = panel === 'meetup' ? showMeetupCalendar
+      : panel === 'map' ? showMap
+      : panel === 'mood' ? showMood
+      : panel === 'question' ? showQuestion
+      : showGarden;
+    closeAllPanels();
+    if (isOpen) return;
+    if (panel === 'meetup') setShowMeetupCalendar(true);
+    else if (panel === 'map') setShowMap(true);
+    else if (panel === 'mood') setShowMood(true);
+    else if (panel === 'question') setShowQuestion(true);
+    else setShowGarden(true);
   };
 
-  const handleToggleMap = () => {
-    setShowSearch(false);
-    setShowMeetupCalendar(false);
-    setShowMap(prev => !prev);
+  const handleToggleMeetupCalendar = () => togglePanel('meetup');
+  const handleToggleMap = () => togglePanel('map');
+
+  // Check-in de humor: upsert de um item por pessoa por dia (id determinístico),
+  // então trocar o humor no mesmo dia atualiza a linha em vez de criar outra —
+  // e o servidor só notifica o parceiro no primeiro check-in do dia.
+  const handleMoodCheckIn = async (emoji: string, label: string, note: string) => {
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const id = moodItemId(userProfile, todayStr);
+    const moodItem: Partial<ListItem> = {
+      id,
+      title: label,
+      comment: note,
+      category: 'mood',
+      eventDate: todayStr,
+      moodEmoji: emoji,
+      createdBy: userProfile,
+      status: 'pending',
+    };
+
+    // Otimista: mostra na hora e substitui o registro do dia se já existir.
+    setItems(prev => {
+      const others = prev.filter(i => i.id !== id);
+      const merged = [{ ...(prev.find(i => i.id === id) || {}), ...moodItem, createdAt: new Date().toISOString() } as ListItem, ...others];
+      saveItemsToStorage(merged);
+      return merged;
+    });
+
+    try {
+      const saved = await syncApi.createItem(moodItem);
+      setItems(prev => {
+        const merged = prev.map(i => (i.id === saved.id ? saved : i));
+        saveItemsToStorage(merged);
+        return merged;
+      });
+      toast.success(`Humor de hoje: ${emoji} ${label}`);
+    } catch (error) {
+      console.error('Failed to save mood:', error);
+      toast.error('Não deu pra salvar o humor. Tenta de novo!');
+    }
   };
 
   return (
@@ -912,6 +1045,9 @@ export default function Home() {
 
       {/* Notification Permission Banner */}
       <NotificationPermissionBanner />
+
+      {/* Aviso de novidade — aparece 1x no dia em que uma feature é liberada */}
+      <FeatureAnnouncement />
       
       {/* Header */}
       <header className="bg-transparent pt-16 pb-4 px-6 relative">
@@ -937,6 +1073,19 @@ export default function Home() {
             <div className="font-normal text-[20px] mb-1">- Mesinha -</div>
             <div className="font-bold text-[28px]">Amanda & Mateus</div>
           </h1>
+          {togetherSince && isFeatureUnlocked('counter') && (() => {
+            const [y, m, d] = togetherSince.split('-').map(Number);
+            const start = new Date(y, (m || 1) - 1, d || 1);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const days = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            if (days < 0) return null;
+            return (
+              <p className="font-['Quicksand',sans-serif] text-sm text-[#8A847D] mt-1">
+                juntos há <span className="font-bold text-[#4D989B]">{days}</span> dias 💗
+              </p>
+            );
+          })()}
           
           {/* Progress indicator */}
           {headerPressProgress > 0 && (
@@ -963,9 +1112,18 @@ export default function Home() {
           showSearch={showSearch}
           showMeetupCalendar={showMeetupCalendar}
           showMap={showMap}
+          showMood={showMood}
+          showQuestion={showQuestion}
+          showGarden={showGarden}
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
           onOpenMap={handleToggleMap}
+          onOpenMood={() => togglePanel('mood')}
+          onOpenQuestion={() => togglePanel('question')}
+          onOpenGarden={() => togglePanel('garden')}
+          onOpenRoulette={() => setShowRouletteModal(true)}
+          onOpenGames={() => setShowGamesModal(true)}
+          onOpenNudge={() => setShowNudgeModal(true)}
         />
 
         {error && (
@@ -1001,6 +1159,16 @@ export default function Home() {
           />
         ) : showMap ? (
           <MapView userProfile={userProfile} {...locationSharing} />
+        ) : showMood ? (
+          <MoodPanel
+            items={items}
+            userProfile={userProfile}
+            onCheckIn={handleMoodCheckIn}
+          />
+        ) : showQuestion ? (
+          <QuestionPanel userProfile={userProfile} />
+        ) : showGarden ? (
+          <GardenPanel userProfile={userProfile} />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -1013,21 +1181,43 @@ export default function Home() {
           />
         ) : (
           <div className="px-6">
+            {/* Cabeçalhos por categoria: placar das tarefas e progresso dos sonhos.
+                O placar aparece com ou sem tarefas pendentes (ele mesmo some
+                quando não há nenhuma tarefa cadastrada). */}
+            {activeCategory === 'chore' && (
+              <ChoreBalance items={items} userProfile={userProfile} />
+            )}
+            {activeCategory === 'bucket' && (
+              <BucketProgress items={items} />
+            )}
+
             {/* Pending Items */}
             <div className={activeCategory === 'mural' ? '' : 'space-y-2'}>
               {activeCategory === 'mural' ? (
-                <MuralSection
-                  pendingItems={pendingItems}
-                  userProfile={userProfile}
-                  onDeleteItem={handleDeleteItem}
-                  onMarkViewed={handleMarkViewed}
-                  onToggleLike={handleToggleLike}
-                />
+                <>
+                  {isFeatureUnlocked('onthisday') && <OnThisDayCard />}
+                  <MuralSection
+                    pendingItems={pendingItems}
+                    userProfile={userProfile}
+                    onDeleteItem={handleDeleteItem}
+                    onMarkViewed={handleMarkViewed}
+                    onToggleLike={handleToggleLike}
+                    onSetReaction={isFeatureUnlocked('reactions') ? handleSetReaction : undefined}
+                  />
+                </>
               ) : pendingItems.length === 0 ? (
                 <EmptyState category={activeCategory} />
               ) : (
                 pendingItems.map(item => (
-                  activeCategory === 'top3' ? (
+                  activeCategory === 'chore' ? (
+                    <ChoreItemComponent
+                      key={item.id}
+                      item={item}
+                      userProfile={userProfile}
+                      onUpdate={(updates) => handleUpdateItem(item.id, updates)}
+                      onDelete={() => handleDeleteItem(item.id)}
+                    />
+                  ) : activeCategory === 'top3' ? (
                     <Top3ItemComponent
                       key={item.id}
                       item={item}
@@ -1066,7 +1256,7 @@ export default function Home() {
             )}
 
             {/* Done Section - não mostrar para categoria alarm, top3 e mural */}
-            {doneItems.length > 0 && activeCategory !== 'alarm' && activeCategory !== 'top3' && activeCategory !== 'mural' && (
+            {doneItems.length > 0 && activeCategory !== 'alarm' && activeCategory !== 'top3' && activeCategory !== 'mural' && activeCategory !== 'chore' && (
               <div className="mt-8">
                 <div className="flex items-center justify-center mb-4">
                   <div className="px-4 py-1.5 bg-muted/30 rounded-full">
@@ -1109,7 +1299,7 @@ export default function Home() {
       </main>
 
       {/* FAB - escondido quando busca, calendário de encontros ou mapa está ativo */}
-      {!showSearch && !showMeetupCalendar && !showMap && (
+      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && !showGarden && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}
@@ -1136,6 +1326,24 @@ export default function Home() {
           allItems={items}
         />
       )}
+
+      <NudgeModal
+        isOpen={showNudgeModal}
+        onClose={() => setShowNudgeModal(false)}
+        userProfile={userProfile}
+      />
+
+      <DateRouletteModal
+        isOpen={showRouletteModal}
+        onClose={() => setShowRouletteModal(false)}
+        items={items}
+      />
+
+      <GamesModal
+        isOpen={showGamesModal}
+        onClose={() => setShowGamesModal(false)}
+        userProfile={userProfile}
+      />
 
       <FilterModal
         isOpen={showFilterModal}

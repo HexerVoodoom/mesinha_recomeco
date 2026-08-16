@@ -25,6 +25,10 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
   const [tags, setTags] = useState<string[]>([]);
   const [showTagSelector, setShowTagSelector] = useState(false);
   const [videoLink, setVideoLink] = useState(''); // Link do vídeo para categoria watch
+  // Tarefas de casa (categoria chore): quem começa e se reveza a cada conclusão
+  const currentProfile = (localStorage.getItem('userProfile') === 'Amanda' ? 'Amanda' : 'Mateus') as 'Amanda' | 'Mateus';
+  const [choreAssignee, setChoreAssignee] = useState<'Amanda' | 'Mateus'>(currentProfile);
+  const [choreRotates, setChoreRotates] = useState(true);
   
   // Top 3 fields
   const [top3MateusPos1, setTop3MateusPos1] = useState('');
@@ -99,6 +103,19 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
   const handleSubmit = () => {
     if (!title.trim()) return;
 
+    // Cápsula do tempo: precisa de data de abertura no futuro e de uma mensagem
+    if (category === 'capsule') {
+      const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+      if (!eventDate || eventDate <= todayStr) {
+        toast.error('Escolhe uma data futura pra cápsula abrir!');
+        return;
+      }
+      if (!comment.trim() && !photoUrl) {
+        toast.error('A cápsula precisa de uma mensagem ou de uma foto dentro!');
+        return;
+      }
+    }
+
     const newItem: Partial<ListItem> = {
       title,
       comment,
@@ -112,6 +129,13 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
       videoLink: category === 'watch' && videoLink ? videoLink : undefined,
     };
     
+    // Tarefa de casa: quem começa e se reveza a cada conclusão
+    if (category === 'chore') {
+      newItem.choreAssignee = choreAssignee;
+      newItem.choreRotates = choreRotates;
+      newItem.choreDoneCount = 0;
+    }
+
     // Se for categoria alarm, adicionar campos específicos de lembrete
     if (category === 'alarm') {
       newItem.reminderTime = '08:00';
@@ -148,6 +172,8 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
     setPhotoUrl('');
     setTags([]);
     setVideoLink('');
+    setChoreAssignee(currentProfile);
+    setChoreRotates(true);
     setTop3MateusPos1('');
     setTop3MateusPos2('');
     setTop3MateusPos3('');
@@ -157,6 +183,8 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
   };
 
   const isDateCategory = category === 'dates';
+  const isCapsuleCategory = category === 'capsule';
+  const isChoreCategory = category === 'chore';
 
   return (
     <AnimatePresence>
@@ -215,14 +243,80 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
               {/* Comment (não mostrar para top3) */}
               {category !== 'top3' && (
                 <div className="mb-4">
-                  <label className="text-base font-medium mb-2 block">Comentário</label>
+                  <label className="text-base font-medium mb-2 block">
+                    {isCapsuleCategory ? 'Mensagem da cápsula 💌' : 'Comentário'}
+                  </label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Adicione detalhes..."
+                    placeholder={isCapsuleCategory
+                      ? 'Escreve a carta... só quem abrir na data vai ler!'
+                      : 'Adicione detalhes...'}
                     className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                    rows={3}
+                    rows={isCapsuleCategory ? 5 : 3}
                   />
+                </div>
+              )}
+
+              {/* Tarefa de casa: dono inicial + rodízio */}
+              {isChoreCategory && (
+                <div className="mb-4">
+                  <label className="text-base font-medium mb-2 block">Quem começa?</label>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {(['Amanda', 'Mateus'] as const).map(name => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setChoreAssignee(name)}
+                        className={`py-3 rounded-xl border-2 font-['Quicksand',sans-serif] font-bold text-sm transition-colors ${
+                          choreAssignee === name
+                            ? 'border-[#4D989B] bg-[#4D989B]/10 text-[#2B2A28]'
+                            : 'border-[#E9E4DF] bg-white text-[#8A847D]'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setChoreRotates(prev => !prev)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-input-background"
+                  >
+                    <span className="text-left">
+                      <span className="block text-sm font-medium text-[#2B2A28]">Revezar a cada conclusão</span>
+                      <span className="block text-xs text-muted-foreground">
+                        A vez passa automaticamente pro outro
+                      </span>
+                    </span>
+                    <span className={`relative inline-block w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                      choreRotates ? 'bg-primary' : 'bg-muted'
+                    }`}>
+                      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                        choreRotates ? 'translate-x-7' : 'translate-x-1'
+                      }`} />
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Data de abertura (cápsula do tempo) */}
+              {isCapsuleCategory && (
+                <div className="mb-4">
+                  <label className="text-base font-medium mb-2 block flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Abrir em *
+                  </label>
+                  <input
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Até lá, nem quem escreveu consegue espiar o conteúdo 🔒
+                  </p>
                 </div>
               )}
 

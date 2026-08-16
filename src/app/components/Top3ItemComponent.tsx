@@ -195,7 +195,6 @@ export function Top3ItemComponent({
   return (
     <>
       <Card
-        variant="white"
         className={`overflow-visible ${cardBackgroundClass}`}
       >
         <CardContent className="p-5">
