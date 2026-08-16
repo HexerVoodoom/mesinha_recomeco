@@ -105,6 +105,7 @@ Todos prefixados em `/make-server-19717bce`:
 | `mural` | Posts do mural (text, image, video, audio) |
 | `alarm` | Lembretes com horário, dias e destinatário |
 | `lista` | Listas compartilhadas |
+| `capsule` | Cápsula do tempo: carta/foto que só abre na data (`eventDate`). O conteúdo é escondido **no servidor** enquanto lacrada (`capsuleLocked: true` na resposta); push ao lacrar e no dia da abertura (cron 08:00) |
 | _(outros)_ | Extensível |
 
 ---

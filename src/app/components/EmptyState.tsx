@@ -16,6 +16,7 @@ const categoryEmojis: Record<string, string> = {
   top3: '🏆',
   mural: '💌',
   other: '☂️',
+  capsule: '🕰️',
 };
 
 const categoryMessages: Record<string, string> = {
@@ -30,6 +31,7 @@ const categoryMessages: Record<string, string> = {
   top3: 'Criem suas listas de Top 3 favoritos',
   mural: 'Compartilhem momentos especiais',
   other: 'Adicione outros itens importantes',
+  capsule: 'Escrevam cartas que só abrem na data marcada',
 };
 
 export function EmptyState({ category }: EmptyStateProps) {

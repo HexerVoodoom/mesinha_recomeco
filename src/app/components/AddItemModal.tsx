@@ -99,6 +99,19 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
   const handleSubmit = () => {
     if (!title.trim()) return;
 
+    // Cápsula do tempo: precisa de data de abertura no futuro e de uma mensagem
+    if (category === 'capsule') {
+      const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+      if (!eventDate || eventDate <= todayStr) {
+        toast.error('Escolhe uma data futura pra cápsula abrir!');
+        return;
+      }
+      if (!comment.trim() && !photoUrl) {
+        toast.error('A cápsula precisa de uma mensagem ou de uma foto dentro!');
+        return;
+      }
+    }
+
     const newItem: Partial<ListItem> = {
       title,
       comment,
@@ -157,6 +170,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
   };
 
   const isDateCategory = category === 'dates';
+  const isCapsuleCategory = category === 'capsule';
 
   return (
     <AnimatePresence>
@@ -215,14 +229,37 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
               {/* Comment (não mostrar para top3) */}
               {category !== 'top3' && (
                 <div className="mb-4">
-                  <label className="text-base font-medium mb-2 block">Comentário</label>
+                  <label className="text-base font-medium mb-2 block">
+                    {isCapsuleCategory ? 'Mensagem da cápsula 💌' : 'Comentário'}
+                  </label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Adicione detalhes..."
+                    placeholder={isCapsuleCategory
+                      ? 'Escreve a carta... só quem abrir na data vai ler!'
+                      : 'Adicione detalhes...'}
                     className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                    rows={3}
+                    rows={isCapsuleCategory ? 5 : 3}
                   />
+                </div>
+              )}
+
+              {/* Data de abertura (cápsula do tempo) */}
+              {isCapsuleCategory && (
+                <div className="mb-4">
+                  <label className="text-base font-medium mb-2 block flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Abrir em *
+                  </label>
+                  <input
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Até lá, nem quem escreveu consegue espiar o conteúdo 🔒
+                  </p>
                 </div>
               )}
 

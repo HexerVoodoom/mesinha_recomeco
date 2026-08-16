@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronRight, Play, ExternalLink, AlarmClock, Star } from 'lucide-react';
+import { ChevronRight, Play, ExternalLink, AlarmClock, Star, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { ListItem } from '../utils/api';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -66,6 +67,12 @@ export function ListItemComponent({
   const isAlarmCategory = item.category === 'alarm';
   const isJokesCategory = item.category === 'jokes';
   const isOtherCategory = item.category === 'other';
+  const isCapsuleCategory = item.category === 'capsule';
+  // Cápsula lacrada: o servidor esconde o conteúdo até a data de abertura
+  const isCapsuleLocked = isCapsuleCategory && !!item.capsuleLocked;
+  const capsuleDaysLeft = isCapsuleLocked && item.eventDate
+    ? Math.max(1, Math.ceil((new Date(item.eventDate + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
   const isDone = item.status === 'done';
   
   // Determine background color based on creator
@@ -100,8 +107,8 @@ export function ListItemComponent({
         <CardContent className="p-[18px]">
           {/* Main Row */}
           <div className="flex items-start gap-4">
-            {/* Checkbox - não mostrar para categoria dates, jokes (bobeiras) e other (outros) */}
-            {!isDateCategory && !isJokesCategory && !isOtherCategory && (
+            {/* Checkbox - não mostrar para categoria dates, jokes (bobeiras), other (outros) e capsule */}
+            {!isDateCategory && !isJokesCategory && !isOtherCategory && !isCapsuleCategory && (
               <button
                 onClick={() => {
                   if (isAlarmCategory) {
@@ -142,14 +149,36 @@ export function ListItemComponent({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => {
+                  if (isCapsuleLocked) {
+                    toast.info(`Sem espiar! 🔒 Essa cápsula abre em ${capsuleDaysLeft} dia${capsuleDaysLeft === 1 ? '' : 's'}.`);
+                    return;
+                  }
+                  setShowModal(true);
+                }}
                 className="w-full text-left"
               >
                 <div className={`font-['Quicksand',sans-serif] font-semibold text-base ${
                   isDone ? 'line-through text-muted-foreground' : 'text-[#2B2A28]'
-                }`}>
+                } flex items-center gap-1.5`}>
+                  {isCapsuleLocked && <Lock className="w-4 h-4 text-[#4D989B] shrink-0" />}
                   {item.title}
                 </div>
+
+                {/* Cápsula do tempo: estado de abertura */}
+                {isCapsuleCategory && item.eventDate && (
+                  <div className="mt-1">
+                    {isCapsuleLocked ? (
+                      <span className="text-xs font-medium text-[#4D989B] bg-[#4D989B]/10 px-2 py-0.5 rounded-full">
+                        🕰️ Abre {format(parseISO(item.eventDate), "d 'de' MMMM 'de' yyyy", { locale: ptBR })} · faltam {capsuleDaysLeft} dia{capsuleDaysLeft === 1 ? '' : 's'}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        💌 Aberta! Toca pra ler
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 {/* Horário do lembrete - aparece entre título e metadados */}
                 {isAlarmCategory && item.reminderTime && (
@@ -334,7 +363,15 @@ export function ListItemComponent({
               )}
               
               {/* Chevron */}
-              <button onClick={() => setShowModal(true)}>
+              <button
+                onClick={() => {
+                  if (isCapsuleLocked) {
+                    toast.info(`Sem espiar! 🔒 Essa cápsula abre em ${capsuleDaysLeft} dia${capsuleDaysLeft === 1 ? '' : 's'}.`);
+                    return;
+                  }
+                  setShowModal(true);
+                }}
+              >
                 <ChevronRight className="w-5 h-5 text-[#8A847D]/70" strokeWidth={2.5} />
               </button>
             </div>

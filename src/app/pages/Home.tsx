@@ -156,6 +156,7 @@ export default function Home() {
     top3: 1,
     mural: 1,
     other: 1,
+    capsule: 1,
   });
   const [loadedCategories, setLoadedCategories] = useState<Set<Category>>(new Set(['mural']));
   const ITEMS_PER_PAGE = 7;

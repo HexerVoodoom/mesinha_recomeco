@@ -15,6 +15,7 @@ import {
   Gift,
   Dices,
   HeartHandshake,
+  Hourglass,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -31,7 +32,7 @@ import imgIconVieosCurtos from "figma:asset/b72dc3ec57224b4caa82c0bbb8e9602e4a86
 
 export type Category =
   | 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates'
-  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other';
+  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other' | 'capsule';
 
 export const categories = [
   { id: 'mural' as Category, icon: Gift, label: 'Mural' },
@@ -45,10 +46,12 @@ export const categories = [
   { id: 'food' as Category, icon: UtensilsCrossed, label: 'Comidas' },
   { id: 'places' as Category, icon: MapPin, label: 'Lugares' },
   { id: 'other' as Category, icon: Umbrella, label: 'Outros' },
+  { id: 'capsule' as Category, icon: Hourglass, label: 'Cápsula' },
 ];
 
-// Mapeamento dos ícones personalizados do Figma
-const categoryIcons: Record<Category | 'search', string> = {
+// Mapeamento dos ícones personalizados do Figma. Categorias sem PNG (ex.:
+// capsule) caem no ícone lucide correspondente no badge.
+const categoryIcons: Partial<Record<Category | 'search', string>> = {
   mural: imgIconeMural,
   alarm: imgIconLembrete,
   dates: imgIconData,
@@ -149,13 +152,17 @@ export function CategoryMenu({
       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E9E4DF] rounded-full px-4 py-1 flex items-center gap-2">
         {activeToolMeta ? (
           <activeToolMeta.icon className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} />
-        ) : (
+        ) : (showSearch ? categoryIcons.search : categoryIcons[activeCategory]) ? (
           <img
             src={showSearch ? categoryIcons.search : categoryIcons[activeCategory]}
             alt=""
             className="w-5 h-5 object-contain"
           />
-        )}
+        ) : (() => {
+          // Categoria sem PNG do Figma (ex.: Cápsula): usa o ícone lucide dela
+          const meta = categories.find(c => c.id === activeCategory);
+          return meta ? <meta.icon className="w-5 h-5 text-[#2B2A28]" strokeWidth={1.5} /> : null;
+        })()}
         <span className="font-['Quicksand',sans-serif] font-bold text-xs text-[#2B2A28] uppercase tracking-tight">
           {activeToolMeta ? activeToolMeta.label : showSearch ? 'Buscar' : categories.find(c => c.id === activeCategory)?.label}
         </span>

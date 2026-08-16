@@ -56,6 +56,37 @@ function describeMeetup(item: any): string {
   return period ? `${type} ${period}` : type;
 }
 
+// ── Cápsula do Tempo (categoria "capsule") ───────────────────────────────────
+//
+// Carta/foto que só abre na data marcada (eventDate). O conteúdo é escondido
+// AQUI no servidor — nunca chega ao cliente antes da hora, então não vaza via
+// cache offline nem via DevTools. Depois da data, os GETs voltam a entregar
+// o conteúdo normalmente.
+
+function isCapsuleLocked(item: any): boolean {
+  return (
+    item?.category === "capsule" &&
+    typeof item.eventDate === "string" &&
+    item.eventDate > brazilNow().toISOString().slice(0, 10)
+  );
+}
+
+function lockCapsule(item: any): any {
+  return {
+    ...item,
+    comment: "",
+    photo: null,
+    muralContent: undefined,
+    muralThumbnail: undefined,
+    caption: undefined,
+    capsuleLocked: true,
+  };
+}
+
+function lockCapsules(items: any[]): any[] {
+  return items.map((i) => (isCapsuleLocked(i) ? lockCapsule(i) : i));
+}
+
 const app = new Hono();
 
 // Enable CORS for all routes and methods (must be first)
@@ -128,7 +159,7 @@ app.get("/make-server-19717bce/items", async (c) => {
     });
 
     return c.json({
-      items,
+      items: lockCapsules(items),
       total,
       hasMore: offset + limit < total
     });
@@ -148,7 +179,7 @@ app.get("/make-server-19717bce/items/:id/full", async (c) => {
       return c.json({ error: "Item not found" }, 404);
     }
 
-    return c.json({ item });
+    return c.json({ item: isCapsuleLocked(item) ? lockCapsule(item) : item });
   } catch (error) {
     console.error("Error fetching full item:", error);
     return c.json({
@@ -168,7 +199,7 @@ app.get("/make-server-19717bce/items/:id/photo", async (c) => {
       return c.json({ error: "Item not found" }, 404);
     }
 
-    return c.json({ photo: item.photo || null });
+    return c.json({ photo: isCapsuleLocked(item) ? null : (item.photo || null) });
   } catch (error) {
     console.error("Error fetching photo:", error);
     return c.json({
@@ -266,6 +297,18 @@ app.post("/make-server-19717bce/items", async (c) => {
       }).catch(console.error);
     }
 
+    // Notifica o parceiro quando uma cápsula do tempo é lacrada (sem revelar o conteúdo!)
+    if (item.category === "capsule" && item.createdBy && item.eventDate) {
+      const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      const [y, m, d] = String(item.eventDate).split("-");
+      sendPushToUser(otherUser, {
+        title: "Uma cápsula do tempo foi lacrada! 🕰️",
+        body: `${item.createdBy} deixou algo pra você abrir em ${d}/${m}/${y}. Sem espiar!`,
+        tag: "mesinha-capsule",
+        url: "/",
+      }).catch(console.error);
+    }
+
     // Notifica o parceiro quando um dia é proposto no Calendário de Encontros
     if (item.category === "meetup" && item.createdBy && item.eventDate) {
       const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
@@ -359,7 +402,8 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
       }).catch(console.error);
     }
 
-    return c.json({ item: updatedItem });
+    // Cápsula ainda lacrada: guarda o conteúdo mas devolve a versão trancada.
+    return c.json({ item: isCapsuleLocked(updatedItem) ? lockCapsule(updatedItem) : updatedItem });
   } catch (error) {
     console.error("Error updating item:", error);
     return c.json({ 
@@ -1054,6 +1098,32 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
         console.log(`[Reminders] Meetup reminder fired for ${todayStr}`);
       }
       await kv.set(meetupReminderKey, todayStr);
+    }
+
+    // Cápsulas do tempo que abrem HOJE: avisa os dois (junto do horário das
+    // 08:00, com trava própria de 1x por dia).
+    const capsuleReminderKey = "capsule-reminder-last-fired";
+    if ((await kv.get(capsuleReminderKey)) !== todayStr) {
+      const { items: capsuleItems } = await kv.getItemsLightPaged({
+        offset: 0,
+        limit: 50,
+        categoryFilter: "capsule",
+      });
+      const opening = capsuleItems.filter((item: any) => item.eventDate === todayStr);
+      for (const capsule of opening) {
+        const payload = {
+          title: "Uma cápsula do tempo abriu! 🎉",
+          body: `"${capsule.title}" pode ser aberta hoje. Corre lá na Cápsula!`,
+          tag: `mesinha-capsule-open-${capsule.id}`,
+          url: "/",
+        };
+        await Promise.all([
+          sendPushToUser("Amanda", payload),
+          sendPushToUser("Mateus", payload),
+        ]);
+        console.log(`[Reminders] Capsule opened: "${capsule.title}"`);
+      }
+      await kv.set(capsuleReminderKey, todayStr);
     }
   }
 

@@ -51,6 +51,9 @@ export interface ListItem {
   // Campos específicos do Calendário de Encontros (categoria meetup)
   meetupPeriod?: MeetupPeriod; // período do dia (manhã/tarde/noite)
   meetupType?: MeetupType; // o que vão fazer (juntos em casa / video game cada um em casa / sair)
+  // Cápsula do Tempo (categoria capsule): true enquanto o servidor esconde o
+  // conteúdo (a data de abertura em eventDate ainda não chegou)
+  capsuleLocked?: boolean;
 }
 
 // Compartilhamento de localização em tempo real (aba "Mapa")
