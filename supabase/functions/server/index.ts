@@ -279,6 +279,14 @@ app.post("/make-server-19717bce/items", async (c) => {
       // Campos específicos do Calendário de Encontros (categoria meetup)
       meetupPeriod: body.meetupPeriod || undefined,
       meetupType: body.meetupType || undefined,
+      // Check-in de humor (categoria mood)
+      moodEmoji: body.moodEmoji || undefined,
+      // Tarefas de casa (categoria chore)
+      choreAssignee: body.choreAssignee || undefined,
+      choreRotates: body.choreRotates !== undefined ? body.choreRotates : undefined,
+      choreDoneCount: body.choreDoneCount !== undefined ? Number(body.choreDoneCount) : undefined,
+      choreLastDoneBy: body.choreLastDoneBy || undefined,
+      choreLastDoneAt: body.choreLastDoneAt || undefined,
     };
 
     await kv.set(`item:${itemId}`, item);
@@ -293,6 +301,20 @@ app.post("/make-server-19717bce/items", async (c) => {
         title: "Novo no Mural! 💗",
         body: `${item.createdBy} adicionou: ${emoji} ${item.title || "Novo post"}`,
         tag: "mesinha-mural",
+        url: "/",
+      }).catch(console.error);
+    }
+
+    // Check-in de humor: avisa o parceiro só no PRIMEIRO check-in do dia (o id
+    // é determinístico por pessoa+dia, então trocar o humor depois só atualiza
+    // o mesmo item e não dispara push de novo).
+    if (item.category === "mood" && !existingItem && item.createdBy) {
+      const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
+      const note = item.comment ? ` "${String(item.comment).slice(0, 60)}"` : "";
+      sendPushToUser(otherUser, {
+        title: `${item.createdBy} registrou o humor de hoje ${item.moodEmoji || "💭"}`,
+        body: `${item.title}${note}`,
+        tag: "mesinha-mood",
         url: "/",
       }).catch(console.error);
     }
@@ -755,6 +777,241 @@ app.delete("/make-server-19717bce/push-subscription", async (c) => {
   } catch (error) {
     console.error("[DELETE /push-subscription] Error:", error);
     return c.json({ error: "Failed to remove subscription" }, 500);
+  }
+});
+
+// ── Pergunta do Dia (categoria "question") ───────────────────────────────────
+//
+// Uma pergunta por dia, igual para os dois (item com id determinístico
+// `question-<data>`). Cada um responde sem ver a resposta do outro — o
+// servidor só revela quando os DOIS responderam. O banco de perguntas é
+// alimentado por vocês (KV `question-bank`); quando acaba, cai nas padrão.
+
+const QUESTION_BANK_KEY = "question-bank";
+const MAX_QUESTION_LEN = 200;
+
+const DEFAULT_QUESTIONS: string[] = [
+  "Qual foi a melhor coisa que aconteceu com você essa semana?",
+  "O que eu faço que mais te deixa feliz?",
+  "Se a gente pudesse viajar pra qualquer lugar amanhã, pra onde?",
+  "Qual foi a primeira coisa que você pensou de mim?",
+  "O que você quer que a gente faça mais vezes?",
+  "Qual música te lembra da gente?",
+  "O que te deu orgulho de você mesmo esse mês?",
+  "Qual a bobeira nossa que você mais lembra?",
+  "O que você quer estar fazendo daqui 5 anos?",
+  "Qual foi o dia mais feliz da sua vida até agora?",
+  "O que eu poderia fazer pra facilitar sua semana?",
+  "Que comida você comeria pra sempre sem enjoar?",
+  "Qual medo seu você gostaria de perder?",
+  "O que você mais admira em mim?",
+  "Se a gente ganhasse na loteria hoje, qual a primeira coisa?",
+  "Qual filme você quer rever comigo?",
+  "O que te faz sentir mais amado?",
+  "Qual foi a coisa mais engraçada que você viu essa semana?",
+  "Que hábito nosso você quer manter pra sempre?",
+  "Qual lugar da nossa cidade é o nosso lugar?",
+  "O que você gostaria de aprender comigo?",
+  "Qual foi a maior surpresa boa que te dei?",
+  "Que tradição você quer criar com a gente?",
+  "O que você faria num dia livre perfeito?",
+  "Qual foto nossa é a sua favorita?",
+  "O que você quer me contar mas não achou hora?",
+  "Que presente você lembra com carinho?",
+  "Qual sua parte favorita do nosso dia a dia?",
+  "O que te deixa mais tranquilo quando o dia foi ruim?",
+  "Se você pudesse reviver um dia nosso, qual seria?",
+];
+
+// Escolha estável por data: a mesma pergunta para os dois, sem sortear duas
+// vezes coisas diferentes. Prioriza as perguntas escritas por vocês que ainda
+// não foram usadas; quando todas foram, cai nas padrão ainda não usadas; e se
+// tudo já rodou, recomeça (sem repetir a de ontem quando dá pra evitar).
+function pickQuestionForDay(bank: string[], usedQuestions: string[], dateStr: string): string {
+  const used = new Set(usedQuestions);
+  const freshCustom = bank.filter((q) => !used.has(q));
+  const freshDefault = DEFAULT_QUESTIONS.filter((q) => !used.has(q));
+  const pool = freshCustom.length ? freshCustom
+    : freshDefault.length ? freshDefault
+    : (bank.length ? bank : DEFAULT_QUESTIONS);
+  // Índice derivado da data => determinístico (Math.random daria respostas
+  // diferentes se dois requests chegassem juntos).
+  const seed = dateStr.split("-").join("");
+  return pool[Number(seed) % pool.length];
+}
+
+// Esconde a resposta do outro enquanto os dois não responderam.
+function shapeQuestion(item: any, profile: string | null) {
+  const answerAmanda = item?.answerAmanda ?? null;
+  const answerMateus = item?.answerMateus ?? null;
+  const revealed = !!answerAmanda && !!answerMateus;
+  return {
+    id: item.id,
+    question: item.title,
+    date: item.eventDate,
+    revealed,
+    answerAmanda: revealed || profile === "Amanda" ? answerAmanda : (answerAmanda ? "__HIDDEN__" : null),
+    answerMateus: revealed || profile === "Mateus" ? answerMateus : (answerMateus ? "__HIDDEN__" : null),
+  };
+}
+
+// Pergunta de hoje — cria na primeira chamada do dia (mesma para os dois).
+app.get("/make-server-19717bce/question-of-the-day", async (c) => {
+  try {
+    const profile = c.req.query("profile") || null;
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const itemId = `question-${todayStr}`;
+    let item = await kv.get(`item:${itemId}`);
+
+    if (!item) {
+      const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
+      const usedQuestions: string[] = (await kv.get("question-used")) || [];
+      const question = pickQuestionForDay(bank, usedQuestions, todayStr);
+      item = {
+        id: itemId,
+        title: question,
+        comment: "",
+        category: "question",
+        eventDate: todayStr,
+        photo: null,
+        reminderEnabled: false,
+        createdBy: "Mesinha",
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        tags: [],
+        answerAmanda: null,
+        answerMateus: null,
+      };
+      await kv.set(`item:${itemId}`, item);
+      // Guarda as últimas 60 usadas para não repetir tão cedo.
+      await kv.set("question-used", [...usedQuestions, question].slice(-60));
+    }
+
+    return c.json(shapeQuestion(item, profile));
+  } catch (error) {
+    console.error("[GET /question-of-the-day] Error:", error);
+    return c.json({ error: "Failed to fetch question", details: String(error) }, 500);
+  }
+});
+
+// Responde a pergunta de hoje. Quando o segundo responde, avisa os dois que
+// as respostas foram reveladas.
+app.post("/make-server-19717bce/question-of-the-day/answer", async (c) => {
+  try {
+    const { profile, answer } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    if (typeof answer !== "string" || !answer.trim()) {
+      return c.json({ error: "Escreve uma resposta primeiro!" }, 400);
+    }
+
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const itemId = `question-${todayStr}`;
+    const item = await kv.get(`item:${itemId}`);
+    if (!item) {
+      return c.json({ error: "A pergunta de hoje ainda não foi criada" }, 404);
+    }
+
+    const field = profile === "Amanda" ? "answerAmanda" : "answerMateus";
+    const wasRevealed = !!item.answerAmanda && !!item.answerMateus;
+    const updated = {
+      ...item,
+      [field]: answer.trim().substring(0, 1000),
+      updatedAt: new Date().toISOString(),
+    };
+    const nowRevealed = !!updated.answerAmanda && !!updated.answerMateus;
+    if (nowRevealed) updated.status = "done";
+    await kv.set(`item:${itemId}`, updated);
+
+    const other = profile === "Amanda" ? "Mateus" : "Amanda";
+    if (nowRevealed && !wasRevealed) {
+      // Os dois responderam: libera a revelação para ambos.
+      const payload = {
+        title: "Respostas reveladas! 💬",
+        body: `Os dois responderam "${item.title}". Corre ver!`,
+        tag: "mesinha-question",
+        url: "/",
+      };
+      await Promise.all([
+        sendPushToUser("Amanda", payload),
+        sendPushToUser("Mateus", payload),
+      ]);
+    } else if (!nowRevealed) {
+      // Primeiro a responder: chama o outro (sem entregar a resposta).
+      sendPushToUser(other, {
+        title: `${profile} já respondeu a pergunta de hoje 💭`,
+        body: `"${item.title}" — responde pra liberar as duas respostas!`,
+        tag: "mesinha-question",
+        url: "/",
+      }).catch(console.error);
+    }
+
+    return c.json(shapeQuestion(updated, profile));
+  } catch (error) {
+    console.error("[POST /question-of-the-day/answer] Error:", error);
+    return c.json({ error: "Failed to answer", details: String(error) }, 500);
+  }
+});
+
+// Banco de perguntas escritas por vocês (o que nenhum app comercial consegue).
+app.get("/make-server-19717bce/question-bank", async (c) => {
+  try {
+    const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
+    const used: string[] = (await kv.get("question-used")) || [];
+    const usedSet = new Set(used);
+    return c.json({
+      questions: bank,
+      pending: bank.filter((q) => !usedSet.has(q)).length,
+      defaultsCount: DEFAULT_QUESTIONS.length,
+    });
+  } catch (error) {
+    console.error("[GET /question-bank] Error:", error);
+    return c.json({ error: "Failed to fetch bank", details: String(error) }, 500);
+  }
+});
+
+app.post("/make-server-19717bce/question-bank", async (c) => {
+  try {
+    const { profile, question } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    if (typeof question !== "string" || !question.trim()) {
+      return c.json({ error: "Escreve a pergunta primeiro!" }, 400);
+    }
+    const text = question.trim().substring(0, MAX_QUESTION_LEN);
+    const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
+    if (bank.includes(text)) {
+      return c.json({ error: "Essa pergunta já está no banco" }, 409);
+    }
+    const updated = [...bank, text].slice(-300);
+    await kv.set(QUESTION_BANK_KEY, updated);
+
+    const other = profile === "Amanda" ? "Mateus" : "Amanda";
+    sendPushToUser(other, {
+      title: `${profile} escreveu uma pergunta nova 💭`,
+      body: "Ela vai aparecer numa Pergunta do Dia em breve!",
+      tag: "mesinha-question-bank",
+      url: "/",
+    }).catch(console.error);
+
+    return c.json({ success: true, count: updated.length });
+  } catch (error) {
+    console.error("[POST /question-bank] Error:", error);
+    return c.json({ error: "Failed to add question", details: String(error) }, 500);
+  }
+});
+
+app.delete("/make-server-19717bce/question-bank", async (c) => {
+  try {
+    const { question } = await c.req.json();
+    const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
+    await kv.set(QUESTION_BANK_KEY, bank.filter((q) => q !== question));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /question-bank] Error:", error);
+    return c.json({ error: "Failed to remove question", details: String(error) }, 500);
   }
 });
 

@@ -16,6 +16,8 @@ import {
   Dices,
   HeartHandshake,
   Hourglass,
+  SmilePlus,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -72,6 +74,8 @@ const categoryIcons: Partial<Record<Category | 'search', string>> = {
 const tools = [
   { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
+  { id: 'mood' as const, icon: SmilePlus, label: 'Humor' },
+  { id: 'question' as const, icon: MessageCircleQuestion, label: 'Pergunta do Dia' },
   { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
   { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
 ];
@@ -102,9 +106,13 @@ interface CategoryMenuProps {
   showSearch: boolean;
   showMeetupCalendar: boolean;
   showMap: boolean;
+  showMood: boolean;
+  showQuestion: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
+  onOpenMood: () => void;
+  onOpenQuestion: () => void;
   onOpenRoulette: () => void;
   onOpenNudge: () => void;
 }
@@ -115,18 +123,28 @@ export function CategoryMenu({
   showSearch,
   showMeetupCalendar,
   showMap,
+  showMood,
+  showQuestion,
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
+  onOpenMood,
+  onOpenQuestion,
   onOpenRoulette,
   onOpenNudge,
 }: CategoryMenuProps) {
   // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
-  const activeTool: ToolId | null = showMeetupCalendar ? 'meetup' : showMap ? 'map' : null;
+  const activeTool: ToolId | null = showMeetupCalendar ? 'meetup'
+    : showMap ? 'map'
+    : showMood ? 'mood'
+    : showQuestion ? 'question'
+    : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
   const toolHandlers: Record<ToolId, () => void> = {
     meetup: onOpenMeetupCalendar,
     map: onOpenMap,
+    mood: onOpenMood,
+    question: onOpenQuestion,
     roleta: onOpenRoulette,
     nudge: onOpenNudge,
   };

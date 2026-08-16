@@ -20,6 +20,8 @@ import { MapView } from '../components/MapView';
 import { NudgeModal } from '../components/NudgeModal';
 import { DateRouletteModal } from '../components/DateRouletteModal';
 import { OnThisDayCard } from '../components/OnThisDayCard';
+import { MoodPanel, moodItemId } from '../components/MoodPanel';
+import { QuestionPanel } from '../components/QuestionPanel';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -142,6 +144,8 @@ export default function Home() {
   const [showMap, setShowMap] = useState(false);
   const [showNudgeModal, setShowNudgeModal] = useState(false);
   const [showRouletteModal, setShowRouletteModal] = useState(false);
+  const [showMood, setShowMood] = useState(false);
+  const [showQuestion, setShowQuestion] = useState(false);
   // Data de início do relacionamento (settings.togetherSince) — mostrada como
   // "juntos há X dias" embaixo do título. Cache local pra aparecer sem delay.
   const [togetherSince, setTogetherSince] = useState<string | null>(() => {
@@ -384,6 +388,14 @@ export default function Home() {
       refreshCategoryItems('meetup');
     }
   }, [showMeetupCalendar]);
+
+  // Humor: o calendário de status precisa dos registros dos dois (que a
+  // paginação geral pode não ter trazido), igual ao mural e aos encontros.
+  useEffect(() => {
+    if (showMood) {
+      refreshCategoryItems('mood');
+    }
+  }, [showMood]);
 
   const loadItems = async (silent: boolean = false, categoryFilter?: string, offset = 0) => {
     // Show cached data immediately so the UI isn't blank while the API wakes up
@@ -905,27 +917,79 @@ export default function Home() {
     }
   };
 
-  const handleCategoryChange = (categoryId: Category) => {
-    setActiveCategory(categoryId);
+  // As telas de ferramenta (Encontros, Mapa, Humor, Pergunta do Dia) e a busca
+  // são mutuamente exclusivas — só uma ocupa a área principal por vez.
+  const closeAllPanels = () => {
     setShowSearch(false);
     setShowMeetupCalendar(false);
     setShowMap(false);
+    setShowMood(false);
+    setShowQuestion(false);
+  };
+
+  const handleCategoryChange = (categoryId: Category) => {
+    setActiveCategory(categoryId);
+    closeAllPanels();
     // Resetar página quando trocar de categoria se ainda não foi carregada
     if (!loadedCategories.has(categoryId)) {
       setCurrentPage(prev => ({ ...prev, [categoryId]: 1 }));
     }
   };
 
-  const handleToggleMeetupCalendar = () => {
-    setShowSearch(false);
-    setShowMap(false);
-    setShowMeetupCalendar(prev => !prev);
+  /** Abre o painel pedido fechando os demais; tocar no ativo fecha (toggle). */
+  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question') => {
+    const isOpen = panel === 'meetup' ? showMeetupCalendar
+      : panel === 'map' ? showMap
+      : panel === 'mood' ? showMood
+      : showQuestion;
+    closeAllPanels();
+    if (isOpen) return;
+    if (panel === 'meetup') setShowMeetupCalendar(true);
+    else if (panel === 'map') setShowMap(true);
+    else if (panel === 'mood') setShowMood(true);
+    else setShowQuestion(true);
   };
 
-  const handleToggleMap = () => {
-    setShowSearch(false);
-    setShowMeetupCalendar(false);
-    setShowMap(prev => !prev);
+  const handleToggleMeetupCalendar = () => togglePanel('meetup');
+  const handleToggleMap = () => togglePanel('map');
+
+  // Check-in de humor: upsert de um item por pessoa por dia (id determinístico),
+  // então trocar o humor no mesmo dia atualiza a linha em vez de criar outra —
+  // e o servidor só notifica o parceiro no primeiro check-in do dia.
+  const handleMoodCheckIn = async (emoji: string, label: string, note: string) => {
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const id = moodItemId(userProfile, todayStr);
+    const moodItem: Partial<ListItem> = {
+      id,
+      title: label,
+      comment: note,
+      category: 'mood',
+      eventDate: todayStr,
+      moodEmoji: emoji,
+      createdBy: userProfile,
+      status: 'pending',
+    };
+
+    // Otimista: mostra na hora e substitui o registro do dia se já existir.
+    setItems(prev => {
+      const others = prev.filter(i => i.id !== id);
+      const merged = [{ ...(prev.find(i => i.id === id) || {}), ...moodItem, createdAt: new Date().toISOString() } as ListItem, ...others];
+      saveItemsToStorage(merged);
+      return merged;
+    });
+
+    try {
+      const saved = await syncApi.createItem(moodItem);
+      setItems(prev => {
+        const merged = prev.map(i => (i.id === saved.id ? saved : i));
+        saveItemsToStorage(merged);
+        return merged;
+      });
+      toast.success(`Humor de hoje: ${emoji} ${label}`);
+    } catch (error) {
+      console.error('Failed to save mood:', error);
+      toast.error('Não deu pra salvar o humor. Tenta de novo!');
+    }
   };
 
   return (
@@ -1024,9 +1088,13 @@ export default function Home() {
           showSearch={showSearch}
           showMeetupCalendar={showMeetupCalendar}
           showMap={showMap}
+          showMood={showMood}
+          showQuestion={showQuestion}
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
           onOpenMap={handleToggleMap}
+          onOpenMood={() => togglePanel('mood')}
+          onOpenQuestion={() => togglePanel('question')}
           onOpenRoulette={() => setShowRouletteModal(true)}
           onOpenNudge={() => setShowNudgeModal(true)}
         />
@@ -1064,6 +1132,14 @@ export default function Home() {
           />
         ) : showMap ? (
           <MapView userProfile={userProfile} {...locationSharing} />
+        ) : showMood ? (
+          <MoodPanel
+            items={items}
+            userProfile={userProfile}
+            onCheckIn={handleMoodCheckIn}
+          />
+        ) : showQuestion ? (
+          <QuestionPanel userProfile={userProfile} />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -1176,7 +1252,7 @@ export default function Home() {
       </main>
 
       {/* FAB - escondido quando busca, calendário de encontros ou mapa está ativo */}
-      {!showSearch && !showMeetupCalendar && !showMap && (
+      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}

@@ -55,7 +55,28 @@ export interface ListItem {
   // Cápsula do Tempo (categoria capsule): true enquanto o servidor esconde o
   // conteúdo (a data de abertura em eventDate ainda não chegou)
   capsuleLocked?: boolean;
+  // Check-in de humor (categoria mood)
+  moodEmoji?: string;
+  // Tarefas de casa (categoria chore)
+  choreAssignee?: 'Amanda' | 'Mateus';
+  choreRotates?: boolean; // ao concluir, passa a vez pro outro
+  choreDoneCount?: number;
+  choreLastDoneBy?: string;
+  choreLastDoneAt?: string;
 }
+
+// Pergunta do Dia — o servidor esconde a resposta do outro (com o sentinel
+// '__HIDDEN__') até os dois responderem.
+export interface QuestionOfTheDay {
+  id: string;
+  question: string;
+  date: string;
+  revealed: boolean;
+  answerAmanda: string | null;
+  answerMateus: string | null;
+}
+
+export const HIDDEN_ANSWER = '__HIDDEN__';
 
 // Compartilhamento de localização em tempo real (aba "Mapa")
 export interface LocationShare {
@@ -336,6 +357,36 @@ export const api = {
   // "Neste dia": posts do mural desta mesma data em anos anteriores (cacheado por dia no servidor)
   getOnThisDay: async (): Promise<{ date: string; memories: OnThisDayMemory[] }> => {
     return await fetchAPI('/memories/on-this-day');
+  },
+
+  // Pergunta do Dia
+  getQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus'): Promise<QuestionOfTheDay> => {
+    return await fetchAPI(`/question-of-the-day?profile=${profile}&_t=${Date.now()}`);
+  },
+
+  answerQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus', answer: string): Promise<QuestionOfTheDay> => {
+    return await fetchAPI('/question-of-the-day/answer', {
+      method: 'POST',
+      body: JSON.stringify({ profile, answer }),
+    });
+  },
+
+  getQuestionBank: async (): Promise<{ questions: string[]; pending: number; defaultsCount: number }> => {
+    return await fetchAPI('/question-bank');
+  },
+
+  addQuestionToBank: async (profile: 'Amanda' | 'Mateus', question: string): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI('/question-bank', {
+      method: 'POST',
+      body: JSON.stringify({ profile, question }),
+    });
+  },
+
+  removeQuestionFromBank: async (question: string): Promise<void> => {
+    await fetchAPI('/question-bank', {
+      method: 'DELETE',
+      body: JSON.stringify({ question }),
+    });
   },
 };
 
