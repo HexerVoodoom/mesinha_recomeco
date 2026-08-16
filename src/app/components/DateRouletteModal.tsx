@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Dices, RefreshCw, Film, UtensilsCrossed, MapPin } from 'lucide-react';
 import { api, ListItem } from '../utils/api';
@@ -34,12 +34,17 @@ export function DateRouletteModal({ isOpen, onClose, items }: DateRouletteModalP
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [spinKey, setSpinKey] = useState(0);
+  // Pools completos vindos do servidor, preservados entre aberturas do modal
+  const serverPoolsRef = useRef<Partial<Record<SlotCategory, ListItem[]>>>({});
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const fromState = (cat: SlotCategory) =>
-      items.filter(i => i.category === cat && i.status === 'pending');
+    const fromState = (cat: SlotCategory) => {
+      const cached = serverPoolsRef.current[cat];
+      if (cached && cached.length > 0) return cached;
+      return items.filter(i => i.category === cat && i.status === 'pending');
+    };
 
     const initial: Record<SlotCategory, ListItem[]> = {
       movies: fromState('movies'),
@@ -66,7 +71,10 @@ export function DateRouletteModal({ isOpen, onClose, items }: DateRouletteModalP
       const next = { ...initial };
       for (const r of results) {
         // Servidor é fonte de verdade quando retorna algo; senão fica o estado local
-        if (r.items.length > 0) next[r.category] = r.items;
+        if (r.items.length > 0) {
+          next[r.category] = r.items;
+          serverPoolsRef.current[r.category] = r.items;
+        }
       }
       setPools(next);
       // Preenche slots que ficaram vazios agora que o pool completo chegou
