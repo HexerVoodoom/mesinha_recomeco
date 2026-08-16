@@ -21,6 +21,7 @@ import {
   Brush,
   ListChecks,
   Sparkles,
+  Sprout,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -87,6 +88,7 @@ const tools = [
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
   { id: 'mood' as const, icon: SmilePlus, label: 'Humor' },
   { id: 'question' as const, icon: MessageCircleQuestion, label: 'Pergunta do Dia' },
+  { id: 'garden' as const, icon: Sprout, label: 'Nosso Jardim' },
   { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
   { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
 ];
@@ -119,11 +121,13 @@ interface CategoryMenuProps {
   showMap: boolean;
   showMood: boolean;
   showQuestion: boolean;
+  showGarden: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
   onOpenMood: () => void;
   onOpenQuestion: () => void;
+  onOpenGarden: () => void;
   onOpenRoulette: () => void;
   onOpenNudge: () => void;
 }
@@ -136,11 +140,13 @@ export function CategoryMenu({
   showMap,
   showMood,
   showQuestion,
+  showGarden,
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
   onOpenMood,
   onOpenQuestion,
+  onOpenGarden,
   onOpenRoulette,
   onOpenNudge,
 }: CategoryMenuProps) {
@@ -149,6 +155,7 @@ export function CategoryMenu({
     : showMap ? 'map'
     : showMood ? 'mood'
     : showQuestion ? 'question'
+    : showGarden ? 'garden'
     : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
   const toolHandlers: Record<ToolId, () => void> = {
@@ -156,6 +163,7 @@ export function CategoryMenu({
     map: onOpenMap,
     mood: onOpenMood,
     question: onOpenQuestion,
+    garden: onOpenGarden,
     roleta: onOpenRoulette,
     nudge: onOpenNudge,
   };

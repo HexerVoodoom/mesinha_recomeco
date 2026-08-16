@@ -1033,6 +1033,129 @@ app.delete("/make-server-19717bce/question-bank", async (c) => {
   }
 });
 
+// ── Jardim: sequência (streak), progresso e retrospectiva ────────────────────
+//
+// Tudo derivado dos itens que já existem (nenhuma escrita nova): a "floresta"
+// do Couple Tree traduzida pro Mesinha. O digest usa uma projeção de três
+// campos por linha (categoria/autor/data), então o custo de Disk IO é baixo, e
+// o resultado é cacheado em KV por dia.
+//
+// A sequência tem CONGELAMENTO de 1 dia por design: a pesquisa sobre streaks é
+// explícita que a ausência de proteção é o que produz pico de uso seguido de
+// abandono na primeira falha. Aqui, pular um dia não zera nada.
+
+const STREAK_FREEZE_DAYS = 1;
+
+function dayStr(iso: string): string {
+  return String(iso).slice(0, 10);
+}
+
+function computeStreak(activeDays: Set<string>, todayStr: string): { current: number; longest: number; frozen: boolean } {
+  const sorted = [...activeDays].sort();
+  if (sorted.length === 0) return { current: 0, longest: 0, frozen: false };
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const toDate = (s: string) => new Date(`${s}T00:00:00Z`).getTime();
+
+  // Maior sequência histórica (tolerando o congelamento de 1 dia).
+  let longest = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const gapDays = Math.round((toDate(sorted[i]) - toDate(sorted[i - 1])) / dayMs);
+    if (gapDays <= STREAK_FREEZE_DAYS + 1) {
+      run += 1;
+      longest = Math.max(longest, run);
+    } else {
+      run = 1;
+    }
+  }
+
+  // Sequência atual: conta pra trás a partir de hoje, aceitando um buraco.
+  const today = toDate(todayStr);
+  const last = toDate(sorted[sorted.length - 1]);
+  const sinceLast = Math.round((today - last) / dayMs);
+  if (sinceLast > STREAK_FREEZE_DAYS + 1) return { current: 0, longest, frozen: false };
+
+  let current = 1;
+  for (let i = sorted.length - 1; i > 0; i--) {
+    const gapDays = Math.round((toDate(sorted[i]) - toDate(sorted[i - 1])) / dayMs);
+    if (gapDays <= STREAK_FREEZE_DAYS + 1) current += 1;
+    else break;
+  }
+  // "Congelado" = hoje ainda não teve atividade, mas a sequência segue viva.
+  return { current, longest, frozen: sinceLast >= 1 };
+}
+
+app.get("/make-server-19717bce/garden", async (c) => {
+  try {
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const cacheKey = `garden:${todayStr}`;
+    const cached = await kv.get(cacheKey);
+    // O cache do dia é invalidado quando o total de itens muda (alguém postou
+    // algo depois do último cálculo), pra não mostrar número velho.
+    const totalNow = await kv.countByPrefix("item:");
+    if (cached && cached.totalItems === totalNow) return c.json(cached);
+
+    const digest = await kv.getActivityDigest(5000);
+
+    const activeDays = new Set<string>();
+    const byCategory: Record<string, number> = {};
+    const byPerson: Record<string, number> = {};
+    const byMonthThisYear: Record<string, number> = {};
+    const currentYear = todayStr.slice(0, 4);
+
+    for (const row of digest) {
+      if (!row?.createdAt) continue;
+      const day = dayStr(row.createdAt);
+      activeDays.add(day);
+      const category = row.category || "outro";
+      byCategory[category] = (byCategory[category] || 0) + 1;
+      if (row.createdBy === "Amanda" || row.createdBy === "Mateus") {
+        byPerson[row.createdBy] = (byPerson[row.createdBy] || 0) + 1;
+      }
+      if (day.slice(0, 4) === currentYear) {
+        const month = day.slice(0, 7);
+        byMonthThisYear[month] = (byMonthThisYear[month] || 0) + 1;
+      }
+    }
+
+    const streak = computeStreak(activeDays, todayStr);
+    const totalItems = digest.length;
+
+    // Nível do jardim: cresce rápido no começo e desacelera, pra nunca ficar
+    // "travado" nem inflacionar quando o histórico já é grande.
+    const level = Math.max(1, Math.floor(Math.sqrt(totalItems / 3)) + 1);
+    const nextLevelAt = Math.pow(level, 2) * 3;
+
+    const busiestMonth = Object.entries(byMonthThisYear)
+      .sort((a, b) => b[1] - a[1])[0] || null;
+
+    const result = {
+      date: todayStr,
+      totalItems: totalNow,
+      streak,
+      level,
+      nextLevelAt,
+      itemsCounted: totalItems,
+      activeDays: activeDays.size,
+      byCategory,
+      byPerson,
+      thisYear: {
+        year: currentYear,
+        total: Object.values(byMonthThisYear).reduce((a, b) => a + b, 0),
+        byMonth: byMonthThisYear,
+        busiestMonth: busiestMonth ? { month: busiestMonth[0], count: busiestMonth[1] } : null,
+      },
+    };
+
+    await kv.set(cacheKey, result);
+    return c.json(result);
+  } catch (error) {
+    console.error("[GET /garden] Error:", error);
+    return c.json({ error: "Failed to compute garden", details: String(error) }, 500);
+  }
+});
+
 // ── Cutucada (nudge): push imediato "tô pensando em você" ────────────────────
 //
 // Um toque manda uma notificação instantânea pro outro. Rate limit no servidor

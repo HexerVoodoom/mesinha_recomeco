@@ -160,6 +160,24 @@ export const getMuralLightByDateRange = async (
   return data ?? [];
 };
 
+// Digest de atividade: só (categoria, autor, data) de cada item — três campos
+// de texto por linha, sem tocar em nenhuma mídia. É o que alimenta a sequência
+// (streak), o jardim e a retrospectiva sem arrastar as linhas pesadas.
+export const getActivityDigest = async (limit = 5000): Promise<any[]> => {
+  const supabase = client();
+  const { data, error } = await supabase
+    .from("kv_store_19717bce")
+    .select("category:value->>category, createdBy:value->>createdBy, createdAt:value->>createdAt")
+    .like("key", "item:%")
+    .not("value->>createdAt", "is", null)
+    .order(`value->>'createdAt'` as any, { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data ?? [];
+};
+
 // Fetches a page of "light" items (função get_items_light no Postgres).
 // A montagem dos itens acontece DENTRO do banco: mídia pesada em base64
 // (photo/muralContent, MBs por linha) nunca sai do Postgres — antes essas

@@ -24,6 +24,7 @@ import { MoodPanel, moodItemId } from '../components/MoodPanel';
 import { QuestionPanel } from '../components/QuestionPanel';
 import { ChoreItemComponent, ChoreBalance } from '../components/ChoreItemComponent';
 import { BucketProgress } from '../components/BucketProgress';
+import { GardenPanel } from '../components/GardenPanel';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -148,6 +149,7 @@ export default function Home() {
   const [showRouletteModal, setShowRouletteModal] = useState(false);
   const [showMood, setShowMood] = useState(false);
   const [showQuestion, setShowQuestion] = useState(false);
+  const [showGarden, setShowGarden] = useState(false);
   // Data de início do relacionamento (settings.togetherSince) — mostrada como
   // "juntos há X dias" embaixo do título. Cache local pra aparecer sem delay.
   const [togetherSince, setTogetherSince] = useState<string | null>(() => {
@@ -934,6 +936,7 @@ export default function Home() {
     setShowMap(false);
     setShowMood(false);
     setShowQuestion(false);
+    setShowGarden(false);
   };
 
   const handleCategoryChange = (categoryId: Category) => {
@@ -946,17 +949,19 @@ export default function Home() {
   };
 
   /** Abre o painel pedido fechando os demais; tocar no ativo fecha (toggle). */
-  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question') => {
+  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question' | 'garden') => {
     const isOpen = panel === 'meetup' ? showMeetupCalendar
       : panel === 'map' ? showMap
       : panel === 'mood' ? showMood
-      : showQuestion;
+      : panel === 'question' ? showQuestion
+      : showGarden;
     closeAllPanels();
     if (isOpen) return;
     if (panel === 'meetup') setShowMeetupCalendar(true);
     else if (panel === 'map') setShowMap(true);
     else if (panel === 'mood') setShowMood(true);
-    else setShowQuestion(true);
+    else if (panel === 'question') setShowQuestion(true);
+    else setShowGarden(true);
   };
 
   const handleToggleMeetupCalendar = () => togglePanel('meetup');
@@ -1099,11 +1104,13 @@ export default function Home() {
           showMap={showMap}
           showMood={showMood}
           showQuestion={showQuestion}
+          showGarden={showGarden}
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
           onOpenMap={handleToggleMap}
           onOpenMood={() => togglePanel('mood')}
           onOpenQuestion={() => togglePanel('question')}
+          onOpenGarden={() => togglePanel('garden')}
           onOpenRoulette={() => setShowRouletteModal(true)}
           onOpenNudge={() => setShowNudgeModal(true)}
         />
@@ -1149,6 +1156,8 @@ export default function Home() {
           />
         ) : showQuestion ? (
           <QuestionPanel userProfile={userProfile} />
+        ) : showGarden ? (
+          <GardenPanel userProfile={userProfile} />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -1280,7 +1289,7 @@ export default function Home() {
       </main>
 
       {/* FAB - escondido quando busca, calendário de encontros ou mapa está ativo */}
-      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && (
+      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && !showGarden && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}

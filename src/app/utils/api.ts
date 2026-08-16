@@ -78,6 +78,25 @@ export interface QuestionOfTheDay {
 
 export const HIDDEN_ANSWER = '__HIDDEN__';
 
+// Jardim: sequência, progresso e retrospectiva, tudo derivado dos itens
+export interface GardenStats {
+  date: string;
+  totalItems: number;
+  streak: { current: number; longest: number; frozen: boolean };
+  level: number;
+  nextLevelAt: number;
+  itemsCounted: number;
+  activeDays: number;
+  byCategory: Record<string, number>;
+  byPerson: Record<string, number>;
+  thisYear: {
+    year: string;
+    total: number;
+    byMonth: Record<string, number>;
+    busiestMonth: { month: string; count: number } | null;
+  };
+}
+
 // Compartilhamento de localização em tempo real (aba "Mapa")
 export interface LocationShare {
   profile: 'Amanda' | 'Mateus';
@@ -387,6 +406,11 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ question }),
     });
+  },
+
+  // Jardim: sequência, nível e retrospectiva (cacheado por dia no servidor)
+  getGarden: async (): Promise<GardenStats> => {
+    return await fetchAPI('/garden');
   },
 };
 
