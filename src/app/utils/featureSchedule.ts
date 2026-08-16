@@ -31,7 +31,7 @@ export type FeatureId =
   | 'garden';
 
 /** Data em que a primeira leva entra no ar (YYYY-MM-DD, fuso local). */
-export const LAUNCH_ANCHOR = '2026-08-17';
+export const LAUNCH_ANCHOR = '2026-08-19';
 
 /** Intervalo entre uma feature e a próxima. */
 export const INTERVAL_DAYS = 15;
