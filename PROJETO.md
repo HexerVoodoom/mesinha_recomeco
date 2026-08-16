@@ -84,6 +84,11 @@ Todos prefixados em `/make-server-19717bce`:
 | POST | `/trigger-reminders` | Dispara lembretes (chamado pelo pg_cron) |
 | POST | `/nudge` | Cutucada: push imediato pro outro (rate limit de 3 min por pessoa) |
 | GET | `/memories/on-this-day` | Posts do mural desta data em anos anteriores (cache diário em KV) |
+| GET | `/question-of-the-day` | Pergunta do dia (cria na 1ª chamada); esconde a resposta do outro até os dois responderem |
+| POST | `/question-of-the-day/answer` | Responde a pergunta de hoje |
+| GET/POST/DELETE | `/question-bank` | Banco de perguntas escritas pelo casal |
+| GET/POST/DELETE | `/cards` | Baralho de cartas dos jogos (verdade / desafio / o que prefere) |
+| GET | `/garden` | Sequência, nível do jardim e retrospectiva (cache diário, invalidado por contagem) |
 
 ### Padrões de chave no KV
 
@@ -95,6 +100,10 @@ Todos prefixados em `/make-server-19717bce`:
 | `push-subscription:Mateus` | Subscription push do Mateus |
 | `nudge-last:<perfil>` | Timestamp da última cutucada (rate limit) |
 | `on-this-day:<data>` | Cache diário das memórias do "Neste dia" |
+| `question-bank` | Perguntas do dia escritas pelo casal |
+| `question-used` | Últimas 60 perguntas usadas (evita repetir) |
+| `card-deck` | Cartas dos jogos escritas pelo casal, por tipo |
+| `garden:<data>` | Cache diário da sequência/retrospectiva |
 
 ---
 
@@ -106,6 +115,11 @@ Todos prefixados em `/make-server-19717bce`:
 | `alarm` | Lembretes com horário, dias e destinatário |
 | `lista` | Listas compartilhadas |
 | `capsule` | Cápsula do tempo: carta/foto que só abre na data (`eventDate`). O conteúdo é escondido **no servidor** enquanto lacrada (`capsuleLocked: true` na resposta); push ao lacrar e no dia da abertura (cron 08:00) |
+| `mood` | Check-in de humor. Id determinístico `mood-<perfil>-<data>` (upsert) => 1 registro por pessoa por dia e push no máximo 1x/dia |
+| `question` | Pergunta do dia. Id `question-<data>`, com `answerAmanda`/`answerMateus` |
+| `chore` | Tarefa de casa com rodízio (`choreAssignee`, `choreRotates`, `choreDoneCount`, `choreLastDoneBy/At`) |
+| `bucket` | Lista de sonhos (com barra de progresso) |
+| `gratitude` | Registros de gratidão |
 | _(outros)_ | Extensível |
 
 ---

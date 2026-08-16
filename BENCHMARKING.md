@@ -7,8 +7,11 @@ que presta, e traduzir em ideias concretas para o Mesinha, ancoradas no código
 que já existe.
 
 **Data:** agosto de 2026
-**Método:** 5 rodadas de pesquisa (ver §1)
+**Método:** 5 rodadas de pesquisa + 1 rodada de aprofundamento (ver §1)
 **A parte que importa:** §6 (ideias) e §7 (ideias que só um app de 2 pessoas pode ter)
+
+> **Status:** grande parte deste backlog já foi implementada — ver §11 no fim
+> do documento, que marca o que está no app e o que continua na fila.
 
 ---
 
@@ -21,6 +24,7 @@ que já existe.
 | 3 | Retenção e reclamações | Mecânicas que funcionam + armadilhas a evitar |
 | 4 | Tendências 2026 | IA, widgets de presença, humor, cápsula do tempo |
 | 5 | Lacunas finais | Jogos, pet virtual, comparação com os widgets Android do Mesinha |
+| 6 | Aprofundamento | Novidades recentes do Love8 e do Couple Tree + apps de tarefas domésticas e de gratidão (ver §4.3) |
 
 **Limitação honesta:** o proxy de rede desta sessão bloqueia `play.google.com`,
 `apps.apple.com` e vários blogs de comparação. A coleta foi toda por busca web,
@@ -126,6 +130,35 @@ Ritual leve diário com metáfora de crescimento.
 **Leitura:** a floresta é a melhor ideia de design do mercado. Transforma
 consistência em algo **visível e acumulado**, sem inventar moeda falsa nem
 pontuação artificial. É diretamente transplantável.
+
+### 4.3 O que a rodada 6 achou de novo
+
+Uma passada extra atrás de features recentes e de categorias que as cinco
+primeiras rodadas não cobriram.
+
+**Love8 — novidades recentes**
+
+| Feature | Nota |
+|---|---|
+| **Status + "Status Calendar" widget** | Registro diário de status dos dois, com calendário — validou a ideia do check-in de humor, que virou o painel **Humor** |
+| **"Play Together"** | Desenhar juntos, LoveTouch e "dormir juntos" |
+| **Pet Memories** | Historinhas interativas desbloqueáveis com o pet |
+| **"Daily Heart"** | Pontos de intimidade que destravam estilos de coração |
+| **"Deep Talk"** | Espaço para conversas mais profundas — o mesmo território da Pergunta do Dia |
+| **"Safety Guard"** | Alertas de velocidade, bateria e lugar num painel só |
+
+**Couple Tree — o que faltava**: além da floresta e dos jogos, tem
+**desafios com recompensa de presença** (o mesmo motor de streak).
+
+**Categoria nova que nenhuma rodada anterior tinha coberto: apps de tarefa
+doméstica** (Homsy, OneHaus, Tidywell, OurHome). O achado que importa: o que
+resolve a divisão de tarefas não é a lista, é o **rodízio automático** — "as
+mesmas tarefas param de cair sempre na mesma pessoa" — mais a *visibilidade*
+da divisão. Não é cobrança nem ranking. Virou a categoria **Tarefas**.
+
+**Apps de gratidão/apreciação** (Appreciation Jar, Love Nudge, Couple Joy,
+Connected): jarra de agradecimentos, check-in de humor e reflexões semanais.
+Viraram a categoria **Gratidão** e reforçaram o painel de Humor.
 
 ---
 
@@ -411,6 +444,45 @@ Onda 3  → Personagens vivos · jogos · assistindo juntos · retrospectiva do 
 | Conteúdo que repete | Paired, Couply | Conteúdo escrito por vocês, não banco genérico |
 | Gamificação sobre produto instável | genérico | Onda 0 antes da Onda 2 — streak sobre push furado destrói a confiança |
 | Pareamento que trava | Love8 | Os 2 perfis fixos já evitam a classe inteira do problema |
+
+---
+
+## 11. Status: o que já está no app
+
+Levantado do código depois das implementações.
+
+### ✅ Implementado
+
+| Feature | Onde |
+|---|---|
+| Cutucada (nudge) com rate limit de 3 min | Ferramenta na grade + `POST /nudge` |
+| Roleta de Encontro (sorteia das listas de vocês) | Ferramenta na grade |
+| "Neste dia" (memórias de anos anteriores) | Card no topo do Mural + `GET /memories/on-this-day` |
+| Cápsula do Tempo (lacre server-side) | Categoria `capsule` |
+| Reações com emoji no mural | `MuralItemComponent` + push com o emoji |
+| Contador "juntos há X dias" | Header da Home + Configurações |
+| Aviso de lembrete que não vai tocar | `ItemDetailModal` |
+| **Humor do Dia** + calendário de status de 14 dias | Ferramenta **Humor** (categoria `mood`) |
+| **Pergunta do Dia** com revelação simultânea | Ferramenta **Pergunta do Dia** (categoria `question`) |
+| **Banco de perguntas escrito por vocês** | `question-bank` no KV |
+| **Tarefas de casa com rodízio + placar** | Categoria `chore` |
+| **Lista de Sonhos com progresso** | Categoria `bucket` |
+| **Gratidão** | Categoria `gratitude` |
+| **Nosso Jardim**: sequência (com congelamento), nível e retrospectiva | Ferramenta **Nosso Jardim** + `GET /garden` |
+| **Jogos**: verdade / desafio / o que prefere, com baralho de vocês | Ferramenta **Jogos** + `/cards` |
+
+### 🔜 Continua na fila
+
+| Feature | Por quê ainda não |
+|---|---|
+| Migrar mídia de base64 pro Supabase Storage | Fundação (Onda 0) — é o teto duro documentado no `PROJETO.md` |
+| Widget de foto empurrada (padrão Locket) | Precisa de Kotlin (`android/`), e fica melhor depois do Storage |
+| Resumo semanal dentro do app | Precisa da `ANTHROPIC_API_KEY` no ambiente do servidor |
+| IA que conhece a história de vocês | Mesma dependência de chave de API |
+| Álbum por linha do tempo · Mapa de memórias | Onda 2/3 |
+| Assistindo juntos · Cardápio da semana · Rodízio de decisões | Onda 3 |
+| Alpaquinha e Corvinho vivos · Desenho compartilhado · Recado de voz no widget | Onda 3, com parte nativa |
+| Bateria/sono/distância no widget · Alerta de chegada | Precisam da ponte nativa e de cuidado com bateria |
 
 ---
 

@@ -22,6 +22,7 @@ import {
   ListChecks,
   Sparkles,
   Sprout,
+  Spade,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -90,6 +91,7 @@ const tools = [
   { id: 'question' as const, icon: MessageCircleQuestion, label: 'Pergunta do Dia' },
   { id: 'garden' as const, icon: Sprout, label: 'Nosso Jardim' },
   { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
+  { id: 'cartas' as const, icon: Spade, label: 'Jogos' },
   { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
 ];
 type ToolId = (typeof tools)[number]['id'];
@@ -129,6 +131,7 @@ interface CategoryMenuProps {
   onOpenQuestion: () => void;
   onOpenGarden: () => void;
   onOpenRoulette: () => void;
+  onOpenGames: () => void;
   onOpenNudge: () => void;
 }
 
@@ -148,6 +151,7 @@ export function CategoryMenu({
   onOpenQuestion,
   onOpenGarden,
   onOpenRoulette,
+  onOpenGames,
   onOpenNudge,
 }: CategoryMenuProps) {
   // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
@@ -165,6 +169,7 @@ export function CategoryMenu({
     question: onOpenQuestion,
     garden: onOpenGarden,
     roleta: onOpenRoulette,
+    cartas: onOpenGames,
     nudge: onOpenNudge,
   };
 

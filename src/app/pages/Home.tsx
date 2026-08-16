@@ -25,6 +25,7 @@ import { QuestionPanel } from '../components/QuestionPanel';
 import { ChoreItemComponent, ChoreBalance } from '../components/ChoreItemComponent';
 import { BucketProgress } from '../components/BucketProgress';
 import { GardenPanel } from '../components/GardenPanel';
+import { GamesModal } from '../components/GamesModal';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -150,6 +151,7 @@ export default function Home() {
   const [showMood, setShowMood] = useState(false);
   const [showQuestion, setShowQuestion] = useState(false);
   const [showGarden, setShowGarden] = useState(false);
+  const [showGamesModal, setShowGamesModal] = useState(false);
   // Data de início do relacionamento (settings.togetherSince) — mostrada como
   // "juntos há X dias" embaixo do título. Cache local pra aparecer sem delay.
   const [togetherSince, setTogetherSince] = useState<string | null>(() => {
@@ -1112,6 +1114,7 @@ export default function Home() {
           onOpenQuestion={() => togglePanel('question')}
           onOpenGarden={() => togglePanel('garden')}
           onOpenRoulette={() => setShowRouletteModal(true)}
+          onOpenGames={() => setShowGamesModal(true)}
           onOpenNudge={() => setShowNudgeModal(true)}
         />
 
@@ -1327,6 +1330,12 @@ export default function Home() {
         isOpen={showRouletteModal}
         onClose={() => setShowRouletteModal(false)}
         items={items}
+      />
+
+      <GamesModal
+        isOpen={showGamesModal}
+        onClose={() => setShowGamesModal(false)}
+        userProfile={userProfile}
       />
 
       <FilterModal

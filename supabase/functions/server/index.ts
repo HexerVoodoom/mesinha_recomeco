@@ -1033,6 +1033,120 @@ app.delete("/make-server-19717bce/question-bank", async (c) => {
   }
 });
 
+// ── Jogos: baralho de cartas escrito por vocês ───────────────────────────────
+//
+// Verdade / Desafio / "O que você prefere". O Couple Tree usa esses jogos como
+// isca, mas com conteúdo genérico que fica repetitivo — aqui as cartas são
+// escritas pelos dois e as padrão são só o ponto de partida.
+
+type CardType = "verdade" | "desafio" | "prefere";
+const CARD_DECK_KEY = "card-deck";
+const MAX_CARD_LEN = 240;
+
+const DEFAULT_CARDS: Record<CardType, string[]> = {
+  verdade: [
+    "Qual foi a primeira coisa que você reparou em mim?",
+    "Qual mentirinha boba você já me contou?",
+    "Qual foi o momento que você percebeu que gostava de mim?",
+    "O que você faz escondido que eu não sei?",
+    "Qual foi a coisa mais boba pela qual você ficou com ciúmes?",
+    "Que música você canta pensando na gente?",
+    "Qual foi o encontro nosso mais estranho?",
+    "O que você mais tem vontade de fazer comigo e não falou ainda?",
+  ],
+  desafio: [
+    "Manda um áudio cantando a nossa música.",
+    "Faz a melhor imitação minha.",
+    "Manda uma foto do que você tá vendo agora.",
+    "Escreve uma declaração de 3 palavras no Mural.",
+    "Conta uma bobeira nossa como se fosse notícia de jornal.",
+    "Desenha a gente dois em 30 segundos e manda.",
+    "Manda um áudio dizendo 3 coisas que você ama em mim.",
+    "Faz um elogio que você nunca me fez antes.",
+  ],
+  prefere: [
+    "Praia ou montanha, pra sempre?",
+    "Jantar fora chique ou pizza no sofá?",
+    "Viajar muito e trabalhar muito, ou viver devagar e simples?",
+    "Morar na cidade grande ou no interior?",
+    "Maratona de série ou noite de jogo?",
+    "Acordar cedo juntos ou dormir até tarde juntos?",
+    "Um mês de férias sozinho ou uma semana comigo?",
+    "Cachorro ou gato pra chamar de nosso?",
+  ],
+};
+
+function normalizeDeck(stored: any): Record<CardType, string[]> {
+  return {
+    verdade: Array.isArray(stored?.verdade) ? stored.verdade : [],
+    desafio: Array.isArray(stored?.desafio) ? stored.desafio : [],
+    prefere: Array.isArray(stored?.prefere) ? stored.prefere : [],
+  };
+}
+
+// Devolve as cartas de vocês E as padrão, marcadas — o cliente sorteia.
+app.get("/make-server-19717bce/cards", async (c) => {
+  try {
+    const deck = normalizeDeck(await kv.get(CARD_DECK_KEY));
+    return c.json({ custom: deck, defaults: DEFAULT_CARDS });
+  } catch (error) {
+    console.error("[GET /cards] Error:", error);
+    return c.json({ error: "Failed to fetch cards", details: String(error) }, 500);
+  }
+});
+
+app.post("/make-server-19717bce/cards", async (c) => {
+  try {
+    const { profile, type, text } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    if (type !== "verdade" && type !== "desafio" && type !== "prefere") {
+      return c.json({ error: "Tipo de carta inválido" }, 400);
+    }
+    if (typeof text !== "string" || !text.trim()) {
+      return c.json({ error: "Escreve a carta primeiro!" }, 400);
+    }
+
+    const card = text.trim().substring(0, MAX_CARD_LEN);
+    const deck = normalizeDeck(await kv.get(CARD_DECK_KEY));
+    if (deck[type as CardType].includes(card)) {
+      return c.json({ error: "Essa carta já está no baralho" }, 409);
+    }
+    deck[type as CardType] = [...deck[type as CardType], card].slice(-200);
+    await kv.set(CARD_DECK_KEY, deck);
+
+    const other = profile === "Amanda" ? "Mateus" : "Amanda";
+    sendPushToUser(other, {
+      title: `${profile} escreveu uma carta nova 🃏`,
+      body: "Tem carta nova esperando no baralho de vocês!",
+      tag: "mesinha-cards",
+      url: "/",
+    }).catch(console.error);
+
+    return c.json({ success: true, count: deck[type as CardType].length });
+  } catch (error) {
+    console.error("[POST /cards] Error:", error);
+    return c.json({ error: "Failed to add card", details: String(error) }, 500);
+  }
+});
+
+app.delete("/make-server-19717bce/cards", async (c) => {
+  try {
+    const { type, text } = await c.req.json();
+    if (type !== "verdade" && type !== "desafio" && type !== "prefere") {
+      return c.json({ error: "Tipo de carta inválido" }, 400);
+    }
+    const deck = normalizeDeck(await kv.get(CARD_DECK_KEY));
+    deck[type as CardType] = deck[type as CardType].filter((card) => card !== text);
+    await kv.set(CARD_DECK_KEY, deck);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /cards] Error:", error);
+    return c.json({ error: "Failed to remove card", details: String(error) }, 500);
+  }
+});
+
 // ── Jardim: sequência (streak), progresso e retrospectiva ────────────────────
 //
 // Tudo derivado dos itens que já existem (nenhuma escrita nova): a "floresta"

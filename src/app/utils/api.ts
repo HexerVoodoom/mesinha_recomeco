@@ -78,6 +78,10 @@ export interface QuestionOfTheDay {
 
 export const HIDDEN_ANSWER = '__HIDDEN__';
 
+// Jogos: baralho de cartas escrito por vocês (+ as padrão de reserva)
+export type CardType = 'verdade' | 'desafio' | 'prefere';
+export type CardDeck = Record<CardType, string[]>;
+
 // Jardim: sequência, progresso e retrospectiva, tudo derivado dos itens
 export interface GardenStats {
   date: string;
@@ -411,6 +415,25 @@ export const api = {
   // Jardim: sequência, nível e retrospectiva (cacheado por dia no servidor)
   getGarden: async (): Promise<GardenStats> => {
     return await fetchAPI('/garden');
+  },
+
+  // Jogos: baralho de cartas (as de vocês + as padrão)
+  getCards: async (): Promise<{ custom: CardDeck; defaults: CardDeck }> => {
+    return await fetchAPI('/cards');
+  },
+
+  addCard: async (profile: 'Amanda' | 'Mateus', type: CardType, text: string): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI('/cards', {
+      method: 'POST',
+      body: JSON.stringify({ profile, type, text }),
+    });
+  },
+
+  removeCard: async (type: CardType, text: string): Promise<void> => {
+    await fetchAPI('/cards', {
+      method: 'DELETE',
+      body: JSON.stringify({ type, text }),
+    });
   },
 };
 
