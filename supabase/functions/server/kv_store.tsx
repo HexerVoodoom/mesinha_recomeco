@@ -135,6 +135,31 @@ export const getByPrefixPaged = async (
   return { items: data?.map((d) => d.value) ?? [], total: count ?? 0 };
 };
 
+// Posts do mural criados dentro de uma faixa de datas [startDate, endDate),
+// em projeção leve (sem photo/muralContent — mídia pesada nunca sai do banco).
+// Range curto no campo indexado (idx_kv_items_createdat) => query barata.
+// Usado pelo "Neste dia" (memórias de anos anteriores na mesma data).
+export const getMuralLightByDateRange = async (
+  startDate: string,
+  endDate: string,
+): Promise<any[]> => {
+  const supabase = client();
+  const { data, error } = await supabase
+    .from("kv_store_19717bce")
+    .select(
+      "id:value->>id, title:value->>title, caption:value->>caption, comment:value->>comment, createdBy:value->>createdBy, createdAt:value->>createdAt, muralContentType:value->>muralContentType, muralThumbnail:value->>muralThumbnail, likedBy:value->likedBy",
+    )
+    .like("key", "item:%")
+    .eq("value->>category", "mural")
+    .gte("value->>createdAt", startDate)
+    .lt("value->>createdAt", endDate)
+    .limit(10);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data ?? [];
+};
+
 // Fetches a page of "light" items (função get_items_light no Postgres).
 // A montagem dos itens acontece DENTRO do banco: mídia pesada em base64
 // (photo/muralContent, MBs por linha) nunca sai do Postgres — antes essas

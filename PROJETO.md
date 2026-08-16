@@ -82,15 +82,19 @@ Todos prefixados em `/make-server-19717bce`:
 | POST | `/push-subscription` | Registra subscription push de um usuário |
 | DELETE | `/push-subscription` | Remove subscription push |
 | POST | `/trigger-reminders` | Dispara lembretes (chamado pelo pg_cron) |
+| POST | `/nudge` | Cutucada: push imediato pro outro (rate limit de 3 min por pessoa) |
+| GET | `/memories/on-this-day` | Posts do mural desta data em anos anteriores (cache diário em KV) |
 
 ### Padrões de chave no KV
 
 | Prefixo | Conteúdo |
 |---|---|
 | `item:` | Todos os itens (listas, mural, alarmes…) |
-| `settings` | Configurações globais do app |
+| `settings` | Configurações globais do app (inclui `togetherSince` do contador "juntos há X") |
 | `push-subscription:Amanda` | Subscription push da Amanda |
 | `push-subscription:Mateus` | Subscription push do Mateus |
+| `nudge-last:<perfil>` | Timestamp da última cutucada (rate limit) |
+| `on-this-day:<data>` | Cache diário das memórias do "Neste dia" |
 
 ---
 

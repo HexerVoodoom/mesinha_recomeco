@@ -66,6 +66,22 @@ export interface Settings {
   coupleName: string;
   themeColor: string;
   notificationsEnabled: boolean;
+  // Data de início do relacionamento (YYYY-MM-DD) — alimenta o contador "juntos há X dias"
+  togetherSince?: string | null;
+}
+
+// Memória do "Neste dia" — post do mural desta mesma data em anos anteriores
+export interface OnThisDayMemory {
+  id: string;
+  title?: string | null;
+  caption?: string | null;
+  comment?: string | null;
+  createdBy: string;
+  createdAt: string;
+  muralContentType?: 'text' | 'image' | 'video' | 'audio' | null;
+  muralThumbnail?: string | null;
+  muralContent?: string | null; // preenchido só para posts de texto
+  yearsAgo: number;
 }
 
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> => {
@@ -302,6 +318,20 @@ export const api = {
 
   getLocations: async (): Promise<{ Amanda: LocationShare | null; Mateus: LocationShare | null }> => {
     return await fetchAPI('/location');
+  },
+
+  // Cutucada: push imediato pro outro. O servidor aplica rate limit (429 com
+  // mensagem amigável se cutucar de novo rápido demais).
+  sendNudge: async (from: 'Amanda' | 'Mateus', message?: string): Promise<{ success: boolean; to: string }> => {
+    return await fetchAPI('/nudge', {
+      method: 'POST',
+      body: JSON.stringify({ from, message }),
+    });
+  },
+
+  // "Neste dia": posts do mural desta mesma data em anos anteriores (cacheado por dia no servidor)
+  getOnThisDay: async (): Promise<{ date: string; memories: OnThisDayMemory[] }> => {
+    return await fetchAPI('/memories/on-this-day');
   },
 };
 

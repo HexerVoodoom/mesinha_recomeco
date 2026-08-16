@@ -695,6 +695,94 @@ app.delete("/make-server-19717bce/push-subscription", async (c) => {
   }
 });
 
+// ── Cutucada (nudge): push imediato "tô pensando em você" ────────────────────
+//
+// Um toque manda uma notificação instantânea pro outro. Rate limit no servidor
+// (1 cutucada a cada 3 min por pessoa) para nunca virar spam — excesso de
+// notificação é a reclamação nº 1 contra apps de casal concorrentes.
+
+const NUDGE_COOLDOWN_MS = 3 * 60 * 1000;
+const NUDGE_MAX_LEN = 90;
+
+app.post("/make-server-19717bce/nudge", async (c) => {
+  try {
+    const { from, message } = await c.req.json();
+    if (from !== "Amanda" && from !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+
+    const lastKey = `nudge-last:${from}`;
+    const last = await kv.get(lastKey);
+    const now = Date.now();
+    if (typeof last === "number" && now - last < NUDGE_COOLDOWN_MS) {
+      const waitSec = Math.ceil((NUDGE_COOLDOWN_MS - (now - last)) / 1000);
+      return c.json({
+        error: `Calma, coração! Espera ${waitSec}s pra cutucar de novo.`,
+        retryAfterSec: waitSec,
+      }, 429);
+    }
+    await kv.set(lastKey, now);
+
+    const to = from === "Amanda" ? "Mateus" : "Amanda";
+    const body = typeof message === "string" && message.trim()
+      ? message.trim().substring(0, NUDGE_MAX_LEN)
+      : "tá pensando em você agora 💭";
+
+    await sendPushToUser(to, {
+      title: `💌 ${from} te cutucou!`,
+      body,
+      tag: "mesinha-nudge",
+      url: "/",
+    });
+
+    return c.json({ success: true, to });
+  } catch (error) {
+    console.error("[POST /nudge] Error:", error);
+    return c.json({ error: "Failed to send nudge", details: String(error) }, 500);
+  }
+});
+
+// ── "Neste dia": posts do mural na mesma data em anos anteriores ─────────────
+//
+// Busca por faixa de data usa o índice idx_kv_items_createdat (uma query por
+// ano, range curto de 1 dia), e o resultado é cacheado em KV por dia — o custo
+// de Disk IO é de no máximo algumas queries pequenas por dia.
+
+app.get("/make-server-19717bce/memories/on-this-day", async (c) => {
+  try {
+    const todayStr = brazilNow().toISOString().slice(0, 10);
+    const cacheKey = `on-this-day:${todayStr}`;
+    const cached = await kv.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const [year, month, day] = todayStr.split("-").map(Number);
+    const memories: any[] = [];
+    for (let back = 1; back <= 4; back++) {
+      const start = new Date(Date.UTC(year - back, month - 1, day)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(year - back, month - 1, day + 1)).toISOString().slice(0, 10);
+      const rows = await kv.getMuralLightByDateRange(start, end);
+      for (const row of rows) {
+        // Posts de texto guardam o conteúdo em muralContent (pequeno) — busca o
+        // valor completo só para eles; mídia pesada nunca sai do banco aqui.
+        if (row.muralContentType === "text" && row.id) {
+          const full = await kv.get(`item:${row.id}`);
+          row.muralContent = typeof full?.muralContent === "string"
+            ? full.muralContent.substring(0, 500)
+            : null;
+        }
+        memories.push({ ...row, yearsAgo: back });
+      }
+    }
+
+    const result = { date: todayStr, memories };
+    await kv.set(cacheKey, result);
+    return c.json(result);
+  } catch (error) {
+    console.error("[GET /memories/on-this-day] Error:", error);
+    return c.json({ error: "Failed to fetch memories", details: String(error) }, 500);
+  }
+});
+
 // ── Compartilhamento de localização em tempo real (aba "Mapa") ───────────────
 //
 // Estado efêmero (não é um "item"): cada perfil tem no máximo uma sessão de

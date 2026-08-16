@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Bell, Calendar, Search, Download } from 'lucide-react';
+import { ArrowLeft, Bell, Calendar, Search, Download, Heart } from 'lucide-react';
 import { api, Settings as SettingsType } from '../utils/api';
 import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
@@ -12,6 +12,20 @@ import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
 // em main que mexe em android/**). Funciona tanto no navegador quanto dentro
 // do app nativo (a WebView já sabe lidar com o download, ver MainActivity.kt).
 const LATEST_APK_URL = 'https://github.com/HexerVoodoom/mesinha_recomeco/releases/latest/download/app-release.apk';
+
+// Dias completos desde a data (YYYY-MM-DD), no fuso local.
+function daysTogether(since: string): number {
+  const [y, m, d] = since.split('-').map(Number);
+  const start = new Date(y, (m || 1) - 1, d || 1);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+function formatBrDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -140,6 +154,37 @@ export default function Settings() {
                 <div className="text-sm text-muted-foreground mb-1">Dias restantes</div>
                 <div className="text-3xl font-bold text-primary mb-2">{daysRemaining}</div>
                 <div className="text-xs text-muted-foreground">Início: 29 de março de 2026</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Juntos há X dias — contador vivo a partir da data configurada */}
+          <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
+            <div className="flex items-start gap-3">
+              <Heart className="w-6 h-6 text-primary mt-0.5" />
+              <div className="flex-1">
+                <div className="text-sm text-muted-foreground mb-1">Juntos há</div>
+                {settings.togetherSince ? (
+                  <>
+                    <div className="text-3xl font-bold text-primary mb-2">
+                      {daysTogether(settings.togetherSince)} dias
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      Desde {formatBrDate(settings.togetherSince)} 💗
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground mb-3">
+                    Configura a data de vocês pra ver o contador
+                  </div>
+                )}
+                <input
+                  type="date"
+                  value={settings.togetherSince || ''}
+                  onChange={(e) => handleSave({ togetherSince: e.target.value || null })}
+                  disabled={saving}
+                  className="px-3 py-2 rounded-lg border border-border bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
               </div>
             </div>
           </div>

@@ -13,6 +13,8 @@ import {
   CalendarHeart,
   Trophy,
   Gift,
+  Dices,
+  HeartHandshake,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -62,10 +64,13 @@ const categoryIcons: Record<Category | 'search', string> = {
 };
 
 // Ferramentas extras, que entram na mesma grade de ícones (não são categoria
-// de lista, mas usam o mesmo slot visual).
+// de lista, mas usam o mesmo slot visual). "meetup" e "map" trocam a tela;
+// "roleta" e "nudge" abrem modais por cima da tela atual.
 const tools = [
   { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
+  { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
+  { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
 ];
 type ToolId = (typeof tools)[number]['id'];
 
@@ -97,6 +102,8 @@ interface CategoryMenuProps {
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
+  onOpenRoulette: () => void;
+  onOpenNudge: () => void;
 }
 
 /** Cartão com o badge da categoria ativa e a grade de ícones (6x2, com slide pra mais páginas). */
@@ -108,10 +115,18 @@ export function CategoryMenu({
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
+  onOpenRoulette,
+  onOpenNudge,
 }: CategoryMenuProps) {
+  // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
   const activeTool: ToolId | null = showMeetupCalendar ? 'meetup' : showMap ? 'map' : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
-  const toolHandlers: Record<ToolId, () => void> = { meetup: onOpenMeetupCalendar, map: onOpenMap };
+  const toolHandlers: Record<ToolId, () => void> = {
+    meetup: onOpenMeetupCalendar,
+    map: onOpenMap,
+    roleta: onOpenRoulette,
+    nudge: onOpenNudge,
+  };
 
   const entries: MenuEntry[] = [
     ...categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),

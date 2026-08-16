@@ -17,6 +17,9 @@ import { AddMuralModal } from '../components/AddMuralModal';
 import { SearchContent } from '../components/SearchContent';
 import { MeetupCalendar } from '../components/MeetupCalendar';
 import { MapView } from '../components/MapView';
+import { NudgeModal } from '../components/NudgeModal';
+import { DateRouletteModal } from '../components/DateRouletteModal';
+import { OnThisDayCard } from '../components/OnThisDayCard';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -137,6 +140,8 @@ export default function Home() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showNudgeModal, setShowNudgeModal] = useState(false);
+  const [showRouletteModal, setShowRouletteModal] = useState(false);
 
   // Paginação - 7 itens por página
   const [currentPage, setCurrentPage] = useState<Record<Category, number>>({
@@ -966,6 +971,8 @@ export default function Home() {
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
           onOpenMap={handleToggleMap}
+          onOpenRoulette={() => setShowRouletteModal(true)}
+          onOpenNudge={() => setShowNudgeModal(true)}
         />
 
         {error && (
@@ -1016,13 +1023,16 @@ export default function Home() {
             {/* Pending Items */}
             <div className={activeCategory === 'mural' ? '' : 'space-y-2'}>
               {activeCategory === 'mural' ? (
-                <MuralSection
-                  pendingItems={pendingItems}
-                  userProfile={userProfile}
-                  onDeleteItem={handleDeleteItem}
-                  onMarkViewed={handleMarkViewed}
-                  onToggleLike={handleToggleLike}
-                />
+                <>
+                  <OnThisDayCard />
+                  <MuralSection
+                    pendingItems={pendingItems}
+                    userProfile={userProfile}
+                    onDeleteItem={handleDeleteItem}
+                    onMarkViewed={handleMarkViewed}
+                    onToggleLike={handleToggleLike}
+                  />
+                </>
               ) : pendingItems.length === 0 ? (
                 <EmptyState category={activeCategory} />
               ) : (
@@ -1136,6 +1146,18 @@ export default function Home() {
           allItems={items}
         />
       )}
+
+      <NudgeModal
+        isOpen={showNudgeModal}
+        onClose={() => setShowNudgeModal(false)}
+        userProfile={userProfile}
+      />
+
+      <DateRouletteModal
+        isOpen={showRouletteModal}
+        onClose={() => setShowRouletteModal(false)}
+        items={items}
+      />
 
       <FilterModal
         isOpen={showFilterModal}
