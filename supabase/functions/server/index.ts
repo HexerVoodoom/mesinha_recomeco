@@ -428,6 +428,24 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
       }
     }
 
+    // Tarefa de casa concluída com rodízio: avisa quem herdou a vez. O push só
+    // sai quando o dono realmente muda, então marcar/desmarcar sem rodízio (ou
+    // editar outros campos da tarefa) não notifica ninguém.
+    if (
+      updatedItem.category === "chore" &&
+      body.choreAssignee &&
+      body.choreAssignee !== existingItem.choreAssignee &&
+      (body.choreAssignee === "Amanda" || body.choreAssignee === "Mateus")
+    ) {
+      const doneBy = updatedItem.choreLastDoneBy || "Alguém";
+      sendPushToUser(body.choreAssignee, {
+        title: `Sua vez: ${updatedItem.title} 🧹`,
+        body: `${doneBy} fez a última. Agora o rodízio passou pra você!`,
+        tag: `mesinha-chore-${updatedItem.id}`,
+        url: "/",
+      }).catch(console.error);
+    }
+
     // Notifica quem propôs o dia quando o parceiro confirma o encontro.
     if (
       updatedItem.category === "meetup" &&

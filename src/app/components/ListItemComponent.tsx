@@ -68,6 +68,8 @@ export function ListItemComponent({
   const isJokesCategory = item.category === 'jokes';
   const isOtherCategory = item.category === 'other';
   const isCapsuleCategory = item.category === 'capsule';
+  // Gratidão é um registro, não uma tarefa — não faz sentido "concluir".
+  const isGratitudeCategory = item.category === 'gratitude';
   // Cápsula lacrada: o servidor esconde o conteúdo até a data de abertura
   const isCapsuleLocked = isCapsuleCategory && !!item.capsuleLocked;
   const capsuleDaysLeft = isCapsuleLocked && item.eventDate
@@ -107,8 +109,8 @@ export function ListItemComponent({
         <CardContent className="p-[18px]">
           {/* Main Row */}
           <div className="flex items-start gap-4">
-            {/* Checkbox - não mostrar para categoria dates, jokes (bobeiras), other (outros) e capsule */}
-            {!isDateCategory && !isJokesCategory && !isOtherCategory && !isCapsuleCategory && (
+            {/* Checkbox - não mostrar para dates, jokes (bobeiras), other, capsule e gratidão */}
+            {!isDateCategory && !isJokesCategory && !isOtherCategory && !isCapsuleCategory && !isGratitudeCategory && (
               <button
                 onClick={() => {
                   if (isAlarmCategory) {

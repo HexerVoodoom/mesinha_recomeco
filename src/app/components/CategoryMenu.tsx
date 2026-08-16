@@ -18,6 +18,9 @@ import {
   Hourglass,
   SmilePlus,
   MessageCircleQuestion,
+  Brush,
+  ListChecks,
+  Sparkles,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -34,7 +37,8 @@ import imgIconVieosCurtos from "figma:asset/b72dc3ec57224b4caa82c0bbb8e9602e4a86
 
 export type Category =
   | 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates'
-  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other' | 'capsule';
+  | 'jokes' | 'alarm' | 'top3' | 'mural' | 'other' | 'capsule'
+  | 'chore' | 'bucket' | 'gratitude';
 
 export const categories = [
   { id: 'mural' as Category, icon: Gift, label: 'Mural' },
@@ -49,7 +53,14 @@ export const categories = [
   { id: 'places' as Category, icon: MapPin, label: 'Lugares' },
   { id: 'other' as Category, icon: Umbrella, label: 'Outros' },
   { id: 'capsule' as Category, icon: Hourglass, label: 'Cápsula' },
+  { id: 'chore' as Category, icon: Brush, label: 'Tarefas' },
+  { id: 'bucket' as Category, icon: ListChecks, label: 'Sonhos' },
+  { id: 'gratitude' as Category, icon: Sparkles, label: 'Gratidão' },
 ];
+
+// Categorias que nasceram depois da grade original — vão pra página 2 junto
+// das ferramentas, preservando a página 1 como sempre foi.
+const PAGE_2_CATEGORIES: Category[] = ['capsule', 'chore', 'bucket', 'gratitude'];
 
 // Mapeamento dos ícones personalizados do Figma. Categorias sem PNG (ex.:
 // capsule) caem no ícone lucide correspondente no badge.
@@ -150,14 +161,14 @@ export function CategoryMenu({
   };
 
   // Ordem da grade: a página 1 fica EXATAMENTE como sempre foi (11 categorias
-  // + Encontros); tudo que veio depois (Mapa, Roleta, Cutucada, Cápsula) mora
-  // na página 2 — sem quebrar a memória muscular de ninguém.
-  const page1Categories = categories.filter(c => c.id !== 'capsule');
-  const capsuleMeta = categories.find(c => c.id === 'capsule');
+  // + Encontros); tudo que veio depois mora nas páginas seguintes — sem
+  // quebrar a memória muscular de ninguém.
+  const page1Categories = categories.filter(c => !PAGE_2_CATEGORIES.includes(c.id));
+  const laterCategories = categories.filter(c => PAGE_2_CATEGORIES.includes(c.id));
   const entries: MenuEntry[] = [
     ...page1Categories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
     ...tools.map(t => ({ kind: 'tool' as const, id: t.id, icon: t.icon })),
-    ...(capsuleMeta ? [{ kind: 'category' as const, id: capsuleMeta.id, icon: capsuleMeta.icon }] : []),
+    ...laterCategories.map(c => ({ kind: 'category' as const, id: c.id, icon: c.icon })),
   ];
   const pages = paginate(entries);
 

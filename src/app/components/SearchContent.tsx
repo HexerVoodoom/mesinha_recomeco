@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Search as SearchIcon, X, Tv, Film, Gamepad2, UtensilsCrossed, MapPin, Calendar, Smile, AlarmClock, Trophy, MoreHorizontal, Hourglass } from 'lucide-react';
+import { Search as SearchIcon, X, Tv, Film, Gamepad2, UtensilsCrossed, MapPin, Calendar, Smile, AlarmClock, Trophy, MoreHorizontal, Hourglass, Brush, ListChecks, Sparkles } from 'lucide-react';
 import { ListItem } from '../utils/api';
 import { ListItemComponent } from './ListItemComponent';
 import { Top3ItemComponent } from './Top3ItemComponent';
 
-type Category = 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates' | 'jokes' | 'alarm' | 'top3' | 'other' | 'capsule';
+type Category = 'watch' | 'movies' | 'games' | 'food' | 'places' | 'dates' | 'jokes' | 'alarm' | 'top3' | 'other' | 'capsule' | 'chore' | 'bucket' | 'gratitude';
 
 const categoryIcons: Record<Category, any> = {
   watch: Tv,
@@ -19,6 +19,9 @@ const categoryIcons: Record<Category, any> = {
   top3: Trophy,
   other: MoreHorizontal,
   capsule: Hourglass,
+  chore: Brush,
+  bucket: ListChecks,
+  gratitude: Sparkles,
 };
 
 const categoryLabels: Record<Category, string> = {
@@ -33,6 +36,9 @@ const categoryLabels: Record<Category, string> = {
   top3: 'Top 3',
   other: 'Outros',
   capsule: 'Cápsula',
+  chore: 'Tarefas',
+  bucket: 'Sonhos',
+  gratitude: 'Gratidão',
 };
 
 interface SearchContentProps {

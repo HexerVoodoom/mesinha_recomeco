@@ -22,6 +22,8 @@ import { DateRouletteModal } from '../components/DateRouletteModal';
 import { OnThisDayCard } from '../components/OnThisDayCard';
 import { MoodPanel, moodItemId } from '../components/MoodPanel';
 import { QuestionPanel } from '../components/QuestionPanel';
+import { ChoreItemComponent, ChoreBalance } from '../components/ChoreItemComponent';
+import { BucketProgress } from '../components/BucketProgress';
 import { useLocationSharing } from '../hooks/useLocationSharing';
 import { NotificationPermissionBanner } from '../components/NotificationPermissionBanner';
 import { toast } from 'sonner';
@@ -166,6 +168,9 @@ export default function Home() {
     mural: 1,
     other: 1,
     capsule: 1,
+    chore: 1,
+    bucket: 1,
+    gratitude: 1,
   });
   const [loadedCategories, setLoadedCategories] = useState<Set<Category>>(new Set(['mural']));
   const ITEMS_PER_PAGE = 7;
@@ -599,6 +604,10 @@ export default function Home() {
       reminderForMateus: newItem.reminderForMateus,
       reminderForAmanda: newItem.reminderForAmanda,
       reminderActive: newItem.reminderActive,
+      // Tarefas de casa (rodízio)
+      choreAssignee: newItem.choreAssignee,
+      choreRotates: newItem.choreRotates,
+      choreDoneCount: newItem.choreDoneCount,
       // Mural specific fields
       muralContentType: newItem.muralContentType,
       muralContent: newItem.muralContent,
@@ -1152,6 +1161,14 @@ export default function Home() {
           />
         ) : (
           <div className="px-6">
+            {/* Cabeçalhos por categoria: placar das tarefas e progresso dos sonhos */}
+            {activeCategory === 'chore' && pendingItems.length > 0 && (
+              <ChoreBalance items={items} userProfile={userProfile} />
+            )}
+            {activeCategory === 'bucket' && (
+              <BucketProgress items={items} />
+            )}
+
             {/* Pending Items */}
             <div className={activeCategory === 'mural' ? '' : 'space-y-2'}>
               {activeCategory === 'mural' ? (
@@ -1167,10 +1184,21 @@ export default function Home() {
                   />
                 </>
               ) : pendingItems.length === 0 ? (
-                <EmptyState category={activeCategory} />
+                <>
+                  {activeCategory === 'chore' && <ChoreBalance items={items} userProfile={userProfile} />}
+                  <EmptyState category={activeCategory} />
+                </>
               ) : (
                 pendingItems.map(item => (
-                  activeCategory === 'top3' ? (
+                  activeCategory === 'chore' ? (
+                    <ChoreItemComponent
+                      key={item.id}
+                      item={item}
+                      userProfile={userProfile}
+                      onUpdate={(updates) => handleUpdateItem(item.id, updates)}
+                      onDelete={() => handleDeleteItem(item.id)}
+                    />
+                  ) : activeCategory === 'top3' ? (
                     <Top3ItemComponent
                       key={item.id}
                       item={item}
@@ -1209,7 +1237,7 @@ export default function Home() {
             )}
 
             {/* Done Section - não mostrar para categoria alarm, top3 e mural */}
-            {doneItems.length > 0 && activeCategory !== 'alarm' && activeCategory !== 'top3' && activeCategory !== 'mural' && (
+            {doneItems.length > 0 && activeCategory !== 'alarm' && activeCategory !== 'top3' && activeCategory !== 'mural' && activeCategory !== 'chore' && (
               <div className="mt-8">
                 <div className="flex items-center justify-center mb-4">
                   <div className="px-4 py-1.5 bg-muted/30 rounded-full">

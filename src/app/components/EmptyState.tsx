@@ -17,6 +17,10 @@ const categoryEmojis: Record<string, string> = {
   mural: '💌',
   other: '☂️',
   capsule: '🕰️',
+  chore: '🧹',
+  bucket: '✨',
+  gratitude: '🫶',
+  mood: '🌤️',
 };
 
 const categoryMessages: Record<string, string> = {
@@ -32,6 +36,10 @@ const categoryMessages: Record<string, string> = {
   mural: 'Compartilhem momentos especiais',
   other: 'Adicione outros itens importantes',
   capsule: 'Escrevam cartas que só abrem na data marcada',
+  chore: 'Dividam as tarefas de casa com rodízio automático',
+  bucket: 'Listem os sonhos pra realizar juntos',
+  gratitude: 'Guardem os agradecimentos do dia a dia',
+  mood: 'Registrem como cada um está se sentindo',
 };
 
 export function EmptyState({ category }: EmptyStateProps) {
