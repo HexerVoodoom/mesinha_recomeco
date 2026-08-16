@@ -185,7 +185,7 @@ export function GardenPanel({ userProfile }: GardenPanelProps) {
             <p className="font-['Quicksand',sans-serif] font-bold text-2xl text-[#2B2A28] leading-none">
               {stats.activeDays}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">dias com registro</p>
+            <p className="text-xs text-muted-foreground mt-1">dias com registro em {stats.thisYear.year}</p>
           </div>
         </div>
 

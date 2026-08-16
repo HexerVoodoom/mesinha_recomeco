@@ -90,6 +90,7 @@ export interface GardenStats {
   level: number;
   nextLevelAt: number;
   itemsCounted: number;
+  /** Dias com pelo menos um registro no ano corrente (exibido na retrospectiva). */
   activeDays: number;
   byCategory: Record<string, number>;
   byPerson: Record<string, number>;

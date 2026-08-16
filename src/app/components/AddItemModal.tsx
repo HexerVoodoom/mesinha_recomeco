@@ -172,6 +172,8 @@ export function AddItemModal({ isOpen, onClose, onAdd, category, allItems }: Add
     setPhotoUrl('');
     setTags([]);
     setVideoLink('');
+    setChoreAssignee(currentProfile);
+    setChoreRotates(true);
     setTop3MateusPos1('');
     setTop3MateusPos2('');
     setTop3MateusPos3('');

@@ -738,7 +738,12 @@ app.get("/make-server-19717bce/backup", async (c) => {
         orderByJsonField: "createdAt",
         ascending: false,
       });
-      items.push(...batch);
+      // Cápsulas ainda lacradas saem do backup sem o conteúdo, igual a todos
+      // os outros caminhos de leitura: o export é baixado pelo cliente, então
+      // deixar a carta passar aqui furaria o lacre (é o único jeito de a
+      // promessa "nem via DevTools" ser verdade). O conteúdo continua intacto
+      // no banco e volta pro export assim que a cápsula abre.
+      items.push(...lockCapsules(batch));
     }
     console.log(`[GET /backup] Found ${items.length} items`);
 
@@ -852,9 +857,15 @@ function pickQuestionForDay(bank: string[], usedQuestions: string[], dateStr: st
   const used = new Set(usedQuestions);
   const freshCustom = bank.filter((q) => !used.has(q));
   const freshDefault = DEFAULT_QUESTIONS.filter((q) => !used.has(q));
+  // Quando tudo já rodou, recomeça — mas tirando a de ontem do sorteio: sem
+  // isso, uma virada de mês (o seed pula de 20260831 pra 20260901) pode cair
+  // no mesmo índice e repetir a pergunta dois dias seguidos.
+  const yesterday = usedQuestions[usedQuestions.length - 1];
+  const all = bank.length ? bank : DEFAULT_QUESTIONS;
+  const recycled = all.length > 1 ? all.filter((q) => q !== yesterday) : all;
   const pool = freshCustom.length ? freshCustom
     : freshDefault.length ? freshDefault
-    : (bank.length ? bank : DEFAULT_QUESTIONS);
+    : recycled;
   // Índice derivado da data => determinístico (Math.random daria respostas
   // diferentes se dois requests chegassem juntos).
   const seed = dateStr.split("-").join("");
@@ -1166,6 +1177,12 @@ app.delete("/make-server-19717bce/cards", async (c) => {
 
 const STREAK_FREEZE_DAYS = 1;
 
+/** Janela de varredura do jardim (cobre a retrospectiva do ano + a sequência). */
+const GARDEN_WINDOW_DAYS = 430;
+
+/** Piso entre dois cálculos do jardim, mesmo com itens novos. */
+const GARDEN_MIN_RECOMPUTE_MS = 30 * 60 * 1000;
+
 // Dia (calendário de Brasília) de um createdAt em UTC. Fatiar o ISO direto
 // jogaria tudo que foi feito depois das 21h pro dia seguinte — a sequência e a
 // retrospectiva ficariam um dia adiantadas em relação ao `todayStr` do resto
@@ -1217,14 +1234,36 @@ app.get("/make-server-19717bce/garden", async (c) => {
     const todayStr = brazilNow().toISOString().slice(0, 10);
     const cacheKey = `garden:${todayStr}`;
     const cached = await kv.get(cacheKey);
-    // O cache do dia é invalidado quando o total de itens muda (alguém postou
-    // algo depois do último cálculo), pra não mostrar número velho.
+
+    // Cache quentinho: nem chega a contar os itens. `countByPrefix` é um
+    // COUNT(*) exato sobre todas as linhas `item:` — barato perto da varredura
+    // do digest, mas não de graça, e o piso de tempo já decidiu que não vamos
+    // recalcular mesmo que o total tenha mudado.
+    if (
+      cached && typeof cached.computedAt === "number" &&
+      Date.now() - cached.computedAt < GARDEN_MIN_RECOMPUTE_MS
+    ) {
+      return c.json(cached);
+    }
+
+    // Fora do piso de tempo, o cache do dia ainda vale enquanto o total de
+    // itens não muda (ninguém postou nada desde o último cálculo).
     const totalNow = await kv.countByPrefix("item:");
     if (cached && cached.totalItems === totalNow) return c.json(cached);
 
-    const digest = await kv.getActivityDigest(5000);
+    // Só os últimos ~14 meses: cobre a retrospectiva do ano inteiro e a
+    // sequência atual, e impede que a varredura cresça pra sempre junto com o
+    // histórico. O `total` real continua vindo do countByPrefix (barato).
+    const since = new Date(Date.now() - GARDEN_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      .toISOString();
+    const digest = await kv.getActivityDigest(5000, since);
 
     const activeDays = new Set<string>();
+    // Contado à parte porque é o número exibido dentro da retrospectiva do
+    // ano. Usar o total da janela faria ele ENCOLHER quando dias antigos
+    // saíssem dos 430 dias; restrito ao ano corrente, o número é estável e
+    // ainda por cima bate com o título do card.
+    const activeDaysThisYear = new Set<string>();
     const byCategory: Record<string, number> = {};
     const byPerson: Record<string, number> = {};
     const byMonthThisYear: Record<string, number> = {};
@@ -1240,13 +1279,29 @@ app.get("/make-server-19717bce/garden", async (c) => {
         byPerson[row.createdBy] = (byPerson[row.createdBy] || 0) + 1;
       }
       if (day.slice(0, 4) === currentYear) {
+        activeDaysThisYear.add(day);
         const month = day.slice(0, 7);
         byMonthThisYear[month] = (byMonthThisYear[month] || 0) + 1;
       }
     }
 
     const streak = computeStreak(activeDays, todayStr);
-    const totalItems = digest.length;
+
+    // O recorde é persistido à parte porque o digest só enxerga a janela
+    // recente: sem isso, uma sequência boa de 18 meses atrás sairia da janela
+    // e o "recorde" DIMINUIRIA de um dia pro outro — que é pior do que não ter
+    // recorde nenhum.
+    const storedLongest = Number(await kv.get("garden-longest-streak")) || 0;
+    const longest = Math.max(streak.longest, streak.current, storedLongest);
+    if (longest > storedLongest) {
+      await kv.set("garden-longest-streak", longest);
+    }
+    streak.longest = longest;
+    // O progresso do jardim usa a contagem REAL de itens, não o tamanho do
+    // digest: a varredura é limitada à janela de GARDEN_WINDOW_DAYS, então
+    // derivar o nível dela faria o jardim ENCOLHER (nível e "momentos
+    // plantados" caindo) conforme o histórico antigo saísse da janela.
+    const totalItems = totalNow;
 
     // Nível do jardim: cresce rápido no começo e desacelera, pra nunca ficar
     // "travado" nem inflacionar quando o histórico já é grande.
@@ -1259,11 +1314,12 @@ app.get("/make-server-19717bce/garden", async (c) => {
     const result = {
       date: todayStr,
       totalItems: totalNow,
+      computedAt: Date.now(),
       streak,
       level,
       nextLevelAt,
       itemsCounted: totalItems,
-      activeDays: activeDays.size,
+      activeDays: activeDaysThisYear.size,
       byCategory,
       byPerson,
       thisYear: {
@@ -1659,12 +1715,24 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
     // 08:00, com trava própria de 1x por dia).
     const capsuleReminderKey = "capsule-reminder-last-fired";
     if ((await kv.get(capsuleReminderKey)) !== todayStr) {
-      const { items: capsuleItems } = await kv.getItemsLightPaged({
-        offset: 0,
-        limit: 50,
-        categoryFilter: "capsule",
-      });
-      const opening = capsuleItems.filter((item: any) => item.eventDate === todayStr);
+      // Varre TODAS as páginas de cápsulas: a listagem vem ordenada por
+      // createdAt DESC, e cápsula é escrita com muita antecedência — cortar nas
+      // 50 mais recentes deixaria de fora justamente as mais antigas, que são
+      // as que estão abrindo hoje. A projeção é leve (sem mídia) e isso roda
+      // uma vez por dia, às 08:00.
+      const opening: any[] = [];
+      const CAPSULE_PAGE = 100;
+      for (let offset = 0; ; offset += CAPSULE_PAGE) {
+        const { items: page, total } = await kv.getItemsLightPaged({
+          offset,
+          limit: CAPSULE_PAGE,
+          categoryFilter: "capsule",
+        });
+        for (const item of page as any[]) {
+          if (item.eventDate === todayStr) opening.push(item);
+        }
+        if (page.length === 0 || offset + CAPSULE_PAGE >= total) break;
+      }
       for (const capsule of opening) {
         const payload = {
           title: "Uma cápsula do tempo abriu! 🎉",

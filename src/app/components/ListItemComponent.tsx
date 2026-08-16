@@ -105,7 +105,7 @@ export function ListItemComponent({
 
   return (
     <>
-      <Card variant="white" className={`overflow-visible ${cardBackgroundClass}`}>
+      <Card className={`overflow-visible ${cardBackgroundClass}`}>
         <CardContent className="p-[18px]">
           {/* Main Row */}
           <div className="flex items-start gap-4">

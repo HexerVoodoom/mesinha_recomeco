@@ -50,7 +50,7 @@ export function ChoreItemComponent({ item, userProfile, onUpdate, onDelete }: Ch
     : null;
 
   return (
-    <Card variant="white" className={isMyTurn ? 'bg-[#4D989B]/5' : 'bg-white'}>
+    <Card className={isMyTurn ? 'bg-[#4D989B]/5' : 'bg-white'}>
       <CardContent className="p-[18px]">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">

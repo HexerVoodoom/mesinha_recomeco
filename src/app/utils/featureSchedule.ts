@@ -146,8 +146,6 @@ export const FEATURE_SCHEDULE: ScheduledFeature[] = [
   },
 ];
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /** Data local (fuso do aparelho) em YYYY-MM-DD. */
 function todayStr(): string {
   return new Date().toLocaleDateString('sv-SE');
@@ -161,7 +159,14 @@ function parseLocalDate(dateStr: string): Date {
 /** Data (YYYY-MM-DD) em que a feature passa a aparecer. */
 export function unlockDateFor(feature: ScheduledFeature): string {
   const anchor = parseLocalDate(LAUNCH_ANCHOR);
-  const unlock = new Date(anchor.getTime() + feature.step * INTERVAL_DAYS * DAY_MS);
+  // Soma em DIAS de calendário, não em milissegundos: somar N*24h à meia-noite
+  // local cai às 23h do dia anterior quando o intervalo cruza o fim de um
+  // horário de verão, e a feature abriria um dia adiantada.
+  const unlock = new Date(
+    anchor.getFullYear(),
+    anchor.getMonth(),
+    anchor.getDate() + feature.step * INTERVAL_DAYS,
+  );
   return unlock.toLocaleDateString('sv-SE');
 }
 

@@ -1181,8 +1181,10 @@ export default function Home() {
           />
         ) : (
           <div className="px-6">
-            {/* Cabeçalhos por categoria: placar das tarefas e progresso dos sonhos */}
-            {activeCategory === 'chore' && pendingItems.length > 0 && (
+            {/* Cabeçalhos por categoria: placar das tarefas e progresso dos sonhos.
+                O placar aparece com ou sem tarefas pendentes (ele mesmo some
+                quando não há nenhuma tarefa cadastrada). */}
+            {activeCategory === 'chore' && (
               <ChoreBalance items={items} userProfile={userProfile} />
             )}
             {activeCategory === 'bucket' && (
@@ -1204,10 +1206,7 @@ export default function Home() {
                   />
                 </>
               ) : pendingItems.length === 0 ? (
-                <>
-                  {activeCategory === 'chore' && <ChoreBalance items={items} userProfile={userProfile} />}
-                  <EmptyState category={activeCategory} />
-                </>
+                <EmptyState category={activeCategory} />
               ) : (
                 pendingItems.map(item => (
                   activeCategory === 'chore' ? (

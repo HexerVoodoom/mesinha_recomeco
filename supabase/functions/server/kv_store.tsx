@@ -162,15 +162,28 @@ export const getMuralLightByDateRange = async (
 };
 
 // Digest de atividade: só (categoria, autor, data) de cada item — três campos
-// de texto por linha, sem tocar em nenhuma mídia. É o que alimenta a sequência
-// (streak), o jardim e a retrospectiva sem arrastar as linhas pesadas.
-export const getActivityDigest = async (limit = 5000): Promise<any[]> => {
+// de texto por linha, sem trazer nenhuma mídia pela rede. Alimenta a sequência
+// (streak), o jardim e a retrospectiva.
+//
+// ATENÇÃO ao custo: extrair um campo de JSONB obriga o Postgres a
+// descomprimir (detoast) a linha inteira, e neste banco cada item pesa ~1,3MB
+// por causa do base64. Medido em produção: 158 itens => ~20k buffers (~156MB)
+// lidos, 103ms. Por isso o `since` limita a varredura a uma janela recente
+// (usa o índice idx_kv_items_createdat) e o chamador cacheia o resultado.
+// A correção de raiz é mover a mídia pro Storage (ver PROJETO.md).
+export const getActivityDigest = async (limit = 5000, since?: string): Promise<any[]> => {
   const supabase = client();
-  const { data, error } = await supabase
+  let query = supabase
     .from("kv_store_19717bce")
     .select("category:value->>category, createdBy:value->>createdBy, createdAt:value->>createdAt")
-    .like("key", "item:%")
-    .not("value->>createdAt", "is", null)
+    .like("key", "item:%");
+
+  // Range no campo indexado: descarta itens antigos sem precisar descomprimi-los.
+  query = since
+    ? query.gte("value->>createdAt", since)
+    : query.not("value->>createdAt", "is", null);
+
+  const { data, error } = await query
     .order(`value->>'createdAt'` as any, { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) {
