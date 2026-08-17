@@ -189,6 +189,26 @@ proposital, o que hoje só afeta builds locais (o CI sempre sobrescreve).
   obrigatórias** (2 a 8, 9:16, entre 320-3840px por lado). Tablet
   7"/10" e as demais categorias são opcionais (o app não tem layout dedicado
   pra tablet — é um container de largura fixa de celular).
+- **"Precisa desinstalar o app anterior pra instalar o novo"** — o Android
+  recusa atualizar um app quando a **assinatura muda**. Duas causas possíveis:
+
+  1. **APK de debug** (`android-build.yml`). *Corrigido:* o debug não tinha
+     configuração de assinatura, então o Gradle usava o keystore automático do
+     Android — gerado **novo a cada run do CI**. Cada APK de debug saía com uma
+     assinatura diferente, e nem debug sobre debug atualizava. Agora o debug é
+     assinado com a mesma chave de upload do release, e todos os APKs que o CI
+     gera atualizam por cima uns dos outros.
+
+  2. **Misturar Play Store com APK direto** — *isso não tem correção técnica.*
+     Com o Play App Signing, o Google **re-assina** o app com uma chave que
+     você não possui; o APK do GitHub é assinado com a chave de *upload*. São
+     assinaturas diferentes para o mesmo `com.mesinha.app`, então um nunca
+     atualiza o outro. A solução é **escolher um canal e ficar nele**:
+     - *Só APK direto* (recomendado pra vocês dois): desinstale uma vez,
+       instale pelo link da GitHub Release, e daí em diante toda atualização
+       instala por cima. Sem revisão do Google, vale na hora.
+     - *Só Play Store*: instale pela faixa de teste e deixe o Play atualizar.
+
 - **Se aparecer erro de "chave de assinatura incorreta"** ao subir um AAB:
   significa que aquele app específico na Play Console já tem uma chave de
   upload diferente registrada (de um envio anterior). Ou usa a opção de
