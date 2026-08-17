@@ -110,20 +110,30 @@ Todos prefixados em `/make-server-19717bce`:
 ## Calendário de Lançamento das Features
 
 Todas as features novas já estão no código em `main`, mas cada uma fica
-**invisível** até a data dela — uma nova a cada 15 dias, pra ser surpresa. Não
-existe cadeado nem "em breve": o ícone simplesmente não aparece na grade até
-abrir, e no dia aparece um aviso de novidade (uma única vez por aparelho).
+**invisível** até a data dela — **duas por mês**, pra ser surpresa. Não existe
+cadeado nem "em breve": o ícone simplesmente não aparece na grade até abrir, e
+no dia aparece um aviso de novidade (uma única vez por aparelho).
 
 **Arquivo:** `src/app/utils/featureSchedule.ts`
 
-Para ajustar, mexa em duas constantes:
+As datas alternam entre o **dia 19** (fixo, nunca muda) e o **dia 4**. Esse par
+é o que dá o espaçamento mais parelho mantendo o 19: 15 dias do 4 pro 19, e 13
+a 16 do 19 pro 4 do mês seguinte (em meses de 30 dias fica 15/15 exato). No
+calendário atual o intervalo fica entre 15 e 16 dias, média 15,3.
 
-- `LAUNCH_ANCHOR` — data em que a primeira feature entra no ar
-- `INTERVAL_DAYS` — intervalo entre uma e a próxima (padrão: 15)
+```
+step 0 -> 19/ago   step 1 -> 04/set   step 2 -> 19/set   step 3 -> 04/out ...
+```
+
+Para ajustar, mexa em três constantes:
+
+- `FIRST_RELEASE` — mês/ano da estreia (a estreia cai no `MAIN_DAY` desse mês)
+- `MAIN_DAY` — o dia fixo (19)
+- `MID_DAY` — o dia da segunda surpresa do mês (4)
 
 A ordem de lançamento é a ordem da lista `FEATURE_SCHEDULE`; o campo `step` é
-a posição na fila (0 = já no ar na data da âncora). Para adiantar uma feature,
-basta baixar o `step` dela.
+a posição na fila (0 = a estreia). Para adiantar uma feature, basta baixar o
+`step` dela. Steps pares sempre caem no dia 19.
 
 | Peça | Como respeita o calendário |
 |---|---|

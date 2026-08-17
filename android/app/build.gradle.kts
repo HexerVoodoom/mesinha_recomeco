@@ -23,11 +23,15 @@ android {
 
     // Assinatura de release. Só é configurada quando a chave de upload está
     // disponível via variáveis de ambiente (no CI, a partir dos GitHub Secrets).
+    // Checa vazio além de nulo: um secret ausente chega como string vazia, e
+    // aí `!= null` passaria e o build quebraria tentando assinar sem arquivo.
+    val uploadKeystorePath: String? = System.getenv("ANDROID_KEYSTORE_PATH")
+        ?.takeIf { it.isNotBlank() && file(it).exists() }
+
     signingConfigs {
         create("release") {
-            val ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
-            if (ksPath != null) {
-                storeFile = file(ksPath)
+            if (uploadKeystorePath != null) {
+                storeFile = file(uploadKeystorePath)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
                 keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
@@ -42,7 +46,24 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+            if (uploadKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+
+        // O APK de debug usa o MESMO applicationId do release, então os dois
+        // disputam a mesma instalação no aparelho. Sem esta configuração o
+        // Gradle assina o debug com o keystore automático do Android — que no
+        // runner do CI é gerado NOVO a cada execução. Resultado: cada APK de
+        // debug saía com uma assinatura diferente, e o Android recusa
+        // atualizar um app quando a assinatura muda ("app não instalado" /
+        // "desinstale o anterior"). Nem debug sobre debug funcionava.
+        //
+        // Assinando o debug com a mesma chave de upload, todos os APKs que o
+        // CI gera passam a ser intercambiáveis e atualizam por cima uns dos
+        // outros. Em build local (sem os secrets) segue no keystore padrão.
+        debug {
+            if (uploadKeystorePath != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }

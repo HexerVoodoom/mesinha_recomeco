@@ -5,13 +5,15 @@
  * o ícone não aparece na grade, o card não renderiza, nada de "em breve" nem
  * cadeado. No dia que abre, o app mostra um aviso de novidade uma única vez.
  *
- * A ideia é que a cada 15 dias apareça uma surpresa nova em vez de tudo de
- * uma vez só.
+ * São **duas surpresas por mês**: uma sempre no dia 19 e outra no dia 4. Esse
+ * par é o que dá o espaçamento mais parelho mantendo o 19 fixo — 15 dias do 4
+ * pro 19, e 13 a 16 do 19 pro 4 do mês seguinte (em meses de 30 dias fica
+ * 15/15 exato).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * PRA AJUSTAR: mude `LAUNCH_ANCHOR` (data da primeira leva) ou
- * `INTERVAL_DAYS`. A ordem da lista abaixo é a ordem de lançamento — o campo
- * `step` é o índice na fila (0 = já no ar no dia da âncora).
+ * PRA AJUSTAR: mude `FIRST_RELEASE` (mês/ano da estreia) ou os dias em
+ * `MAIN_DAY` / `MID_DAY`. A ordem da lista abaixo é a ordem de lançamento —
+ * o campo `step` é o índice na fila (0 = a estreia).
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -30,11 +32,14 @@ export type FeatureId =
   | 'cartas'
   | 'garden';
 
-/** Data em que a primeira leva entra no ar (YYYY-MM-DD, fuso local). */
-export const LAUNCH_ANCHOR = '2026-08-19';
+/** Dia fixo do mês da primeira surpresa (o que você pediu pra nunca mudar). */
+export const MAIN_DAY = 19;
 
-/** Intervalo entre uma feature e a próxima. */
-export const INTERVAL_DAYS = 15;
+/** Dia da segunda surpresa do mês — escolhido pelo espaçamento mais parelho. */
+export const MID_DAY = 4;
+
+/** Mês/ano da estreia. A estreia acontece no MAIN_DAY desse mês. */
+export const FIRST_RELEASE = { year: 2026, month: 8 }; // agosto/2026
 
 export interface ScheduledFeature {
   id: FeatureId;
@@ -151,21 +156,23 @@ function todayStr(): string {
   return new Date().toLocaleDateString('sv-SE');
 }
 
-function parseLocalDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
 /** Data (YYYY-MM-DD) em que a feature passa a aparecer. */
 export function unlockDateFor(feature: ScheduledFeature): string {
-  const anchor = parseLocalDate(LAUNCH_ANCHOR);
-  // Soma em DIAS de calendário, não em milissegundos: somar N*24h à meia-noite
-  // local cai às 23h do dia anterior quando o intervalo cruza o fim de um
-  // horário de verão, e a feature abriria um dia adiantada.
+  // Duas por mês, alternando: step par cai no dia 19, step ímpar no dia 4 do
+  // mês seguinte ao 19 anterior.
+  //
+  //   step 0 -> 19/ago    step 1 -> 04/set    step 2 -> 19/set
+  //   step 3 -> 04/out    step 4 -> 19/out    ...
+  //
+  // Construído com (ano, mês, dia) direto: é aritmética de calendário, então
+  // não sofre com horário de verão (somar N*24h à meia-noite local cairia às
+  // 23h do dia anterior ao cruzar o fim de um DST, adiantando a feature).
+  const monthOffset = Math.ceil(feature.step / 2);
+  const day = feature.step % 2 === 0 ? MAIN_DAY : MID_DAY;
   const unlock = new Date(
-    anchor.getFullYear(),
-    anchor.getMonth(),
-    anchor.getDate() + feature.step * INTERVAL_DAYS,
+    FIRST_RELEASE.year,
+    FIRST_RELEASE.month - 1 + monthOffset,
+    day,
   );
   return unlock.toLocaleDateString('sv-SE');
 }
