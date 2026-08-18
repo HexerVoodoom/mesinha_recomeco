@@ -8,7 +8,8 @@
  * São quatro tipos de marcação:
  *  1. Aulas da Amanda  — dia fica desbotado + risquinho embaixo do número;
  *  2. Feriado nacional — estrelinha discreta no canto;
- *  3. Dia 19           — coraçãozinho (o nosso dia do mês);
+ *  3. Dia 19           — coração rosado e a célula pintada de vermelho claro
+ *                        (o nosso dia do mês é o único que não é discreto);
  *  4. Datas especiais  — cruz dourada (1ª Comunhão e Crisma).
  */
 
@@ -24,18 +25,42 @@ export interface ClassDay {
 }
 
 /**
- * Grade de horários da Amanda, indexada por dia da semana (0 = domingo).
- * Quinta, sábado e domingo ficam livres.
+ * Aulas que acontecem toda semana, indexadas por dia da semana (0 = domingo).
  *
  * Seg 18:05–22:00 · FEE0387   |   Ter 18:05–22:00 · FEE0390
- * Qua 18:05–21:15 · FEE0388   |   Sex 18:05–21:15 · FEE0388
  */
-export const AMANDA_SCHEDULE: Record<number, ClassDay> = {
+export const WEEKLY_SCHEDULE: Record<number, ClassDay> = {
   1: { codes: ['FEE0387'], start: '18:05', end: '22:00' },
   2: { codes: ['FEE0390'], start: '18:05', end: '22:00' },
-  3: { codes: ['FEE0388'], start: '18:05', end: '21:15' },
-  5: { codes: ['FEE0388'], start: '18:05', end: '21:15' },
 };
+
+/**
+ * FEE0388 é quinzenal e ainda troca de dia: numa semana cai na **sexta**, na
+ * seguinte na **quarta**, e assim por diante. Nunca nos dois dias da mesma
+ * semana — por isso não dá pra deixar fixo na grade acima.
+ */
+export const ALTERNATING_CLASS: ClassDay = { codes: ['FEE0388'], start: '18:05', end: '21:15' };
+
+/**
+ * Domingo da semana de referência: nela a FEE0388 é na **sexta** (quarta
+ * livre). A semana seguinte inverte, e daí em diante alterna sempre.
+ *
+ * Semana de 16–22/08/2026: quarta (dia 19) livre, aula na sexta (dia 21).
+ *
+ * PRA AJUSTAR: se a alternância sair do compasso (feriadão, semana de prova),
+ * é só mudar esse domingo pra um em que você tem certeza de que a aula é na
+ * sexta — todo o resto do calendário se realinha sozinho.
+ */
+const ALTERNATING_ANCHOR = new Date(2026, 7, 16);
+
+/** Dia da semana em que a FEE0388 cai: 5 (sexta) ou 3 (quarta). */
+function alternatingWeekdayFor(date: Date): number {
+  const sunday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
+  // Arredonda porque o horário de verão pode encurtar/esticar um dia.
+  const weeks = Math.round((sunday.getTime() - ALTERNATING_ANCHOR.getTime()) / (7 * 86400000));
+  // `% 2` de número negativo dá negativo em JS, daí o `+ 2`.
+  return ((weeks % 2) + 2) % 2 === 0 ? 5 : 3;
+}
 
 /**
  * Período letivo. Fora dele a Amanda não tem aula e o calendário não marca
@@ -53,7 +78,9 @@ export function classDayFor(date: Date): ClassDay | null {
   }
   // Em feriado não tem aula, mesmo caindo num dia da grade.
   if (nationalHolidayFor(date)) return null;
-  return AMANDA_SCHEDULE[date.getDay()] ?? null;
+  const weekday = date.getDay();
+  if (weekday === alternatingWeekdayFor(date)) return ALTERNATING_CLASS;
+  return WEEKLY_SCHEDULE[weekday] ?? null;
 }
 
 /* ──────────────────────────── Feriados nacionais ───────────────────────── */
@@ -157,11 +184,6 @@ export function marksFor(date: Date): DayMarks {
     heart: date.getDate() === HEART_DAY,
     goldenCross: GOLDEN_CROSS_DATES[toISODate(date)] ?? null,
   };
-}
-
-/** `true` se o dia tem qualquer marcação — evita renderizar o que é vazio. */
-export function hasAnyMark(marks: DayMarks): boolean {
-  return Boolean(marks.classes || marks.holiday || marks.heart || marks.goldenCross);
 }
 
 /* ─────────────────────────────── Utilidades ────────────────────────────── */

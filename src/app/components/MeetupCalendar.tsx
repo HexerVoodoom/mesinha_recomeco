@@ -80,8 +80,11 @@ function typeOf(id?: MeetupType | null) {
 
 /** Cor de cada marcação de canto — sempre a mesma na grade e na legenda. */
 const HOLIDAY_COLOR = 'text-[#C7B9A1] fill-[#C7B9A1]';
-const HEART_COLOR = 'text-primary fill-primary';
+const HEART_COLOR = 'text-[#E0526E] fill-[#E0526E]';
 const CROSS_COLOR = 'text-[#C9A227]';
+
+/** Vermelho clarinho que preenche a célula do dia 19. */
+const HEART_DAY_CELL = 'bg-[#FCE7EC] text-[#2B2A28] hover:bg-[#F8D8DF]';
 
 /** Cruz latina — a `Cross` do lucide é um sinal de mais, não serve aqui. */
 function LatinCross({ className }: { className?: string }) {
@@ -139,7 +142,7 @@ function DayMarksInfo({ marks, userProfile }: { marks: DayMarks; userProfile: Pr
             </span>
           )}
           {marks.heart && (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-sm text-primary">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FCE7EC] text-sm text-[#B03A54]">
               <Heart className={`w-3.5 h-3.5 ${HEART_COLOR}`} /> Dia 19 💕
             </span>
           )}
@@ -299,7 +302,7 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
           const fadeForClass = Boolean(marks.classes) && state === 'none';
 
           const stateClasses: Record<DayState, string> = {
-            none: 'bg-transparent text-[#2B2A28] hover:bg-muted/30',
+            none: marks.heart ? HEART_DAY_CELL : 'bg-transparent text-[#2B2A28] hover:bg-muted/30',
             'mine-pending': 'bg-white border-2 border-dashed border-primary text-primary',
             'partner-pending': 'bg-[#F6C177]/30 border-2 border-[#F6C177] text-[#8A5A15]',
             confirmed: 'bg-primary text-white',
@@ -376,7 +379,9 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
             Feriado nacional
           </div>
           <div className="flex items-center gap-1.5">
-            <Heart className={`w-3.5 h-3.5 ${HEART_COLOR}`} />
+            <span className="w-4 h-4 rounded-md bg-[#FCE7EC] flex items-center justify-center">
+              <Heart className={`w-2.5 h-2.5 ${HEART_COLOR}`} />
+            </span>
             Dia 19
           </div>
           <div className="flex items-center gap-1.5">
