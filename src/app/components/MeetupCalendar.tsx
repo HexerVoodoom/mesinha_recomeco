@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft,
@@ -13,6 +13,8 @@ import {
   Gamepad2,
   Footprints,
   MessageSquare,
+  Star,
+  GraduationCap,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -33,6 +35,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ListItem, MeetupPeriod, MeetupType } from '../utils/api';
+import { DayMarks, marksFor } from '../utils/calendarMarks';
 
 type Profile = 'Amanda' | 'Mateus';
 type ViewMode = 'month' | 'week';
@@ -73,6 +76,82 @@ function periodOf(id?: MeetupPeriod | null) {
 
 function typeOf(id?: MeetupType | null) {
   return TYPE_OPTIONS.find(t => t.id === id);
+}
+
+/** Cor de cada marcação de canto — sempre a mesma na grade e na legenda. */
+const HOLIDAY_COLOR = 'text-[#C7B9A1] fill-[#C7B9A1]';
+const HEART_COLOR = 'text-primary fill-primary';
+const CROSS_COLOR = 'text-[#C9A227]';
+
+/** Cruz latina — a `Cross` do lucide é um sinal de mais, não serve aqui. */
+function LatinCross({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M10.25 2h3.5v5h5.25v3.5H13.75V22h-3.5V10.5H5V7h5.25V2z" />
+    </svg>
+  );
+}
+
+type MarkIcon = ComponentType<{ className?: string }>;
+
+/** Ícone do canto do dia, na ordem de prioridade: cruz > coração > estrela. */
+function cornerMark(marks: DayMarks): { Icon: MarkIcon; color: string } | null {
+  if (marks.goldenCross) return { Icon: LatinCross, color: CROSS_COLOR };
+  if (marks.heart) return { Icon: Heart, color: HEART_COLOR };
+  if (marks.holiday) return { Icon: Star, color: HOLIDAY_COLOR };
+  return null;
+}
+
+/**
+ * O que a grade só sugere com um risquinho apagado, aqui vira texto: em que
+ * horário a aula acaba (ou seja, a partir de que horas dá pra se ver à noite)
+ * e o que mais tem de especial na data.
+ */
+function DayMarksInfo({ marks, userProfile }: { marks: DayMarks; userProfile: Profile }) {
+  const she = userProfile === 'Amanda' ? 'Você tem' : 'A Amanda tem';
+  const sheFree = userProfile === 'Amanda' ? 'Você fica livre' : 'Ela fica livre';
+
+  return (
+    <div className="mb-4 space-y-2">
+      <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-[#F8F6F4] border border-[#E9E4DF]">
+        <GraduationCap className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+        {marks.classes ? (
+          <div className="text-sm">
+            <p className="text-muted-foreground">
+              {she} aula das {marks.classes.start} às {marks.classes.end} ({marks.classes.codes.join(' · ')}).
+            </p>
+            <p className="font-bold text-[#2B2A28]">
+              {sheFree} a partir das {marks.classes.end} 🌙
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-[#2B2A28]">
+            Sem aula nesse dia — a noite toda livre 🌙
+          </p>
+        )}
+      </div>
+
+      {(marks.goldenCross || marks.heart || marks.holiday) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {marks.goldenCross && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#C9A227]/10 text-sm text-[#8A6E12]">
+              <LatinCross className={`w-3.5 h-3.5 ${CROSS_COLOR}`} /> {marks.goldenCross}
+            </span>
+          )}
+          {marks.heart && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-sm text-primary">
+              <Heart className={`w-3.5 h-3.5 ${HEART_COLOR}`} /> Dia 19 💕
+            </span>
+          )}
+          {marks.holiday && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/40 text-sm text-[#2B2A28]">
+              <Star className={`w-3.5 h-3.5 ${HOLIDAY_COLOR}`} /> Feriado · {marks.holiday}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -213,6 +292,11 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
           const isPast = isBefore(date, today);
           const disabled = isPast;
           const TypeIcon = item ? (typeOf(item.meetupType)?.icon || Heart) : null;
+          const marks = marksFor(date);
+          const corner = cornerMark(marks);
+          // Dia de aula fica desbotado — só nos dias sem encontro, porque onde
+          // já tem proposta a cor do estado é que precisa saltar aos olhos.
+          const fadeForClass = Boolean(marks.classes) && state === 'none';
 
           const stateClasses: Record<DayState, string> = {
             none: 'bg-transparent text-[#2B2A28] hover:bg-muted/30',
@@ -232,7 +316,19 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                   isToday(date) ? 'ring-2 ring-[#2B2A28]/40' : ''
                 }`}
               >
-                {format(date, 'd')}
+                <span className={fadeForClass ? 'opacity-40' : ''}>{format(date, 'd')}</span>
+                {marks.classes && (
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-[2px] rounded-full bg-current opacity-30" />
+                )}
+                {corner && (
+                  <corner.Icon
+                    className={
+                      state === 'none'
+                        ? `absolute -top-0.5 -left-0.5 w-3 h-3 ${corner.color}`
+                        : `absolute -top-0.5 -left-0.5 w-3.5 h-3.5 rounded-full bg-white p-[1px] ${corner.color}`
+                    }
+                  />
+                )}
                 {TypeIcon && (
                   <TypeIcon
                     className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full p-[1px] ${
@@ -267,6 +363,26 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
               {label}
             </div>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <span className="relative w-4 h-4 rounded-md bg-[#2B2A28]/[0.06] text-[#2B2A28]">
+              <span className="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-2.5 h-[2px] rounded-full bg-current opacity-40" />
+            </span>
+            Aula da Amanda
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Star className={`w-3.5 h-3.5 ${HOLIDAY_COLOR}`} />
+            Feriado nacional
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Heart className={`w-3.5 h-3.5 ${HEART_COLOR}`} />
+            Dia 19
+          </div>
+          <div className="flex items-center gap-1.5">
+            <LatinCross className={`w-3.5 h-3.5 ${CROSS_COLOR}`} />
+            1ª Comunhão / Crisma
+          </div>
         </div>
       </div>
 
@@ -307,7 +423,9 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                     {format(new Date(`${proposeDate}T00:00:00`), "d 'de' MMMM", { locale: ptBR })}
                   </h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-5">Propor um encontro para {partner}</p>
+                <p className="text-sm text-muted-foreground mb-4">Propor um encontro para {partner}</p>
+
+                <DayMarksInfo marks={marksFor(new Date(`${proposeDate}T00:00:00`))} userProfile={userProfile} />
 
                 <label className="text-xs font-bold uppercase tracking-tight text-muted-foreground mb-2 block">
                   Período
@@ -406,6 +524,8 @@ export function MeetupCalendar({ items, userProfile, onProposeDay, onConfirmDay,
                     {format(new Date(`${selectedDay.dateStr}T00:00:00`), "d 'de' MMMM", { locale: ptBR })}
                   </h2>
                 </div>
+
+                <DayMarksInfo marks={marksFor(new Date(`${selectedDay.dateStr}T00:00:00`))} userProfile={userProfile} />
 
                 {/* Período + tipo escolhidos na proposta */}
                 {selectedDay.item && (periodOf(selectedDay.item.meetupPeriod) || typeOf(selectedDay.item.meetupType)) && (
