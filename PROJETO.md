@@ -44,6 +44,12 @@ App de casal para Amanda & Mateus: lista compartilhada, mural de memórias, lemb
 - **Branch principal (produção):** `main`
 - **Backup estável:** tag `backup/working-2026-06-24`
 
+### Fluxo de trabalho
+
+Toda mudança segue: branch → commit → push → PR → CI verde → **merge em `main`**
+(squash). O merge é automático, não fica esperando aprovação — as regras
+completas estão no `CLAUDE.md`, na raiz do repositório.
+
 ---
 
 ## Deploy
