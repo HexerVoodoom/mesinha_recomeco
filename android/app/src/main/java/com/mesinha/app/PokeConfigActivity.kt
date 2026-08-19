@@ -112,11 +112,12 @@ class PokeConfigActivity : AppCompatActivity() {
                 }
                 PokeConfig.save(this@PokeConfigActivity, widgetId, from, message)
 
-                // O resultado vem ANTES do desenho: é ele que faz o launcher
-                // concluir a colocação e criar a view do widget. Desenhando
-                // antes disso (como estava), em vários launchers o único
-                // RemoteViews da vida do widget chegava cedo demais e se
-                // perdia — e o widget ficava com "não foi possível carregar".
+                // Ordem: setResult só grava o resultado num campo — quem
+                // entrega ao launcher é o finish(), lá embaixo. Então isto aqui
+                // é organização, não correção: o que de fato conserta o widget
+                // preso em "não foi possível carregar" é o updatePeriodMillis
+                // (widget com tela de config não recebe onUpdate ao ser criado)
+                // e o requestUpdate logo abaixo.
                 setResult(
                     RESULT_OK,
                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)

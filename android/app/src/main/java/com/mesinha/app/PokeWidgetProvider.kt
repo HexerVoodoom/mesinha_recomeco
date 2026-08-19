@@ -57,6 +57,10 @@ class PokeWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int,
         newOptions: Bundle
     ) {
+        // Não sobrescreve o "enviando…"/"enviado!" se uma cutucada estiver em
+        // curso: um reposicionamento no meio do envio apagaria justamente o
+        // feedback que a pessoa está esperando.
+        if (appWidgetId in enviando) return
         renderWidget(context, appWidgetManager, appWidgetId, PokeState.PRONTO)
     }
 
@@ -99,6 +103,7 @@ class PokeWidgetProvider : AppWidgetProvider() {
         val message = PokeConfig.message(appContext, widgetId)
 
         // Feedback imediato: quem tocou vê na hora que a cutucada está indo.
+        enviando.add(widgetId)
         renderWidget(appContext, manager, widgetId, PokeState.ENVIANDO)
 
         // goAsync mantém o receiver vivo enquanto a thread faz o POST.
@@ -144,6 +149,7 @@ class PokeWidgetProvider : AppWidgetProvider() {
                 // Volta ao normal depois de alguns segundos. Se o processo morrer
                 // antes, o próximo toque (ou o update de 30 min) resolve.
                 mainHandler.postDelayed({
+                    enviando.remove(widgetId)
                     renderWidget(
                         appContext,
                         AppWidgetManager.getInstance(appContext),
@@ -162,6 +168,16 @@ class PokeWidgetProvider : AppWidgetProvider() {
             "https://oubdmmaqxnutbbxiqeow.supabase.co/functions/v1/make-server-19717bce/nudge"
 
         private const val VOLTA_AO_NORMAL_MS = 6000L
+
+        /**
+         * Widgets com cutucada em curso. Serve só para o redesenho automático
+         * (reposicionamento do launcher) não apagar o feedback no meio do
+         * envio. Em memória de propósito: se o processo morrer, o estado certo
+         * é mesmo voltar ao normal.
+         */
+        private val enviando = java.util.Collections.newSetFromMap(
+            java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+        )
 
         /**
          * Redesenha o widget no estado pedido. Nunca deixa exceção escapar: este

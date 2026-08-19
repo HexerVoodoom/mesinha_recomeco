@@ -73,11 +73,15 @@ object WidgetCommon {
      * POST de JSON num endpoint do servidor do Mesinha. Devolve o corpo da
      * resposta (da stream de erro quando o HTTP não é 2xx, junto do código,
      * para o chamador poder mostrar a mensagem amigável do servidor).
+     *
+     * O timeout é curto de propósito: quem chama isto é um BroadcastReceiver
+     * segurando um `goAsync()`, e o sistema mata o receiver por volta de 10s.
+     * Connect + read precisam caber com folga nesse orçamento.
      */
-    fun postJson(urlStr: String, body: String): Pair<Int, String> {
+    fun postJson(urlStr: String, body: String, timeoutMs: Int = 4000): Pair<Int, String> {
         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
-            connectTimeout = 8000
-            readTimeout = 8000
+            connectTimeout = timeoutMs
+            readTimeout = timeoutMs
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
