@@ -15,8 +15,10 @@
     <string name="widget_name_amanda">Mesinha · Recado da Amanda</string>
     <string name="widget_name_mateus">Mesinha · Recado do Mateus</string>
     <string name="widget_name_meetup">Mesinha · Encontro hoje?</string>
+    <!-- Widget do Jardim: desabilitado por enquanto (receiver comentado no manifest). -->
     <string name="widget_name_garden">Mesinha · Jardim</string>
-    <string name="widget_name_calendar">Mesinha · Calendário</string>
+    <string name="widget_name_calendar_month">Mesinha · Calendário do mês</string>
+    <string name="widget_name_calendar_week">Mesinha · Calendário da semana</string>
     <string name="widget_name_poke">Mesinha · Cutucar</string>
 
     <!-- Widget Jardim -->

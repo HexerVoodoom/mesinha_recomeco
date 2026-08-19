@@ -15,8 +15,10 @@ class BootReceiver : BroadcastReceiver() {
             WidgetScheduler.scheduleDailyUpdate(context, AlpaquinhaWidgetProvider::class.java, 4322)
             WidgetScheduler.scheduleDailyUpdate(context, CorvinhoWidgetProvider::class.java, 4323)
             WidgetScheduler.scheduleDailyUpdate(context, MeetupWidgetProvider::class.java, 4324)
-            WidgetScheduler.scheduleDailyUpdate(context, GardenWidgetProvider::class.java, 4325)
+            // Jardim desabilitado por enquanto (receiver comentado no manifest).
+            // WidgetScheduler.scheduleDailyUpdate(context, GardenWidgetProvider::class.java, 4325)
             WidgetScheduler.scheduleDailyUpdate(context, CalendarWidgetProvider::class.java, 4326)
+            WidgetScheduler.scheduleDailyUpdate(context, CalendarWeekWidgetProvider::class.java, 4327)
         }
     }
 }
