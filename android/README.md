@@ -37,6 +37,13 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      (endpoint `/nudge`), sem abrir o app. O limite do servidor (1 cutucada a
      cada 3 min) aparece num Toast quando estourado.
 
+> **Widgets de calendário e a prévia:** os `TextView` dos layouts
+> `widget_calendar.xml` / `widget_calendar_week.xml` têm textos padrão de
+> propósito — eles são a prévia mostrada na lista de widgets do Android
+> (`previewLayout`) e o estado antes do primeiro desenho. Sem eles o widget
+> aparece como um retângulo vazio. O desenho também é embrulhado em try/catch:
+> se falhar, o widget mostra o erro em vez de ficar em branco e sem clique.
+
 > O widget **Jardim** (sequência + nível, `GardenWidgetProvider`) está
 > **desabilitado por enquanto**: o código, o layout e as strings continuam no
 > repositório, mas o `<receiver>` está comentado no `AndroidManifest.xml`. Pra

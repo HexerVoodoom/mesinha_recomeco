@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget "Calendário de Encontros" (4x3): grade do mês atual, com os dias que
-  têm encontro pintados pela cor do tipo (coração/video game/pegadas; meio
-  transparente quando ainda não confirmado) e o dia de hoje com contorno.
-  As 42 células (6 semanas x 7 dias) têm ids c0..c41, preenchidas pelo
-  CalendarWidgetProvider.
+  Widget "Calendário do mês" (4x3): grade do mês atual, com os dias que têm
+  encontro pintados pela cor do tipo (meio transparente quando ainda não
+  confirmado) e o dia de hoje com contorno. As 42 células (6 semanas x 7 dias)
+  têm ids c0..c41, preenchidas pelo CalendarWidgetProvider.
+
+  Os textos padrão daqui NÃO são decoração: eles são a prévia mostrada na
+  lista de widgets do Android (previewLayout) e o estado inicial logo antes do
+  primeiro desenho. Sem eles o widget aparecia como um retângulo vazio.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -22,6 +25,7 @@
         android:layout_marginBottom="4dp"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
+        android:text="@string/widget_calendar_month_preview"
         android:textColor="#4D989B"
         android:textSize="13sp"
         android:textStyle="bold" />
@@ -117,6 +121,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="1"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -127,6 +132,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="2"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -137,6 +143,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="3"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -147,6 +154,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="4"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -157,6 +165,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="5"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -167,6 +176,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="6"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -177,6 +187,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="7"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
     </LinearLayout>
@@ -194,6 +205,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="8"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -204,6 +216,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="9"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -214,6 +227,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="10"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -224,6 +238,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="11"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -234,6 +249,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="12"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -244,6 +260,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="13"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -254,6 +271,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="14"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
     </LinearLayout>
@@ -271,6 +289,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="15"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -281,6 +300,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="16"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -291,6 +311,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="17"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -301,6 +322,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="18"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -311,6 +333,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="19"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -321,6 +344,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="20"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -331,6 +355,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="21"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
     </LinearLayout>
@@ -348,6 +373,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="22"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -358,6 +384,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="23"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -368,6 +395,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="24"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -378,6 +406,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="25"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -388,6 +417,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="26"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -398,6 +428,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="27"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -408,6 +439,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="28"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
     </LinearLayout>
@@ -425,6 +457,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="29"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -435,6 +468,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="30"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView
@@ -445,6 +479,7 @@
             android:layout_margin="1dp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
+            android:text="31"
             android:textColor="#1A1A1A"
             android:textSize="11sp" />
         <TextView

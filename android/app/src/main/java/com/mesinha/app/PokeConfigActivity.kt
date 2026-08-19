@@ -1,6 +1,5 @@
 package com.mesinha.app
 
-import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.graphics.Color
@@ -16,14 +15,21 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 
 /**
  * Configuração do widget Poke, aberta quando ele é adicionado à tela: escolhe
  * quem está cutucando (Amanda ou Mateus) e a mensagem enviada a cada toque —
  * uma das rápidas do app ou uma personalizada. A UI é montada em código para
  * não depender de mais recursos; segue as cores do Mesinha.
+ *
+ * Estende AppCompatActivity de propósito: o tema do app é
+ * `Theme.AppCompat.DayNight.NoActionBar`, e uma `android.app.Activity` comum
+ * com tema AppCompat quebra ao abrir. Como o Android abre esta tela no
+ * momento em que o widget é arrastado pra tela inicial, essa quebra aparecia
+ * como "não foi possível carregar o widget".
  */
-class PokeConfigActivity : Activity() {
+class PokeConfigActivity : AppCompatActivity() {
 
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 

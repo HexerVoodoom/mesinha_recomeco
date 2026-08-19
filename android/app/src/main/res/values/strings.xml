@@ -27,6 +27,11 @@
     <string name="widget_garden_days_streak">dias de sequência</string>
     <string name="widget_garden_level">🌱 Jardim nv. %1$d · recorde %2$d</string>
 
+    <!-- Widgets de calendário: textos da prévia (lista de widgets do Android) -->
+    <string name="widget_calendar_month_preview">Encontros do mês</string>
+    <string name="widget_calendar_week_preview">Encontros da semana</string>
+    <string name="widget_calendar_error">não deu pra carregar 😢</string>
+
     <!-- Widget Poke -->
     <string name="widget_poke_label">Cutucar</string>
     <string name="widget_poke_not_configured">Remove e adiciona o widget de novo pra configurar a cutucada 💌</string>

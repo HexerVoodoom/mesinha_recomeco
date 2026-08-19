@@ -53,7 +53,31 @@ class CalendarWeekWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * Desenha o widget. Qualquer falha aqui deixaria o widget preso no layout
+     * inicial — uma caixa vazia e sem clique, indistinguível de "quebrado" —
+     * então o erro é capturado e vira um texto visível.
+     */
     private fun renderWidget(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int
+    ) {
+        try {
+            draw(context, appWidgetManager, appWidgetId)
+        } catch (e: Exception) {
+            val fallback = RemoteViews(context.packageName, R.layout.widget_calendar_week).apply {
+                setTextViewText(
+                    R.id.tv_week,
+                    "${context.getString(R.string.widget_calendar_error)} (${e.javaClass.simpleName})"
+                )
+                setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
+            }
+            appWidgetManager.updateAppWidget(appWidgetId, fallback)
+        }
+    }
+
+    private fun draw(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
