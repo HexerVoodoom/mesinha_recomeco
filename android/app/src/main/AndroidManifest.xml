@@ -90,6 +90,58 @@
                 android:resource="@xml/widget_meetup_info" />
         </receiver>
 
+        <!-- Widget 5: "Jardim" (2x2) — sequência do casal e nível do jardim. -->
+        <receiver
+            android:name=".GardenWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_garden">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_garden_info" />
+        </receiver>
+
+        <!-- Widget 6: "Calendário" (4x3) — mês atual com os dias de encontro marcados. -->
+        <receiver
+            android:name=".CalendarWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_calendar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_calendar_info" />
+        </receiver>
+
+        <!-- Widget 7: "Cutucar" (1x1) — botão que envia a cutucada sem abrir o app. -->
+        <receiver
+            android:name=".PokeWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_poke">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_POKE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_poke_info" />
+        </receiver>
+
+        <!-- Tela de configuração do widget Cutucar (quem envia + mensagem). -->
+        <activity
+            android:name=".PokeConfigActivity"
+            android:exported="true"
+            android:label="@string/widget_poke_config_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- Reagenda a troca diária quando o aparelho reinicia. -->
         <receiver
             android:name=".BootReceiver"

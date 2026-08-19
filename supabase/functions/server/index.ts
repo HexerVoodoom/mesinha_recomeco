@@ -1611,6 +1611,38 @@ app.get("/make-server-19717bce/meetup-today", async (c) => {
   }
 });
 
+// Mês inteiro para o widget nativo de calendário: devolve os dias do mês
+// atual (fuso de Brasília) que têm encontro no Calendário de Encontros, com
+// tipo e status (confirmado ou só proposto) — sem expor os itens completos.
+app.get("/make-server-19717bce/meetup-month", async (c) => {
+  try {
+    const monthStr = brazilNow().toISOString().slice(0, 7); // "YYYY-MM"
+    const { items } = await kv.getItemsLightPaged({
+      offset: 0,
+      limit: 100,
+      categoryFilter: "meetup",
+    });
+    const days = items
+      .filter((item: any) =>
+        typeof item.eventDate === "string" && item.eventDate.startsWith(monthStr)
+      )
+      .map((item: any) => ({
+        date: item.eventDate,
+        type: item.meetupType || null,
+        period: item.meetupPeriod || null,
+        confirmed: item.status === "done",
+      }))
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+    return c.json({ month: monthStr, days });
+  } catch (error) {
+    console.error("[GET /meetup-month] Error:", error);
+    return c.json({
+      error: "Failed to list month meetups",
+      details: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
+});
+
 app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   // Validar autorização
   const authHeader = c.req.header("Authorization") || "";
