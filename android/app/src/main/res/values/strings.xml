@@ -15,4 +15,26 @@
     <string name="widget_name_amanda">Mesinha · Recado da Amanda</string>
     <string name="widget_name_mateus">Mesinha · Recado do Mateus</string>
     <string name="widget_name_meetup">Mesinha · Encontro hoje?</string>
+    <string name="widget_name_garden">Mesinha · Jardim</string>
+    <string name="widget_name_calendar">Mesinha · Calendário</string>
+    <string name="widget_name_poke">Mesinha · Cutucar</string>
+
+    <!-- Widget Jardim -->
+    <string name="widget_garden_loading">carregando…</string>
+    <string name="widget_garden_day_streak">dia de sequência</string>
+    <string name="widget_garden_days_streak">dias de sequência</string>
+    <string name="widget_garden_level">🌱 Jardim nv. %1$d · recorde %2$d</string>
+
+    <!-- Widget Poke -->
+    <string name="widget_poke_label">Cutucar</string>
+    <string name="widget_poke_not_configured">Remove e adiciona o widget de novo pra configurar a cutucada 💌</string>
+    <string name="widget_poke_sent">Cutucada enviada! %1$s vai receber agora 💌</string>
+    <string name="widget_poke_failed">Não deu pra cutucar agora. Tenta de novo!</string>
+    <string name="widget_poke_config_title">Cutucada da tela inicial 💌</string>
+    <string name="widget_poke_config_who">Quem tá cutucando?</string>
+    <string name="widget_poke_config_message">Mensagem enviada a cada toque</string>
+    <string name="widget_poke_config_custom">Escrever a minha…</string>
+    <string name="widget_poke_config_custom_hint">Ex: comprei aquele doce que você ama</string>
+    <string name="widget_poke_config_pick_who">Escolhe quem tá cutucando primeiro 😉</string>
+    <string name="widget_poke_config_save">Salvar widget</string>
 </resources>
