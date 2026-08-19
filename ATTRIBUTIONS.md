@@ -12,3 +12,4 @@ rede — baixar a fonte na hora não é opção.
 - **Autor:** Andrew Paglinawan
 - **Licença:** SIL Open Font License 1.1
 - **Origem:** Google Fonts — https://fonts.google.com/specimen/Quicksand
+- **Aviso de licença no repositório:** `android/licenses/OFL-Quicksand.txt`

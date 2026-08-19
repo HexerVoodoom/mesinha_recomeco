@@ -143,8 +143,14 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val cellId = CELL_IDS[cell]
             val day = cell - firstWeekday + 1
             if (day < 1 || day > daysInMonth) {
-                views.setTextViewText(cellId, "")
+                // Fora do mês: o app mostra o número esmaecido (opacity-30),
+                // não uma célula vazia — é o que dá a sensação de grade contínua.
+                val vizinho = (first.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_MONTH, day - 1)
+                }
+                views.setTextViewText(cellId, vizinho.get(Calendar.DAY_OF_MONTH).toString())
                 views.setInt(cellId, "setBackgroundResource", 0)
+                views.setTextColor(cellId, Color.parseColor("#4D2B2A28"))
                 continue
             }
             views.setTextViewText(cellId, day.toString())
