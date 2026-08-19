@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget "Calendário da semana" (4x1): a semana atual, no visual dos cards do
-  app (fundo branco, cores do MeetupCalendar).
+  Widget "Calendário da semana" (4x1), no mesmo visual do app.
 
-  Estrutura PLANA de propósito: três linhas irmãs, sem LinearLayout por coluna.
-  A versão com colunas aninhadas dava "não foi possível carregar o widget" no
-  aparelho, enquanto o mensal — que nunca aninhou — carregava normalmente.
+  Estrutura PLANA de propósito: linhas irmãs, sem LinearLayout por coluna.
+  A versão com colunas aninhadas dava "não foi possível carregar o widget".
   Não volte a aninhar aqui.
-
-  Textos padrão: prévia da lista de widgets e estado antes do primeiro desenho.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -18,14 +14,42 @@
     android:gravity="center_vertical"
     android:orientation="vertical"
     android:paddingHorizontal="10dp"
-    android:paddingVertical="8dp">
+    android:paddingVertical="7dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:layout_marginEnd="5dp"
+            android:contentDescription="@string/widget_calendar_title"
+            android:src="@drawable/ic_heart_outline" />
+
+        <TextView
+            android:id="@+id/tv_week_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/quicksand"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="@string/widget_calendar_title"
+            android:textColor="#2B2A28"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_week"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
-        android:fontFamily="sans-serif-medium"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="5dp"
+        android:fontFamily="@font/quicksand"
         android:gravity="center"
         android:maxLines="1"
         android:ellipsize="end"
@@ -44,84 +68,84 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="D"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="S"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl2"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="T"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl3"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="Q"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl4"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="Q"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl5"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="S"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/wl6"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
             android:text="S"
-            android:textColor="#6F6960"
-            android:textSize="10sp"
+            android:textColor="#8A847D"
+            android:textSize="9sp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="1dp"
         android:orientation="horizontal">
 
         <TextView
@@ -130,9 +154,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="1"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -142,9 +166,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="2"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -154,9 +178,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="3"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -166,9 +190,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="4"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -178,9 +202,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="5"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -190,9 +214,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="6"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
@@ -202,9 +226,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/quicksand"
             android:gravity="center"
-            android:paddingVertical="5dp"
+            android:paddingVertical="4dp"
             android:text="7"
             android:textColor="#2B2A28"
             android:textSize="12sp" />
