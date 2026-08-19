@@ -74,14 +74,21 @@ object WidgetCommon {
      * resposta (da stream de erro quando o HTTP não é 2xx, junto do código,
      * para o chamador poder mostrar a mensagem amigável do servidor).
      *
-     * O timeout é curto de propósito: quem chama isto é um BroadcastReceiver
-     * segurando um `goAsync()`, e o sistema mata o receiver por volta de 10s.
-     * Connect + read precisam caber com folga nesse orçamento.
+     * Os timeouts são curtos de propósito: quem chama isto é um
+     * BroadcastReceiver segurando um `goAsync()`, e o sistema mata o receiver
+     * por volta de 10s. Como connect e read são cobrados em sequência, o pior
+     * caso aqui é 3 + 4 = 7s — que ainda deixa margem pro Toast e pro
+     * redesenho do widget acontecerem antes do prazo.
      */
-    fun postJson(urlStr: String, body: String, timeoutMs: Int = 4000): Pair<Int, String> {
+    fun postJson(
+        urlStr: String,
+        body: String,
+        connectTimeoutMs: Int = 3000,
+        readTimeoutMs: Int = 4000
+    ): Pair<Int, String> {
         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Content-Type", "application/json")

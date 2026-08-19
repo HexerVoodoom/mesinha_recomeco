@@ -42,6 +42,7 @@ class PokeWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         for (id in appWidgetIds) {
+            if (id in enviando) continue // não apaga o feedback em curso
             renderWidget(context, appWidgetManager, id, PokeState.PRONTO)
         }
     }
@@ -67,6 +68,7 @@ class PokeWidgetProvider : AppWidgetProvider() {
     override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
         val manager = AppWidgetManager.getInstance(context)
         for (id in newWidgetIds) {
+            if (id in enviando) continue // não apaga o feedback em curso
             renderWidget(context, manager, id, PokeState.PRONTO)
         }
     }
