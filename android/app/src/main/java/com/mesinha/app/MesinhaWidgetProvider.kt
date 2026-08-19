@@ -34,20 +34,6 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
         PhraseRepository.maybeRefresh(context)
     }
 
-    /**
-     * Auto-cura: chamado quando o launcher posiciona ou redimensiona o widget.
-     * Como estes widgets não têm atualização própria além do alarme diário, um
-     * broadcast de update perdido deixava o balão vazio até a virada do dia.
-     */
-    override fun onAppWidgetOptionsChanged(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        appWidgetId: Int,
-        newOptions: android.os.Bundle
-    ) {
-        renderWidget(context, appWidgetManager, appWidgetId)
-    }
-
     override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
         val manager = AppWidgetManager.getInstance(context)
         for (id in newWidgetIds) {
@@ -55,7 +41,11 @@ class MesinhaWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    /** Chamado quando o usuário redimensiona o widget: re-renderiza no tamanho novo. */
+    /**
+     * Chamado quando o usuário redimensiona o widget — e também quando o
+     * launcher o posiciona. Além de re-renderizar no tamanho novo, serve de
+     * auto-cura: um broadcast de update perdido deixaria o balão vazio.
+     */
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
