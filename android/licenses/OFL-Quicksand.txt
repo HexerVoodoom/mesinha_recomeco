@@ -1,0 +1,20 @@
+Fonte Quicksand — Copyright (c) The Quicksand Project Authors
+(https://github.com/andrew-paglinawan/QuicksandFamily)
+
+Licenciada sob a SIL Open Font License, Version 1.1.
+Texto completo da licença: https://openfontlicense.org/open-font-license-official-text/
+
+Resumo das condições (não substitui o texto oficial):
+
+- Os arquivos da fonte podem ser usados, estudados, modificados e
+  redistribuídos livremente, inclusive embutidos em um aplicativo.
+- Não podem ser vendidos isoladamente.
+- Versões modificadas não podem usar o nome reservado "Quicksand".
+- Este aviso de copyright e licença deve acompanhar as cópias.
+
+Arquivos neste repositório:
+  android/app/src/main/res/font/quicksand_medium.ttf  (peso 500)
+  android/app/src/main/res/font/quicksand_bold.ttf    (peso 700)
+
+Eles ficam versionados porque os widgets de tela inicial desenham sem o app
+aberto e sem rede — baixar a fonte na hora não é opção.
