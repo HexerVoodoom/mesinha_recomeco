@@ -1611,12 +1611,17 @@ app.get("/make-server-19717bce/meetup-today", async (c) => {
   }
 });
 
-// Mês inteiro para o widget nativo de calendário: devolve os dias do mês
-// atual (fuso de Brasília) que têm encontro no Calendário de Encontros, com
-// tipo e status (confirmado ou só proposto) — sem expor os itens completos.
+// Mês inteiro para os widgets nativos de calendário: devolve os dias do mês
+// (fuso de Brasília) que têm encontro no Calendário de Encontros, com tipo e
+// status (confirmado ou só proposto) — sem expor os itens completos. Sem o
+// parâmetro `month` usa o mês atual; o widget semanal pede um mês específico
+// quando a semana cai na virada do mês.
 app.get("/make-server-19717bce/meetup-month", async (c) => {
   try {
-    const monthStr = brazilNow().toISOString().slice(0, 7); // "YYYY-MM"
+    const requestedMonth = c.req.query("month");
+    const monthStr = /^\d{4}-\d{2}$/.test(requestedMonth || "")
+      ? requestedMonth!
+      : brazilNow().toISOString().slice(0, 7); // "YYYY-MM"
     const { items } = await kv.getItemsLightPaged({
       offset: 0,
       limit: 100,

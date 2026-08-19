@@ -8,7 +8,7 @@ App Android nativo do Mesinha. Ele faz duas coisas:
    por padrão): seletor de arquivo, microfone (Mural), notificações (FCM) e
    geolocalização (aba Mapa — `onGeolocationPermissionsShowPrompt` pedindo
    `ACCESS_FINE_LOCATION`).
-2. **Widgets de tela inicial** — sete opções no menu de widgets:
+2. **Widgets de tela inicial** — seis opções no menu de widgets:
    - **Mesinha · Conversa** (`MesinhaWidgetProvider`, 2×4): Corvinho à esquerda,
      Alpaquinha à direita e dois balões de fala, mudando 1× por dia (32 pares
      de frases, ver `Dialogues.kt`).
@@ -22,19 +22,25 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      um em casa, pegadas = sair); coração vazio quando ainda não há nada
      confirmado. Consulta o endpoint `/meetup-today`, que já resolve "hoje" no
      fuso de Brasília e devolve o tipo do encontro.
-   - **Mesinha · Jardim** (`GardenWidgetProvider`, 2×2): sequência atual do
-     casal (🔥, ou 💤 quando congelada esperando a atividade de hoje), nível do
-     jardim e recorde. Consulta o endpoint `/garden`.
-   - **Mesinha · Calendário** (`CalendarWidgetProvider`, 4×3): grade do mês
-     atual com os dias de encontro pintados pela cor do tipo (rosa = juntos em
-     casa, verde-azulado = video game, laranja = sair; versão suave quando
-     ainda não confirmado) e o dia de hoje com contorno. Consulta o endpoint
-     `/meetup-month`.
+   - **Mesinha · Calendário do mês** (`CalendarWidgetProvider`, 4×3): grade do
+     mês atual com os dias de encontro pintados pela cor do tipo (rosa =
+     juntos em casa, verde-azulado = video game, laranja = sair; versão suave
+     quando ainda não confirmado) e o dia de hoje com contorno. Consulta o
+     endpoint `/meetup-month`.
+   - **Mesinha · Calendário da semana** (`CalendarWeekWidgetProvider`, 4×1): a
+     mesma coisa em uma linha só, com a semana atual (domingo a sábado) e o
+     intervalo no topo. Quando a semana cruza a virada do mês, pede os dois
+     meses ao servidor.
    - **Mesinha · Cutucar** (`PokeWidgetProvider`, 1×1): botão de cutucada. Ao
      adicionar, uma tela de configuração pergunta quem está cutucando e qual
      mensagem enviar; depois, um toque no widget envia a push pro outro na hora
      (endpoint `/nudge`), sem abrir o app. O limite do servidor (1 cutucada a
      cada 3 min) aparece num Toast quando estourado.
+
+> O widget **Jardim** (sequência + nível, `GardenWidgetProvider`) está
+> **desabilitado por enquanto**: o código, o layout e as strings continuam no
+> repositório, mas o `<receiver>` está comentado no `AndroidManifest.xml`. Pra
+> religar, descomenta ele e a linha do Jardim no `BootReceiver`.
 
 ## Pré-requisitos
 

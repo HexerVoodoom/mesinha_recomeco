@@ -95,7 +95,7 @@ Todos prefixados em `/make-server-19717bce`:
 | GET/POST/DELETE | `/question-bank` | Banco de perguntas escritas pelo casal |
 | GET/POST/DELETE | `/cards` | Baralho de cartas dos jogos (verdade / desafio / o que prefere) |
 | GET | `/garden` | Sequência, nível do jardim e retrospectiva (cache diário, invalidado por contagem) |
-| GET | `/meetup-month` | Dias do mês atual com encontro (tipo + confirmação) — usado pelo widget nativo de calendário |
+| GET | `/meetup-month` | Dias com encontro de um mês (tipo + confirmação) — usado pelos widgets nativos de calendário; `?month=YYYY-MM` opcional (padrão: mês atual) |
 
 ### Padrões de chave no KV
 

@@ -90,7 +90,12 @@
                 android:resource="@xml/widget_meetup_info" />
         </receiver>
 
-        <!-- Widget 5: "Jardim" (2x2) — sequência do casal e nível do jardim. -->
+        <!--
+          Widget "Jardim" (2x2) — DESABILITADO por enquanto. O código
+          (GardenWidgetProvider/GardenRepository, layout e strings) continua no
+          repositório; pra religar é só descomentar este receiver e a linha do
+          Jardim no BootReceiver.
+
         <receiver
             android:name=".GardenWidgetProvider"
             android:exported="true"
@@ -103,12 +108,13 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_garden_info" />
         </receiver>
+        -->
 
-        <!-- Widget 6: "Calendário" (4x3) — mês atual com os dias de encontro marcados. -->
+        <!-- Widget: "Calendário do mês" (4x3) — mês atual com os dias de encontro marcados. -->
         <receiver
             android:name=".CalendarWidgetProvider"
             android:exported="true"
-            android:label="@string/widget_name_calendar">
+            android:label="@string/widget_name_calendar_month">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
@@ -118,7 +124,21 @@
                 android:resource="@xml/widget_calendar_info" />
         </receiver>
 
-        <!-- Widget 7: "Cutucar" (1x1) — botão que envia a cutucada sem abrir o app. -->
+        <!-- Widget: "Calendário da semana" (4x1) — a semana atual, com os dias de encontro marcados. -->
+        <receiver
+            android:name=".CalendarWeekWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name_calendar_week">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mesinha.app.ACTION_DAILY_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_calendar_week_info" />
+        </receiver>
+
+        <!-- Widget: "Cutucar" (1x1) — botão que envia a cutucada sem abrir o app. -->
         <receiver
             android:name=".PokeWidgetProvider"
             android:exported="true"

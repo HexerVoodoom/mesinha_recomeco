@@ -9,14 +9,15 @@ import android.graphics.Color
 import android.widget.RemoteViews
 import java.util.Calendar
 import java.util.Locale
-import java.util.TimeZone
 
 /**
- * Widget "Calendário de Encontros" (4x3): grade do mês atual (semana começando
- * no domingo), com os dias que têm encontro pintados pela cor do tipo
+ * Widget "Calendário do mês" (4x3): grade do mês atual (semana começando no
+ * domingo), com os dias que têm encontro pintados pela cor do tipo
  * (coração/video game/pegadas; versão suave quando ainda não confirmado) e o
  * dia de hoje com contorno. Os dados vêm do endpoint `/meetup-month` via
  * [CalendarRepository]. O mês segue o fuso de Brasília, igual ao servidor.
+ *
+ * A versão de uma linha só, com a semana atual, é o [CalendarWeekWidgetProvider].
  */
 class CalendarWidgetProvider : AppWidgetProvider() {
 
@@ -29,12 +30,12 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             renderWidget(context, appWidgetManager, id)
         }
         WidgetScheduler.scheduleDailyUpdate(context, CalendarWidgetProvider::class.java, 4326)
-        CalendarRepository.maybeRefresh(context)
+        CalendarRepository.maybeRefresh(context, listOf(WidgetCommon.currentMonthStr()))
     }
 
     override fun onEnabled(context: Context) {
         WidgetScheduler.scheduleDailyUpdate(context, CalendarWidgetProvider::class.java, 4326)
-        CalendarRepository.maybeRefresh(context)
+        CalendarRepository.maybeRefresh(context, listOf(WidgetCommon.currentMonthStr()))
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -49,7 +50,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             }
             // Reagenda o próximo (o alarme é one-shot).
             WidgetScheduler.scheduleDailyUpdate(context, CalendarWidgetProvider::class.java, 4326)
-            CalendarRepository.maybeRefresh(context)
+            CalendarRepository.maybeRefresh(context, listOf(WidgetCommon.currentMonthStr()))
         }
     }
 
@@ -59,26 +60,20 @@ class CalendarWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int
     ) {
         // "Agora" no fuso de Brasília (UTC-3 fixo, igual ao brazilNow() do servidor).
-        val brazil = Calendar.getInstance(TimeZone.getTimeZone("GMT-03:00"))
+        val brazil = WidgetCommon.brazilCalendar()
         val year = brazil.get(Calendar.YEAR)
         val month = brazil.get(Calendar.MONTH) // 0..11
         val today = brazil.get(Calendar.DAY_OF_MONTH)
         val monthStr = String.format(Locale.US, "%04d-%02d", year, month + 1)
 
-        val meetupByDay = CalendarRepository.cachedDays(context, monthStr)
-            .associateBy { it.date }
+        val meetupByDay = CalendarRepository.cachedDaysByDate(context, listOf(monthStr))
 
-        val first = Calendar.getInstance(TimeZone.getTimeZone("GMT-03:00")).apply {
-            set(year, month, 1)
-        }
+        val first = WidgetCommon.brazilCalendar().apply { set(year, month, 1) }
         val firstWeekday = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY // 0=domingo
         val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         val views = RemoteViews(context.packageName, R.layout.widget_calendar)
-        views.setTextViewText(
-            R.id.tv_month,
-            "${MONTH_NAMES[month]} $year"
-        )
+        views.setTextViewText(R.id.tv_month, "${WidgetCommon.MONTH_NAMES[month]} $year")
 
         for (cell in 0 until 42) {
             val cellId = CELL_IDS[cell]
@@ -93,7 +88,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val dateStr = String.format(Locale.US, "%s-%02d", monthStr, day)
             val meetup = meetupByDay[dateStr]
             val background = when {
-                meetup != null -> dayBackground(meetup)
+                meetup != null -> CalendarRepository.dayBackground(meetup)
                 day == today -> R.drawable.day_today
                 else -> 0
             }
@@ -112,22 +107,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    private fun dayBackground(meetup: CalendarRepository.MeetupDay): Int =
-        when (meetup.type) {
-            "videogame" -> if (meetup.confirmed) R.drawable.day_meetup_videogame
-            else R.drawable.day_meetup_videogame_soft
-            "pegadas" -> if (meetup.confirmed) R.drawable.day_meetup_pegadas
-            else R.drawable.day_meetup_pegadas_soft
-            else -> if (meetup.confirmed) R.drawable.day_meetup_coracao
-            else R.drawable.day_meetup_coracao_soft
-        }
-
     companion object {
-        private val MONTH_NAMES = arrayOf(
-            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-        )
-
         private val CELL_IDS = intArrayOf(
             R.id.c0, R.id.c1, R.id.c2, R.id.c3, R.id.c4, R.id.c5, R.id.c6,
             R.id.c7, R.id.c8, R.id.c9, R.id.c10, R.id.c11, R.id.c12, R.id.c13,

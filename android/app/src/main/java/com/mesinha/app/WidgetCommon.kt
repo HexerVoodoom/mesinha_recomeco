@@ -11,6 +11,41 @@ import android.os.Build
  */
 object WidgetCommon {
 
+    /** Nomes dos meses em português, usados nos widgets de calendário. */
+    val MONTH_NAMES = arrayOf(
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    )
+
+    /** Iniciais dos dias da semana, começando no domingo. */
+    val WEEKDAY_INITIALS = arrayOf("D", "S", "T", "Q", "Q", "S", "S")
+
+    /**
+     * "Agora" no fuso de Brasília (UTC-3 fixo, igual ao brazilNow() do
+     * servidor) — assim o widget vira o dia junto com o app.
+     */
+    fun brazilCalendar(): java.util.Calendar =
+        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("GMT-03:00"))
+
+    /** Mês atual em Brasília no formato "YYYY-MM". */
+    fun currentMonthStr(): String = monthStrOf(brazilCalendar())
+
+    /** Mês de um Calendar no formato "YYYY-MM". */
+    fun monthStrOf(calendar: java.util.Calendar): String = String.format(
+        java.util.Locale.US,
+        "%04d-%02d",
+        calendar.get(java.util.Calendar.YEAR),
+        calendar.get(java.util.Calendar.MONTH) + 1
+    )
+
+    /** Data de um Calendar no formato "YYYY-MM-DD". */
+    fun dateStrOf(calendar: java.util.Calendar): String = String.format(
+        java.util.Locale.US,
+        "%s-%02d",
+        monthStrOf(calendar),
+        calendar.get(java.util.Calendar.DAY_OF_MONTH)
+    )
+
     const val SUPABASE_ANON_KEY =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91YmRtbWFxeG51dGJieGlxZW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDE2OTMsImV4cCI6MjA4ODA3NzY5M30.jLMAGrD0jOaId3Tjy1IKDPc4rtDqm4hx-Bv6Mzo0dDw"
 
