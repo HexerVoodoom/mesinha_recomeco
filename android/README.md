@@ -34,8 +34,18 @@ App Android nativo do Mesinha. Ele faz duas coisas:
    - **Mesinha · Cutucar** (`PokeWidgetProvider`, 1×1): botão de cutucada. Ao
      adicionar, uma tela de configuração pergunta quem está cutucando e qual
      mensagem enviar; depois, um toque no widget envia a push pro outro na hora
-     (endpoint `/nudge`), sem abrir o app. O limite do servidor (1 cutucada a
-     cada 3 min) aparece num Toast quando estourado.
+     (endpoint `/nudge`), sem abrir o app. O próprio widget mostra o andamento
+     — `⏳ enviando…`, `✅ enviado!` ou `⚠️ falhou` — e volta ao normal em
+     alguns segundos; o limite do servidor (1 cutucada a cada 3 min) aparece
+     nesse aviso e num Toast.
+
+> **Por que o Cutucar tem tanta rede de segurança:** widget com
+> `android:configure` **não** recebe `onUpdate` ao ser criado. Com
+> `updatePeriodMillis="0"` e nada agendado, o desenho feito pela tela de
+> configuração era o único da vida dele — e se aquele único desenho se
+> perdesse (host ainda não pronto), o widget ficava com "não foi possível
+> carregar" para sempre. Hoje existem três caminhos de redesenho: período de
+> 30 min, `onAppWidgetOptionsChanged` e `onRestored`. Não reduza isso a um só.
 
 > **Widgets de calendário e a prévia:** os `TextView` dos layouts
 > `widget_calendar.xml` / `widget_calendar_week.xml` têm textos padrão de

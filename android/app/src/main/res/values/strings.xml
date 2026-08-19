@@ -33,7 +33,11 @@
     <string name="widget_calendar_error">não deu pra carregar 😢</string>
 
     <!-- Widget Poke -->
+    <string name="widget_poke_emoji">💌</string>
     <string name="widget_poke_label">Cutucar</string>
+    <string name="widget_poke_sending">enviando…</string>
+    <string name="widget_poke_ok">enviado!</string>
+    <string name="widget_poke_error">falhou</string>
     <string name="widget_poke_not_configured">Remove e adiciona o widget de novo pra configurar a cutucada 💌</string>
     <string name="widget_poke_sent">Cutucada enviada! %1$s vai receber agora 💌</string>
     <string name="widget_poke_failed">Não deu pra cutucar agora. Tenta de novo!</string>

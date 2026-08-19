@@ -111,12 +111,25 @@ class PokeConfigActivity : AppCompatActivity() {
                     else -> null
                 }
                 PokeConfig.save(this@PokeConfigActivity, widgetId, from, message)
-                val manager = AppWidgetManager.getInstance(this@PokeConfigActivity)
-                PokeWidgetProvider.renderWidget(this@PokeConfigActivity, manager, widgetId)
+
+                // Ordem: setResult só grava o resultado num campo — quem
+                // entrega ao launcher é o finish(), lá embaixo. Então isto aqui
+                // é organização, não correção: o que de fato conserta o widget
+                // preso em "não foi possível carregar" é o updatePeriodMillis
+                // (widget com tela de config não recebe onUpdate ao ser criado)
+                // e o requestUpdate logo abaixo.
                 setResult(
                     RESULT_OK,
                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                 )
+                PokeWidgetProvider.renderWidget(
+                    this@PokeConfigActivity,
+                    AppWidgetManager.getInstance(this@PokeConfigActivity),
+                    widgetId
+                )
+                // E ainda pede um desenho pelo caminho normal do sistema, já
+                // com o widget posicionado.
+                PokeWidgetProvider.requestUpdate(this@PokeConfigActivity, widgetId)
                 finish()
             }
         }

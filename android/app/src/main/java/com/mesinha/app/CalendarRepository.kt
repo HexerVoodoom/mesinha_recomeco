@@ -70,6 +70,12 @@ object CalendarRepository {
         }
         if (stale.isEmpty()) return
 
+        // Marca a tentativa ANTES de sair a thread: na primeira adição do
+        // widget, onEnabled e onUpdate chegam quase juntos, e sem isto os dois
+        // passariam pela checagem de "vencido" e baixariam o mesmo mês em
+        // duplicata.
+        for (month in stale) marcarTentativa(context, month)
+
         val appContext = context.applicationContext
         Thread {
             var changed = false
@@ -78,6 +84,8 @@ object CalendarRepository {
                     if (fetchAndStore(appContext, month)) changed = true
                 } catch (_: Exception) {
                     // Sem internet / erro: mantém o cache anterior daquele mês.
+                    // A tentativa já foi marcada antes da thread, então o
+                    // widget não fica martelando a rede enquanto está offline.
                 }
             }
             if (changed) refreshWidgets(appContext)
@@ -125,6 +133,13 @@ object CalendarRepository {
         else ->
             if (meetup.confirmed) R.drawable.day_meetup_coracao
             else R.drawable.day_meetup_coracao_soft
+    }
+
+    /** Marca que houve tentativa de baixar este mês (respeita o intervalo mínimo). */
+    private fun marcarTentativa(context: Context, monthStr: String) {
+        prefs(context).edit()
+            .putLong(keyFetch(monthStr), System.currentTimeMillis())
+            .apply()
     }
 
     private fun keyDays(monthStr: String) = "days:$monthStr"

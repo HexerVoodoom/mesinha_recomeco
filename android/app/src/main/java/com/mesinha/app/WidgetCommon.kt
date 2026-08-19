@@ -21,11 +21,12 @@ object WidgetCommon {
     val WEEKDAY_INITIALS = arrayOf("D", "S", "T", "Q", "Q", "S", "S")
 
     /**
-     * "Agora" no fuso de Brasília (UTC-3 fixo, igual ao brazilNow() do
-     * servidor) — assim o widget vira o dia junto com o app.
+     * "Agora" no fuso de Brasília — assim o widget vira o dia junto com o app.
+     * Usa o fuso nomeado (e não "GMT-03:00" fixo) pra continuar certo se o
+     * horário de verão voltar algum dia.
      */
     fun brazilCalendar(): java.util.Calendar =
-        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("GMT-03:00"))
+        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/Sao_Paulo"))
 
     /** Mês atual em Brasília no formato "YYYY-MM". */
     fun currentMonthStr(): String = monthStrOf(brazilCalendar())
@@ -72,11 +73,22 @@ object WidgetCommon {
      * POST de JSON num endpoint do servidor do Mesinha. Devolve o corpo da
      * resposta (da stream de erro quando o HTTP não é 2xx, junto do código,
      * para o chamador poder mostrar a mensagem amigável do servidor).
+     *
+     * Os timeouts são curtos de propósito: quem chama isto é um
+     * BroadcastReceiver segurando um `goAsync()`, e o sistema mata o receiver
+     * por volta de 10s. Como connect e read são cobrados em sequência, o pior
+     * caso aqui é 3 + 4 = 7s — que ainda deixa margem pro Toast e pro
+     * redesenho do widget acontecerem antes do prazo.
      */
-    fun postJson(urlStr: String, body: String): Pair<Int, String> {
+    fun postJson(
+        urlStr: String,
+        body: String,
+        connectTimeoutMs: Int = 3000,
+        readTimeoutMs: Int = 4000
+    ): Pair<Int, String> {
         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
-            connectTimeout = 8000
-            readTimeout = 8000
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Content-Type", "application/json")

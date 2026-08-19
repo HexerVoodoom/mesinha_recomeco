@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget "Poke" (1x1): botão de cutucada. Um toque envia a notificação push
+  Widget "Cutucar" (1x1): botão de cutucada. Um toque envia a notificação push
   pro outro com a mensagem configurada, sem abrir o app.
+
+  O emoji e o rótulo são trocados pelo PokeWidgetProvider conforme o estado
+  (pronto / enviando / enviado / erro) — é assim que quem toca sabe se a
+  cutucada saiu. Os valores daqui são o estado "pronto" e a prévia da lista
+  de widgets.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -16,10 +21,11 @@
         android:id="@+id/tv_poke"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="💌"
-        android:textSize="30sp" />
+        android:text="@string/widget_poke_emoji"
+        android:textSize="28sp" />
 
     <TextView
+        android:id="@+id/tv_poke_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFamily="sans-serif-medium"
