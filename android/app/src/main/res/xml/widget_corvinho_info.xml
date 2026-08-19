@@ -10,4 +10,4 @@
     android:widgetCategory="home_screen"
     android:previewLayout="@layout/widget_corvinho"
     android:initialLayout="@layout/widget_corvinho"
-    android:updatePeriodMillis="0" />
+    android:updatePeriodMillis="1800000" />

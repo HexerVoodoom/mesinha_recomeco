@@ -27,6 +27,30 @@ class AlpaquinhaWidgetProvider : AppWidgetProvider() {
 
     override fun onEnabled(context: Context) {
         WidgetScheduler.scheduleDailyUpdate(context, AlpaquinhaWidgetProvider::class.java, 4322)
+        // Numa instalação nova o cache está vazio: sem isto o widget ficaria
+        // mostrando a lista embutida de reserva em vez das falas escritas no app.
+        PhraseRepository.maybeRefresh(context)
+    }
+
+    /**
+     * Auto-cura: chamado quando o launcher posiciona ou redimensiona o widget.
+     * Como estes widgets não têm atualização própria além do alarme diário, um
+     * broadcast de update perdido deixava o balão vazio até a virada do dia.
+     */
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: android.os.Bundle
+    ) {
+        renderWidget(context, appWidgetManager, appWidgetId)
+    }
+
+    override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
+        val manager = AppWidgetManager.getInstance(context)
+        for (id in newWidgetIds) {
+            renderWidget(context, manager, id)
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

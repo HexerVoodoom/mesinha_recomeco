@@ -140,17 +140,16 @@ class CalendarWeekWidgetProvider : AppWidgetProvider() {
                 NUMBER_IDS[index],
                 "setBackgroundResource",
                 when {
-                    meetup != null -> CalendarRepository.dayBackground(meetup)
-                    isToday -> R.drawable.day_today
+                    meetup != null -> CalendarRepository.dayBackground(meetup, isToday)
+                    isToday -> R.drawable.day_hoje
                     else -> 0
                 }
             )
             views.setTextColor(
                 NUMBER_IDS[index],
                 when {
-                    meetup?.confirmed == true -> Color.WHITE
-                    isToday -> Color.parseColor("#4D989B")
-                    else -> Color.parseColor("#1A1A1A")
+                    meetup != null -> CalendarRepository.dayTextColor(meetup)
+                    else -> Color.parseColor("#2B2A28") // --foreground do app
                 }
             )
             day.add(Calendar.DAY_OF_YEAR, 1)

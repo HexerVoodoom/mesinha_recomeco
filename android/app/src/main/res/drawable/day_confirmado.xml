@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dia com encontro CONFIRMADO: primary sólido (igual "bg-primary" do app). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#4D989B" />
+    <corners android:radius="12dp" />
+</shape>

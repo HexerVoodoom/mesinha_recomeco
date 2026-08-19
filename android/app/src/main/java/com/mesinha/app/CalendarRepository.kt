@@ -120,20 +120,22 @@ object CalendarRepository {
     }
 
     /**
-     * Fundo do dia conforme o tipo de encontro — cheio quando confirmado,
-     * suave quando ainda é só proposta. Compartilhado pelos dois calendários.
+     * Fundo do dia. Segue o mesmo critério do Calendário de Encontros dentro
+     * do app (`MeetupCalendar.tsx`): a cor comunica o ESTADO — confirmado ou
+     * só proposto —, não o tipo do encontro. O tipo aparece no app pelo ícone
+     * dentro da célula, que não cabe num widget desse tamanho.
      */
-    fun dayBackground(meetup: MeetupDay): Int = when (meetup.type) {
-        "videogame" ->
-            if (meetup.confirmed) R.drawable.day_meetup_videogame
-            else R.drawable.day_meetup_videogame_soft
-        "pegadas" ->
-            if (meetup.confirmed) R.drawable.day_meetup_pegadas
-            else R.drawable.day_meetup_pegadas_soft
-        else ->
-            if (meetup.confirmed) R.drawable.day_meetup_coracao
-            else R.drawable.day_meetup_coracao_soft
+    fun dayBackground(meetup: MeetupDay, isToday: Boolean = false): Int = when {
+        meetup.confirmed && isToday -> R.drawable.day_confirmado_hoje
+        meetup.confirmed -> R.drawable.day_confirmado
+        isToday -> R.drawable.day_proposto_hoje
+        else -> R.drawable.day_proposto
     }
+
+    /** Cor do número do dia, casando com o fundo escolhido acima. */
+    fun dayTextColor(meetup: MeetupDay): Int =
+        if (meetup.confirmed) android.graphics.Color.WHITE
+        else android.graphics.Color.parseColor("#8A5A15")
 
     /** Marca que houve tentativa de baixar este mês (respeita o intervalo mínimo). */
     private fun marcarTentativa(context: Context, monthStr: String) {

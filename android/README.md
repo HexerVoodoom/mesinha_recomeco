@@ -23,10 +23,10 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      confirmado. Consulta o endpoint `/meetup-today`, que já resolve "hoje" no
      fuso de Brasília e devolve o tipo do encontro.
    - **Mesinha · Calendário do mês** (`CalendarWidgetProvider`, 4×3): grade do
-     mês atual com os dias de encontro pintados pela cor do tipo (rosa =
-     juntos em casa, verde-azulado = video game, laranja = sair; versão suave
-     quando ainda não confirmado) e o dia de hoje com contorno. Consulta o
-     endpoint `/meetup-month`.
+     mês atual no visual dos cards do app (fundo branco), com os dias de
+     encontro pintados pelo estado — confirmado em `primary` sólido, proposto
+     em âmbar — e o dia de hoje com contorno. Consulta o endpoint
+     `/meetup-month`.
    - **Mesinha · Calendário da semana** (`CalendarWeekWidgetProvider`, 4×1): a
      mesma coisa em uma linha só, com a semana atual (domingo a sábado) e o
      intervalo no topo. Quando a semana cruza a virada do mês, pede os dois
@@ -38,6 +38,20 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      — `⏳ enviando…`, `✅ enviado!` ou `⚠️ falhou` — e volta ao normal em
      alguns segundos; o limite do servidor (1 cutucada a cada 3 min) aparece
      nesse aviso e num Toast.
+
+> **`updatePeriodMillis="0"` é uma armadilha:** um widget com 0 não recebe
+> nenhuma atualização periódica, então ele depende de um único `onUpdate`. Se
+> esse broadcast se perder (o processo do app morrer no meio da entrega), o
+> widget fica congelado no layout inicial — no caso dos widgets de fala, com o
+> balão vazio. Foi o que aconteceu com Conversa/Alpaquinha/Corvinho e com o
+> Cutucar. Todos usam 30 min agora. O "Encontro hoje?", que já usava 30 min,
+> nunca apresentou o problema.
+
+> **Cores dos calendários:** seguem o estado, igual ao `MeetupCalendar.tsx` —
+> confirmado é `primary` sólido, proposto é âmbar, hoje ganha contorno (que é
+> aditivo, some por cima da cor do estado). O app ainda distingue *proposto por
+> mim* de *proposto pelo outro*; o widget não, porque o `/meetup-month` não
+> devolve quem propôs e o widget não sabe de quem é o celular.
 
 > **Por que o Cutucar tem tanta rede de segurança:** widget com
 > `android:configure` **não** recebe `onUpdate` ao ser criado. Com

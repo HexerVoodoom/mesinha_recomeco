@@ -152,17 +152,16 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val dateStr = String.format(Locale.US, "%s-%02d", monthStr, day)
             val meetup = meetupByDay[dateStr]
             val background = when {
-                meetup != null -> CalendarRepository.dayBackground(meetup)
-                day == today -> R.drawable.day_today
+                meetup != null -> CalendarRepository.dayBackground(meetup, day == today)
+                day == today -> R.drawable.day_hoje
                 else -> 0
             }
             views.setInt(cellId, "setBackgroundResource", background)
             views.setTextColor(
                 cellId,
                 when {
-                    meetup?.confirmed == true -> Color.WHITE
-                    day == today -> Color.parseColor("#4D989B")
-                    else -> Color.parseColor("#1A1A1A")
+                    meetup != null -> CalendarRepository.dayTextColor(meetup)
+                    else -> Color.parseColor("#2B2A28") // --foreground do app
                 }
             )
         }

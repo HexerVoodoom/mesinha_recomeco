@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Encontro proposto que cai HOJE: cor do estado + contorno de hoje. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#4DF6C177" />
+            <corners android:radius="12dp" />
+            <stroke android:width="2dp" android:color="#F6C177" />
+        </shape>
+    </item>
+    <!-- Contorno de hoje por cima, como o "ring" do app (que é aditivo). -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+            <corners android:radius="12dp" />
+            <stroke android:width="2dp" android:color="#662B2A28" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fundo dos widgets de calendário: cartão branco opaco com a borda do app.
+  Espelha os tokens de cor dos cards do Mesinha: card #ffffff, borda #E9E4DF.
+  (Sem os dois hifens do nome das variaveis CSS: comentario XML nao aceita.)
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="16dp" />
+    <stroke
+        android:width="2dp"
+        android:color="#E9E4DF" />
+</shape>

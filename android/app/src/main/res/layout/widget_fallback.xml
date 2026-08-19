@@ -9,7 +9,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
+    android:background="@drawable/widget_card_bg"
     android:gravity="center"
     android:orientation="vertical"
     android:padding="8dp">
@@ -20,8 +20,10 @@
         android:layout_height="wrap_content"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
+        android:maxLines="2"
+        android:ellipsize="end"
         android:text="@string/widget_calendar_error"
-        android:textColor="#4D989B"
+        android:textColor="#2B2A28"
         android:textSize="11sp" />
 
 </LinearLayout>

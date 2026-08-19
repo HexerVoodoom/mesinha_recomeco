@@ -14,4 +14,4 @@
     android:widgetCategory="home_screen"
     android:previewLayout="@layout/widget_dialogue"
     android:initialLayout="@layout/widget_dialogue"
-    android:updatePeriodMillis="0" />
+    android:updatePeriodMillis="1800000" />
