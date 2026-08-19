@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dia PROPOSTO, ainda sem confirmação: âmbar translúcido com borda cheia,
+  igual ao estado "pending" do app (bg-[#F6C177]/30 + border-[#F6C177]).
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#4DF6C177" />
+    <corners android:radius="12dp" />
+    <stroke
+        android:width="2dp"
+        android:color="#F6C177" />
+</shape>

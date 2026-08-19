@@ -10,4 +10,4 @@
     android:widgetCategory="home_screen"
     android:previewLayout="@layout/widget_alpaquinha"
     android:initialLayout="@layout/widget_alpaquinha"
-    android:updatePeriodMillis="0" />
+    android:updatePeriodMillis="1800000" />
