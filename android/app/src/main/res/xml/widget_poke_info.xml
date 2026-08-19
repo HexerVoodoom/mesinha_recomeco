@@ -9,4 +9,4 @@
     android:previewLayout="@layout/widget_poke"
     android:initialLayout="@layout/widget_poke"
     android:configure="com.mesinha.app.PokeConfigActivity"
-    android:updatePeriodMillis="0" />
+    android:updatePeriodMillis="1800000" />

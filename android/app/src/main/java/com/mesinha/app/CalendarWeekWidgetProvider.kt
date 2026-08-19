@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.graphics.Color
 import android.widget.RemoteViews
 import java.util.Calendar
@@ -28,13 +29,11 @@ class CalendarWeekWidgetProvider : AppWidgetProvider() {
         for (id in appWidgetIds) {
             renderWidget(context, appWidgetManager, id)
         }
-        WidgetScheduler.scheduleDailyUpdate(context, CalendarWeekWidgetProvider::class.java, 4327)
-        CalendarRepository.maybeRefresh(context, weekMonths())
+        agendarEAtualizar(context)
     }
 
     override fun onEnabled(context: Context) {
-        WidgetScheduler.scheduleDailyUpdate(context, CalendarWeekWidgetProvider::class.java, 4327)
-        CalendarRepository.maybeRefresh(context, weekMonths())
+        agendarEAtualizar(context)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -48,15 +47,53 @@ class CalendarWeekWidgetProvider : AppWidgetProvider() {
                 renderWidget(context, manager, id)
             }
             // Reagenda o próximo (o alarme é one-shot).
+            agendarEAtualizar(context)
+        }
+    }
+
+
+    /**
+     * Reagenda o alarme diário e pede os dados novos. Embrulhado em try/catch
+     * de propósito: uma exceção aqui escaparia do BroadcastReceiver e mataria
+     * o processo do app — derrubando junto os broadcasts de update que
+     * estivessem na fila para os outros widgets.
+     */
+    private fun agendarEAtualizar(context: Context) {
+        try {
             WidgetScheduler.scheduleDailyUpdate(context, CalendarWeekWidgetProvider::class.java, 4327)
             CalendarRepository.maybeRefresh(context, weekMonths())
+        } catch (_: Exception) {
+            // O desenho já aconteceu; perder o agendamento é bem menos grave
+            // do que derrubar o app.
         }
     }
 
     /**
-     * Desenha o widget. Qualquer falha aqui deixaria o widget preso no layout
-     * inicial — uma caixa vazia e sem clique, indistinguível de "quebrado" —
-     * então o erro é capturado e vira um texto visível.
+     * Chamado quando o launcher posiciona ou redimensiona o widget. Serve de
+     * auto-cura: um widget que ficou preso no layout inicial (porque o
+     * broadcast de update se perdeu) volta a desenhar aqui.
+     */
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle
+    ) {
+        renderWidget(context, appWidgetManager, appWidgetId)
+    }
+
+    override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
+        val manager = AppWidgetManager.getInstance(context)
+        for (id in newWidgetIds) {
+            renderWidget(context, manager, id)
+        }
+    }
+
+    /**
+     * Desenha o widget. Uma exceção aqui deixaria o widget preso no layout
+     * inicial — caixa vazia e sem clique, indistinguível de "quebrado" — então
+     * o erro vira um texto visível, num layout de emergência separado (reusar
+     * o layout que pode ter falhado tornaria este try/catch inútil).
      */
     private fun renderWidget(
         context: Context,
@@ -66,14 +103,17 @@ class CalendarWeekWidgetProvider : AppWidgetProvider() {
         try {
             draw(context, appWidgetManager, appWidgetId)
         } catch (e: Exception) {
-            val fallback = RemoteViews(context.packageName, R.layout.widget_calendar_week).apply {
-                setTextViewText(
-                    R.id.tv_week,
-                    "${context.getString(R.string.widget_calendar_error)} (${e.javaClass.simpleName})"
-                )
-                setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
+            try {
+                val fallback = RemoteViews(context.packageName, R.layout.widget_fallback).apply {
+                    setTextViewText(R.id.tv_erro, "Calendário: ${e.javaClass.simpleName}")
+                    setOnClickPendingIntent(R.id.widget_root, WidgetCommon.openAppIntent(context))
+                }
+                appWidgetManager.updateAppWidget(appWidgetId, fallback)
+            } catch (_: Exception) {
+                // Widget quebrado é melhor que processo derrubado: uma exceção
+                // escapando daqui mataria o app e levaria junto os broadcasts
+                // enfileirados para os outros widgets.
             }
-            appWidgetManager.updateAppWidget(appWidgetId, fallback)
         }
     }
 

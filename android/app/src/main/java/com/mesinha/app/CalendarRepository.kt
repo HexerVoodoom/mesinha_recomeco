@@ -77,7 +77,10 @@ object CalendarRepository {
                 try {
                     if (fetchAndStore(appContext, month)) changed = true
                 } catch (_: Exception) {
-                    // Sem internet / erro: mantém o cache anterior daquele mês.
+                    // Sem internet / erro: mantém o cache anterior daquele mês
+                    // e marca a tentativa, senão cada toque no widget dispararia
+                    // uma thread de rede nova enquanto estivesse offline.
+                    marcarTentativa(appContext, month)
                 }
             }
             if (changed) refreshWidgets(appContext)
@@ -125,6 +128,13 @@ object CalendarRepository {
         else ->
             if (meetup.confirmed) R.drawable.day_meetup_coracao
             else R.drawable.day_meetup_coracao_soft
+    }
+
+    /** Marca que houve tentativa de baixar este mês (respeita o intervalo mínimo). */
+    private fun marcarTentativa(context: Context, monthStr: String) {
+        prefs(context).edit()
+            .putLong(keyFetch(monthStr), System.currentTimeMillis())
+            .apply()
     }
 
     private fun keyDays(monthStr: String) = "days:$monthStr"

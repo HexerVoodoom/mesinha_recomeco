@@ -21,11 +21,12 @@ object WidgetCommon {
     val WEEKDAY_INITIALS = arrayOf("D", "S", "T", "Q", "Q", "S", "S")
 
     /**
-     * "Agora" no fuso de Brasília (UTC-3 fixo, igual ao brazilNow() do
-     * servidor) — assim o widget vira o dia junto com o app.
+     * "Agora" no fuso de Brasília — assim o widget vira o dia junto com o app.
+     * Usa o fuso nomeado (e não "GMT-03:00" fixo) pra continuar certo se o
+     * horário de verão voltar algum dia.
      */
     fun brazilCalendar(): java.util.Calendar =
-        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("GMT-03:00"))
+        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/Sao_Paulo"))
 
     /** Mês atual em Brasília no formato "YYYY-MM". */
     fun currentMonthStr(): String = monthStrOf(brazilCalendar())

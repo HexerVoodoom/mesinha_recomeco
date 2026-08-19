@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Layout de emergência dos widgets: usado quando o desenho normal falha.
+  É de propósito o mais simples possível (uma caixa e um texto), porque o
+  layout que falhou pode ser justamente o problema — reusá-lo faria o
+  try/catch falhar junto.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/tv_erro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="@string/widget_calendar_error"
+        android:textColor="#4D989B"
+        android:textSize="11sp" />
+
+</LinearLayout>

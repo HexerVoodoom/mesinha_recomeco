@@ -111,12 +111,24 @@ class PokeConfigActivity : AppCompatActivity() {
                     else -> null
                 }
                 PokeConfig.save(this@PokeConfigActivity, widgetId, from, message)
-                val manager = AppWidgetManager.getInstance(this@PokeConfigActivity)
-                PokeWidgetProvider.renderWidget(this@PokeConfigActivity, manager, widgetId)
+
+                // O resultado vem ANTES do desenho: é ele que faz o launcher
+                // concluir a colocação e criar a view do widget. Desenhando
+                // antes disso (como estava), em vários launchers o único
+                // RemoteViews da vida do widget chegava cedo demais e se
+                // perdia — e o widget ficava com "não foi possível carregar".
                 setResult(
                     RESULT_OK,
                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                 )
+                PokeWidgetProvider.renderWidget(
+                    this@PokeConfigActivity,
+                    AppWidgetManager.getInstance(this@PokeConfigActivity),
+                    widgetId
+                )
+                // E ainda pede um desenho pelo caminho normal do sistema, já
+                // com o widget posicionado.
+                PokeWidgetProvider.requestUpdate(this@PokeConfigActivity, widgetId)
                 finish()
             }
         }
