@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Célula do dia: fundo do estado (confirmado)
+  com o selo do tipo no canto superior direito, como no app.
+
+  Feito com layer-list de propósito: colocar o ícone numa View separada exigiria
+  um FrameLayout por célula (42 no mensal), que é o padrão de aninhamento
+  suspeito de ter quebrado o widget semanal. Aqui continua sendo uma única
+  chamada de setBackgroundResource, sem nenhuma View nova.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:drawable="@drawable/day_confirmado" />
+
+    <item
+        android:drawable="@drawable/badge_pegadas_primary"
+        android:gravity="top|end"
+        android:top="1dp"
+        android:right="1dp"
+        android:width="8dp"
+        android:height="8dp" />
+
+</layer-list>
