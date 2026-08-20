@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Selo do canto do dia — "Juntos em casa".
+  Espelha o badge do app: círculo branco com o ícone do tipo dentro
+  (MeetupCalendar.tsx, "absolute -top-1 -right-1 rounded-full bg-white").
+  O círculo e o ícone vão no mesmo vetor pra caber numa única camada do
+  fundo da célula, sem precisar de nenhuma View a mais.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="12dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,0A12,12 0,1 1,11.99 0Z" />
+
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:scaleX="0.68"
+        android:scaleY="0.68">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#2B2A28"
+                android:strokeWidth="2.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M19,14c1.49,-1.46 3,-3.21 3,-5.5A5.5,5.5 0,0 0,16.5 3c-1.76,0 -3,0.5 -4.5,2 -1.5,-1.5 -2.74,-2 -4.5,-2A5.5,5.5 0,0 0,2 8.5c0,2.3 1.5,4.05 3,5.5l7,7Z" />
+    </group>
+
+</vector>

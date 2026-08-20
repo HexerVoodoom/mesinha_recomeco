@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Selo do canto do dia — "Sair".
+  Espelha o badge do app: círculo branco com o ícone do tipo dentro
+  (MeetupCalendar.tsx, "absolute -top-1 -right-1 rounded-full bg-white").
+  O círculo e o ícone vão no mesmo vetor pra caber numa única camada do
+  fundo da célula, sem precisar de nenhuma View a mais.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="12dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,0A12,12 0,1 1,11.99 0Z" />
+
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:scaleX="0.68"
+        android:scaleY="0.68">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#2B2A28"
+                android:strokeWidth="2.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M4,16v-2.38C4,11.5 2.97,10.5 3,8c0.03,-2.72 1.49,-6 4.5,-6C9.37,2 10,3.8 10,5.5c0,3.11 -2,5.66 -2,8.68V16a2,2 0,1 1,-4 0Z" />
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#2B2A28"
+                android:strokeWidth="2.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M20,20v-2.38c0,-2.12 1.03,-3.12 1,-5.62c-0.03,-2.72 -1.49,-6 -4.5,-6C14.63,6 14,7.8 14,9.5c0,3.11 2,5.66 2,8.68V20a2,2 0,1 0,4 0Z" />
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#2B2A28"
+                android:strokeWidth="2.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M16,17L20,17" />
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#2B2A28"
+                android:strokeWidth="2.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M4,13L8,13" />
+    </group>
+
+</vector>

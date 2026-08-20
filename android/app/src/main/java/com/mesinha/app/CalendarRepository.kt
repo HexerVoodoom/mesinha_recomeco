@@ -120,17 +120,39 @@ object CalendarRepository {
     }
 
     /**
-     * Fundo do dia. Segue o mesmo critério do Calendário de Encontros dentro
-     * do app (`MeetupCalendar.tsx`): a cor comunica o ESTADO — confirmado ou
-     * só proposto —, não o tipo do encontro. O tipo aparece no app pelo ícone
-     * dentro da célula, que não cabe num widget desse tamanho.
+     * Fundo do dia. Segue o Calendário de Encontros do app
+     * (`MeetupCalendar.tsx`): a COR comunica o estado — confirmado ou só
+     * proposto — e o selo do canto comunica o TIPO do encontro.
+     *
+     * Tudo num drawable só (layer-list) de propósito: pôr o ícone numa View
+     * separada exigiria um FrameLayout por célula, e o aninhamento é o padrão
+     * suspeito de ter quebrado o widget semanal. Assim continua sendo uma
+     * única chamada de setBackgroundResource.
+     *
+     * Encontro sem tipo cai no coração, como o app faz
+     * (`typeOf(item.meetupType)?.icon || Heart`).
      */
-    fun dayBackground(meetup: MeetupDay, isToday: Boolean = false): Int = when {
-        meetup.confirmed && isToday -> R.drawable.day_confirmado_hoje
-        meetup.confirmed -> R.drawable.day_confirmado
-        isToday -> R.drawable.day_proposto_hoje
-        else -> R.drawable.day_proposto
-    }
+    fun dayBackground(meetup: MeetupDay, isToday: Boolean = false): Int =
+        when (meetup.type) {
+            "videogame" -> when {
+                meetup.confirmed && isToday -> R.drawable.day_confirmado_videogame_hoje
+                meetup.confirmed -> R.drawable.day_confirmado_videogame
+                isToday -> R.drawable.day_proposto_videogame_hoje
+                else -> R.drawable.day_proposto_videogame
+            }
+            "pegadas" -> when {
+                meetup.confirmed && isToday -> R.drawable.day_confirmado_pegadas_hoje
+                meetup.confirmed -> R.drawable.day_confirmado_pegadas
+                isToday -> R.drawable.day_proposto_pegadas_hoje
+                else -> R.drawable.day_proposto_pegadas
+            }
+            else -> when {
+                meetup.confirmed && isToday -> R.drawable.day_confirmado_coracao_hoje
+                meetup.confirmed -> R.drawable.day_confirmado_coracao
+                isToday -> R.drawable.day_proposto_coracao_hoje
+                else -> R.drawable.day_proposto_coracao
+            }
+        }
 
     /** Cor do número do dia, casando com o fundo escolhido acima. */
     fun dayTextColor(meetup: MeetupDay): Int =
