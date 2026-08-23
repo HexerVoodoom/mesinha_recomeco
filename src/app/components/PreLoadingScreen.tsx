@@ -53,7 +53,7 @@ export function PreLoadingScreen({ onComplete }: PreLoadingScreenProps) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-white select-none touch-none"
+      className="fixed inset-0 z-[110] flex flex-col items-center justify-center select-none touch-none"
       initial={{ opacity: 1 }}
       animate={{ opacity: done ? 0 : 1 }}
       transition={{ duration: 0.6, ease: 'easeInOut' }}
@@ -65,13 +65,19 @@ export function PreLoadingScreen({ onComplete }: PreLoadingScreenProps) {
       onPointerLeave={stopHold}
       onPointerCancel={stopHold}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
+      style={{
+        // Mesmo tom de papel da ilustração, pra imagem não virar um retângulo
+        // recortado no meio da tela.
+        backgroundColor: '#f4f2ec',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+      }}
     >
       <img
         src={ninho}
         alt="Ninho"
         draggable={false}
-        className="w-full max-w-md px-6 pointer-events-none"
+        className="w-full max-w-xl px-6 pointer-events-none"
       />
     </motion.div>
   );
