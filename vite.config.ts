@@ -23,6 +23,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate', // Atualiza automaticamente em background
+      injectRegister: null, // registramos na mão em src/pwa.ts
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Mesinha App',
@@ -52,6 +53,9 @@ export default defineConfig({
       },
       workbox: {
         importScripts: ['/push-handler.js'],
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
