@@ -7,8 +7,8 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { PreLoadingScreen } from './components/PreLoadingScreen';
 
 // Liga/desliga a tela de abertura do ninho (a do tap and hold secreto de 10s).
-// Está desativada por enquanto — é só voltar pra `true` quando quiser de novo.
-const TELA_DE_ABERTURA_ATIVA = false;
+// Pra desligar de novo é só trocar pra `false`.
+const TELA_DE_ABERTURA_ATIVA = true;
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
