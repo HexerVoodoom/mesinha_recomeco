@@ -103,16 +103,17 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
   return cachedToken.token;
 }
 
+/** Devolve `true` só quando o FCM aceitou a mensagem para o aparelho. */
 export async function sendFcmToUser(
   user: string,
   title: string,
   body: string,
-): Promise<void> {
+): Promise<boolean> {
   const sa = await getServiceAccount();
-  if (!sa) return; // service account ainda não configurado
+  if (!sa) return false; // service account ainda não configurado
 
   const token = await kv.get(`fcm-token:${user}`);
-  if (!token || typeof token !== "string") return;
+  if (!token || typeof token !== "string") return false;
 
   const accessToken = await getAccessToken(sa);
   const res = await fetch(
@@ -147,7 +148,8 @@ export async function sendFcmToUser(
     ) {
       await kv.del(`fcm-token:${user}`);
     }
-  } else {
-    console.log(`[FCM] enviado para ${user}`);
+    return false;
   }
+  console.log(`[FCM] enviado para ${user}`);
+  return true;
 }
