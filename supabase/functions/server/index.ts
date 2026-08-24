@@ -10,13 +10,21 @@ const VAPID_PRIVATE_KEY = "V9PFLTWJWHdqXPGmuJZHfJds-L0nmme4kti5dD_nF5o";
 
 webpush.setVapidDetails("mailto:mateus.sprnd@gmail.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-async function sendPushToUser(user: string, payload: any): Promise<void> {
+/**
+ * Manda a notificação pelos dois canais (Web Push e FCM). Devolve `true` se
+ * ALGUM canal aceitou a mensagem — quem chama pode então dizer à pessoa se a
+ * notificação saiu de verdade em vez de fingir sucesso com o silêncio.
+ */
+async function sendPushToUser(user: string, payload: any): Promise<boolean> {
+  let entregue = false;
+
   // 1) Web Push (Chrome / PWA instalado pelo navegador).
   const subscription = await kv.get(`push-subscription:${user}`);
   if (subscription) {
     try {
       await webpush.sendNotification(subscription, JSON.stringify(payload));
       console.log(`[Push] Sent to ${user}`);
+      entregue = true;
     } catch (err: any) {
       console.error(`[Push] Failed to send to ${user}:`, err?.statusCode, err?.message);
       if (err?.statusCode === 410 || err?.statusCode === 404) {
@@ -27,14 +35,17 @@ async function sendPushToUser(user: string, payload: any): Promise<void> {
 
   // 2) FCM (app Android instalado). Ignorado se o secret não estiver configurado.
   try {
-    await sendFcmToUser(
+    const okFcm = await sendFcmToUser(
       user,
       String(payload?.title ?? "Mesinha"),
       String(payload?.body ?? ""),
     );
+    entregue = entregue || okFcm;
   } catch (err) {
     console.error(`[FCM] Failed to send to ${user}:`, err);
   }
+
+  return entregue;
 }
 
 // Rótulos do Calendário de Encontros (categoria "meetup"), usados nas
@@ -1364,27 +1375,39 @@ app.post("/make-server-19717bce/nudge", async (c) => {
         retryAfterSec: waitSec,
       }, 429);
     }
-    await kv.set(lastKey, now);
 
     const to = from === "Amanda" ? "Mateus" : "Amanda";
     const body = typeof message === "string" && message.trim()
       ? message.trim().substring(0, NUDGE_MAX_LEN)
       : "tá pensando em você agora 💭";
 
+    // A trava de 3 min é gravada só DEPOIS de a notificação sair. Gravada
+    // antes (como estava), uma cutucada que não chegou ainda deixava a pessoa
+    // 3 minutos travada — e a retentativa tomava 429 em vez de tentar de novo.
+    let entregue = false;
     try {
-      await sendPushToUser(to, {
+      entregue = await sendPushToUser(to, {
         title: `💌 ${from} te cutucou!`,
         body,
         tag: "mesinha-nudge",
         url: "/",
       });
     } catch (err) {
-      // A trava de 3 min já foi gravada: se o envio falhou, libera de novo em
-      // vez de deixar a pessoa 3 minutos travada por uma cutucada que nem saiu.
       console.error("[POST /nudge] Push failed:", err);
-      await kv.del(lastKey).catch(() => {});
       return c.json({ error: "Não deu pra cutucar agora. Tenta de novo!" }, 500);
     }
+
+    if (!entregue) {
+      // Nenhum canal aceitou (sem token FCM, sem inscrição de push, ou os dois
+      // recusaram). Antes disso a resposta era 200 e o widget dizia "enviada!"
+      // numa cutucada que não chegava em ninguém.
+      console.error(`[POST /nudge] Nenhum canal entregou para ${to}`);
+      return c.json({
+        error: `O ${to === "Amanda" ? "celular da Amanda" : "celular do Mateus"} não recebeu — pede pra abrir o app e ligar as notificações 🔔`,
+      }, 502);
+    }
+
+    await kv.set(lastKey, now);
 
     return c.json({ success: true, to });
   } catch (error) {

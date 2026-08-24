@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Notificações (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Segura a CPU enquanto o widget Cutucar termina de enviar a cutucada. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Localização (aba Mapa: navigator.geolocation dentro da WebView). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

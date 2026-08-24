@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.widget.RemoteViews
 import android.widget.Toast
 import org.json.JSONObject
@@ -108,9 +109,37 @@ class PokeWidgetProvider : AppWidgetProvider() {
         enviando.add(widgetId)
         renderWidget(appContext, manager, widgetId, PokeState.ENVIANDO)
 
-        // goAsync mantém o receiver vivo enquanto a thread faz o POST.
+        // goAsync mantém o receiver vivo enquanto a thread faz o POST, mas o
+        // sistema só dá ~10s pra ele. A função do servidor pode passar disso
+        // sozinha quando está fria (cold start): nos logs, uma cutucada que
+        // FUNCIONOU levou mais de 4s só na resposta. Com os timeouts curtos de
+        // antes o widget desistia no meio e mostrava "falhou" numa cutucada que
+        // tinha saído. Agora: timeouts folgados, um WakeLock pra CPU não dormir
+        // e o finish() do receiver com prazo próprio, para o envio continuar
+        // mesmo depois de o sistema considerar o broadcast encerrado.
         val pendingResult = goAsync()
         val mainHandler = Handler(Looper.getMainLooper())
+        val wakeLock = try {
+            (appContext.getSystemService(Context.POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "mesinha:cutucada")
+                .apply { acquire(WAKELOCK_MS) }
+        } catch (_: Exception) {
+            null
+        }
+        val receiverEncerrado = java.util.concurrent.atomic.AtomicBoolean(false)
+        val encerraReceiver = {
+            if (receiverEncerrado.compareAndSet(false, true)) {
+                try {
+                    pendingResult.finish()
+                } catch (_: Exception) {
+                    // Já encerrado pelo sistema: nada a fazer.
+                }
+            }
+        }
+        // Rede de segurança: encerra o broadcast antes do prazo do sistema,
+        // mesmo que o POST ainda esteja em curso (o WakeLock segura a CPU).
+        mainHandler.postDelayed({ encerraReceiver() }, RECEIVER_LIMITE_MS)
+
         Thread {
             var enviado = false
             val aviso: String = try {
@@ -118,7 +147,12 @@ class PokeWidgetProvider : AppWidgetProvider() {
                     put("from", from)
                     if (!message.isNullOrBlank()) put("message", message)
                 }
-                val (code, responseText) = WidgetCommon.postJson(URL_NUDGE, body.toString())
+                val (code, responseText) = WidgetCommon.postJson(
+                    URL_NUDGE,
+                    body.toString(),
+                    connectTimeoutMs = NUDGE_CONNECT_TIMEOUT_MS,
+                    readTimeoutMs = NUDGE_READ_TIMEOUT_MS
+                )
                 if (code in 200..299) {
                     enviado = true
                     val to = if (from == "Amanda") "Mateus" else "Amanda"
@@ -132,6 +166,11 @@ class PokeWidgetProvider : AppWidgetProvider() {
                     }
                     serverError.ifBlank { appContext.getString(R.string.widget_poke_failed) }
                 }
+            } catch (_: java.net.SocketTimeoutException) {
+                // Estourou o tempo esperando o servidor: a cutucada pode ter
+                // saído mesmo assim. Dizer "falhou" seco fazia a pessoa cutucar
+                // de novo e tomar o rate limit de 3 min por cima.
+                appContext.getString(R.string.widget_poke_slow)
             } catch (_: Exception) {
                 appContext.getString(R.string.widget_poke_failed)
             }
@@ -147,7 +186,7 @@ class PokeWidgetProvider : AppWidgetProvider() {
                     widgetId,
                     if (enviado) PokeState.ENVIADO else PokeState.ERRO
                 )
-                pendingResult.finish()
+                encerraReceiver()
                 // Volta ao normal depois de alguns segundos. Se o processo morrer
                 // antes, o próximo toque (ou o update de 30 min) resolve.
                 mainHandler.postDelayed({
@@ -158,6 +197,13 @@ class PokeWidgetProvider : AppWidgetProvider() {
                         widgetId,
                         PokeState.PRONTO
                     )
+                    if (wakeLock?.isHeld == true) {
+                        try {
+                            wakeLock.release()
+                        } catch (_: Exception) {
+                            // WakeLock já liberado pelo timeout do acquire().
+                        }
+                    }
                 }, VOLTA_AO_NORMAL_MS)
             }
         }.start()
@@ -170,6 +216,20 @@ class PokeWidgetProvider : AppWidgetProvider() {
             "https://oubdmmaqxnutbbxiqeow.supabase.co/functions/v1/make-server-19717bce/nudge"
 
         private const val VOLTA_AO_NORMAL_MS = 6000L
+
+        /**
+         * Tempo dado ao servidor. A função do Supabase em cold start já levou
+         * mais de 4s pra responder uma cutucada que deu certo — os 3s+4s de
+         * antes viravam "falhou" em cima de cutucada entregue.
+         */
+        private const val NUDGE_CONNECT_TIMEOUT_MS = 6000
+        private const val NUDGE_READ_TIMEOUT_MS = 12000
+
+        /** Prazo do goAsync: o sistema mata o receiver por volta de 10s. */
+        private const val RECEIVER_LIMITE_MS = 8000L
+
+        /** Segura a CPU até o POST terminar, já com o receiver encerrado. */
+        private const val WAKELOCK_MS = 30000L
 
         /**
          * Widgets com cutucada em curso. Serve só para o redesenho automático

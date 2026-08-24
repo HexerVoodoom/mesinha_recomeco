@@ -42,6 +42,7 @@
     <string name="widget_poke_not_configured">Remove e adiciona o widget de novo pra configurar a cutucada 💌</string>
     <string name="widget_poke_sent">Cutucada enviada! %1$s vai receber agora 💌</string>
     <string name="widget_poke_failed">Não deu pra cutucar agora. Tenta de novo!</string>
+    <string name="widget_poke_slow">Demorou demais pra responder. Pode ser que a cutucada tenha ido — espera um pouquinho antes de tentar de novo 💌</string>
     <string name="widget_poke_config_title">Cutucada da tela inicial 💌</string>
     <string name="widget_poke_config_who">Quem tá cutucando?</string>
     <string name="widget_poke_config_message">Mensagem enviada a cada toque</string>
