@@ -27,7 +27,20 @@ self.addEventListener('notificationclick', function (event) {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
       for (var i = 0; i < clientList.length; i++) {
-        if ('focus' in clientList[i]) return clientList[i].focus();
+        var client = clientList[i];
+        if ('focus' in client) {
+          // Leva a aba já aberta até a tela da notificação antes de focar —
+          // antes o endereço mandado no push era simplesmente ignorado quando
+          // o app já estava aberto.
+          if ('navigate' in client && url) {
+            return client.navigate(url).then(function (focado) {
+              return (focado || client).focus();
+            }).catch(function () {
+              return client.focus();
+            });
+          }
+          return client.focus();
+        }
       }
       if (clients.openWindow) return clients.openWindow(url);
     })

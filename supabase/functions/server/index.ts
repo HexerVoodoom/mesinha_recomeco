@@ -540,6 +540,14 @@ app.post("/make-server-19717bce/fcm-token", async (c) => {
       return c.json({ error: "Token invalido" }, 400);
     }
     await kv.set(`fcm-token:${profile}`, token);
+    // O mesmo aparelho registrado antes no outro perfil continuava lá: as
+    // notificações dos DOIS passavam a chegar nele. Um token é de um aparelho
+    // só, então ele sai do outro perfil quando muda de dono.
+    const outroPerfil = profile === "Amanda" ? "Mateus" : "Amanda";
+    if ((await kv.get(`fcm-token:${outroPerfil}`)) === token) {
+      await kv.del(`fcm-token:${outroPerfil}`);
+      console.log(`[FCM] Token migrado de ${outroPerfil} para ${profile}`);
+    }
     return c.json({ success: true });
   } catch (error) {
     console.log("Error saving fcm token:", error);
@@ -798,6 +806,14 @@ app.post("/make-server-19717bce/push-subscription", async (c) => {
     if (!profile || !subscription) return c.json({ error: "Missing profile or subscription" }, 400);
     if (profile !== "Amanda" && profile !== "Mateus") return c.json({ error: "Invalid profile" }, 400);
     await kv.set(`push-subscription:${profile}`, subscription);
+    // Mesmo caso do token FCM: a inscrição deste navegador sai do outro perfil
+    // para as notificações dele não continuarem caindo aqui.
+    const outroPerfil = profile === "Amanda" ? "Mateus" : "Amanda";
+    const doOutro = await kv.get(`push-subscription:${outroPerfil}`);
+    if (doOutro?.endpoint && subscription?.endpoint && doOutro.endpoint === subscription.endpoint) {
+      await kv.del(`push-subscription:${outroPerfil}`);
+      console.log(`[Push] Inscrição migrada de ${outroPerfil} para ${profile}`);
+    }
     console.log(`[Push] Subscription saved for ${profile}`);
     return c.json({ success: true });
   } catch (error) {

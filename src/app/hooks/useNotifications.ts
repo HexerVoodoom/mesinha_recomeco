@@ -64,14 +64,19 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
     }
   }, [currentUser]);
 
-  // Função para mostrar notificação
-  const showNotification = (title: string, body: string) => {
+  // Função para mostrar notificação.
+  //
+  // A `tag` é a MESMA usada pelo servidor no push equivalente. Sem isso, um
+  // lembrete (ou um post novo no Mural) chegava duas vezes com o app aberto:
+  // uma pelo push do servidor e outra por esta notificação local. Com a tag
+  // igual, a segunda substitui a primeira em vez de empilhar.
+  const showNotification = (title: string, body: string, tag = 'mesinha-reminder') => {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(`💝 Mesinha - ${title}`, {
         body,
         icon: faviconImage,
         badge: faviconImage,
-        tag: 'mesinha-reminder',
+        tag,
         requireInteraction: false,
         silent: false,
       });
@@ -100,7 +105,7 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
     const alreadyNotified = lastNotified.current.get(schedule.itemId) === fireKey;
 
     if (shouldNotifyToday && isRightTime && !alreadyNotified) {
-      showNotification('Lembrete', schedule.title);
+      showNotification('Lembrete', schedule.title, `reminder-${schedule.itemId}`);
       lastNotified.current.set(schedule.itemId, fireKey);
     }
   };
@@ -160,7 +165,8 @@ export function useNotifications(currentUser: 'Amanda' | 'Mateus' | null) {
 
       showNotification(
         'Novo no Mural!',
-        `${item.createdBy} adicionou: ${typeEmoji} ${item.title || 'Novo post'}`
+        `${item.createdBy} adicionou: ${typeEmoji} ${item.title || 'Novo post'}`,
+        'mesinha-mural'
       );
     }
   };
