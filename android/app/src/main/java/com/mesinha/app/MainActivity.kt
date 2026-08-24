@@ -202,11 +202,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshWidgets() {
+        // A lista tem que cobrir TODOS os widgets que se atualizam pelo
+        // disparo diário — os dois calendários ficavam de fora e eram
+        // justamente os que não se curavam ao abrir o app (o BootReceiver já
+        // os reagendava; só a autocura tinha esquecido deles).
         val providers = listOf(
             MesinhaWidgetProvider::class.java,
             AlpaquinhaWidgetProvider::class.java,
             CorvinhoWidgetProvider::class.java,
-            MeetupWidgetProvider::class.java
+            MeetupWidgetProvider::class.java,
+            CalendarWidgetProvider::class.java,
+            CalendarWeekWidgetProvider::class.java
         )
         for (cls in providers) {
             sendBroadcast(

@@ -122,8 +122,10 @@ object Dialogues {
      */
     fun dailyIndex(size: Int): Int {
         if (size <= 0) return 0
-        val date = LocalDate.now()
-        val n = date.dayOfYear.toLong() + date.year.toLong() * 365L
+        // Dias desde 1970. A conta antiga (dia-do-ano + ano*365) dava o MESMO
+        // número no 31/12 de um ano bissexto e no 1º de janeiro seguinte — a
+        // frase do dia ficava repetida bem na virada do ano.
+        val n = LocalDate.now().toEpochDay()
         return Math.floorMod(n, size.toLong()).toInt()
     }
 }

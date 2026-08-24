@@ -48,6 +48,7 @@
     <string name="widget_poke_config_message">Mensagem enviada a cada toque</string>
     <string name="widget_poke_config_custom">Escrever a minha…</string>
     <string name="widget_poke_config_custom_hint">Ex: comprei aquele doce que você ama</string>
+    <string name="widget_poke_config_write_message">Escreve a mensagem ou escolhe uma das prontas 💌</string>
     <string name="widget_poke_config_pick_who">Escolhe quem tá cutucando primeiro 😉</string>
     <string name="widget_poke_config_save">Salvar widget</string>
 </resources>

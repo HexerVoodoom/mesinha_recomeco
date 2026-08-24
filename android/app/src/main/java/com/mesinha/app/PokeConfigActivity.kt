@@ -110,6 +110,18 @@ class PokeConfigActivity : AppCompatActivity() {
                     in 10 until 10 + QUICK_MESSAGES.size -> QUICK_MESSAGES[checked - 10]
                     else -> null
                 }
+                // "Escrever a minha…" com o campo em branco salvava mensagem
+                // vazia, e o widget passava a mandar a frase padrão do servidor
+                // — sem nunca dizer que a mensagem escolhida se perdeu.
+                if (messageGroup.checkedRadioButtonId == 99 && message.isNullOrBlank()) {
+                    customInput.requestFocus()
+                    android.widget.Toast.makeText(
+                        this@PokeConfigActivity,
+                        R.string.widget_poke_config_write_message,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnClickListener
+                }
                 PokeConfig.save(this@PokeConfigActivity, widgetId, from, message)
 
                 // Ordem: setResult só grava o resultado num campo — quem
