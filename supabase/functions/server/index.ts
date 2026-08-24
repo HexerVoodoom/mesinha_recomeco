@@ -385,10 +385,12 @@ app.put("/make-server-19717bce/items/:id", async (c) => {
       return c.json({ error: "Item not found" }, 404);
     }
 
-    // Validate photo size if being updated (max 2MB base64 to prevent connection issues)
-    if (body.photo && body.photo.length > 3000000) {
-      console.warn("Photo rejected: too large");
-      return c.json({ error: "Photo too large. Maximum size is 2MB. Please compress the image." }, 400);
+    // Mesmo limite do POST. Com o teto menor aqui, editar um item que JÁ tinha
+    // uma foto grande (o cliente reenvia a foto inteira) era rejeitado — dava
+    // pra criar, mas nunca mais mexer no item.
+    if (body.photo && body.photo.length > 10000000) {
+      console.warn("Photo rejected: too large", body.photo.length);
+      return c.json({ error: "Foto muito grande. Use uma imagem menor que 6MB." }, 400);
     }
 
     const updatedItem = {
@@ -898,37 +900,42 @@ function shapeQuestion(item: any, profile: string | null) {
   };
 }
 
+/** Pergunta de hoje, criando-a se ainda não existir (mesma para os dois). */
+async function garanteQuestionDoDia(todayStr: string): Promise<any> {
+  const itemId = `question-${todayStr}`;
+  const existente = await kv.get(`item:${itemId}`);
+  if (existente) return existente;
+
+  const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
+  const usedQuestions: string[] = (await kv.get("question-used")) || [];
+  const question = pickQuestionForDay(bank, usedQuestions, todayStr);
+  const item = {
+    id: itemId,
+    title: question,
+    comment: "",
+    category: "question",
+    eventDate: todayStr,
+    photo: null,
+    reminderEnabled: false,
+    createdBy: "Mesinha",
+    createdAt: new Date().toISOString(),
+    status: "pending",
+    tags: [],
+    answerAmanda: null,
+    answerMateus: null,
+  };
+  await kv.set(`item:${itemId}`, item);
+  // Guarda as últimas 60 usadas para não repetir tão cedo.
+  await kv.set("question-used", [...usedQuestions, question].slice(-60));
+  return item;
+}
+
 // Pergunta de hoje — cria na primeira chamada do dia (mesma para os dois).
 app.get("/make-server-19717bce/question-of-the-day", async (c) => {
   try {
     const profile = c.req.query("profile") || null;
     const todayStr = brazilNow().toISOString().slice(0, 10);
-    const itemId = `question-${todayStr}`;
-    let item = await kv.get(`item:${itemId}`);
-
-    if (!item) {
-      const bank: string[] = (await kv.get(QUESTION_BANK_KEY)) || [];
-      const usedQuestions: string[] = (await kv.get("question-used")) || [];
-      const question = pickQuestionForDay(bank, usedQuestions, todayStr);
-      item = {
-        id: itemId,
-        title: question,
-        comment: "",
-        category: "question",
-        eventDate: todayStr,
-        photo: null,
-        reminderEnabled: false,
-        createdBy: "Mesinha",
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        tags: [],
-        answerAmanda: null,
-        answerMateus: null,
-      };
-      await kv.set(`item:${itemId}`, item);
-      // Guarda as últimas 60 usadas para não repetir tão cedo.
-      await kv.set("question-used", [...usedQuestions, question].slice(-60));
-    }
+    const item = await garanteQuestionDoDia(todayStr);
 
     return c.json(shapeQuestion(item, profile));
   } catch (error) {
@@ -951,10 +958,10 @@ app.post("/make-server-19717bce/question-of-the-day/answer", async (c) => {
 
     const todayStr = brazilNow().toISOString().slice(0, 10);
     const itemId = `question-${todayStr}`;
-    const item = await kv.get(`item:${itemId}`);
-    if (!item) {
-      return c.json({ error: "A pergunta de hoje ainda não foi criada" }, 404);
-    }
+    // Cria a pergunta se ela ainda não existir em vez de devolver 404: quem
+    // responde pela virada da meia-noite (ou vindo direto da notificação, sem
+    // o GET antes) perdia a resposta escrita.
+    const item = await garanteQuestionDoDia(todayStr);
 
     const field = profile === "Amanda" ? "answerAmanda" : "answerMateus";
     const wasRevealed = !!item.answerAmanda && !!item.answerMateus;
@@ -1606,6 +1613,34 @@ function brazilNow(): Date {
   return new Date(Date.now() + BRAZIL_OFFSET_MS);
 }
 
+/**
+ * Varre TODAS as páginas de uma categoria na listagem leve, aplicando o filtro
+ * em cada página. A listagem vem ordenada por `createdAt` DESC, então cortar
+ * nas N mais RECENTES é uma armadilha: encontro (e cápsula) é criado com muita
+ * antecedência, então justamente o item de hoje pode estar fora das 50 últimas
+ * criadas. Os limites fixos faziam o widget de calendário e o lembrete das
+ * 08:00 simplesmente não enxergarem esses dias.
+ */
+async function varreCategoria(
+  categoria: string,
+  mantem: (item: any) => boolean,
+  tamanhoPagina = 100,
+): Promise<any[]> {
+  const encontrados: any[] = [];
+  for (let offset = 0; ; offset += tamanhoPagina) {
+    const { items: pagina, total } = await kv.getItemsLightPaged({
+      offset,
+      limit: tamanhoPagina,
+      categoryFilter: categoria,
+    });
+    for (const item of pagina as any[]) {
+      if (mantem(item)) encontrados.push(item);
+    }
+    if (pagina.length === 0 || offset + tamanhoPagina >= total) break;
+  }
+  return encontrados;
+}
+
 // Estado do dia para o widget nativo "Encontro hoje?": devolve se HOJE (fuso
 // de Brasília, igual ao resto do app) está confirmado no Calendário de
 // Encontros e, se estiver, o tipo (coração/video game/pegadas) pra escolher o
@@ -1613,12 +1648,11 @@ function brazilNow(): Date {
 app.get("/make-server-19717bce/meetup-today", async (c) => {
   try {
     const todayStr = brazilNow().toISOString().slice(0, 10);
-    const { items } = await kv.getItemsLightPaged({
-      offset: 0,
-      limit: 50,
-      categoryFilter: "meetup",
-    });
-    const todayItem = items.find((item: any) => item.eventDate === todayStr && item.status === "done");
+    const doHoje = await varreCategoria(
+      "meetup",
+      (item: any) => item.eventDate === todayStr && item.status === "done",
+    );
+    const todayItem = doHoje[0];
     return c.json({
       date: todayStr,
       confirmed: !!todayItem,
@@ -1645,15 +1679,12 @@ app.get("/make-server-19717bce/meetup-month", async (c) => {
     const monthStr = /^\d{4}-\d{2}$/.test(requestedMonth || "")
       ? requestedMonth!
       : brazilNow().toISOString().slice(0, 7); // "YYYY-MM"
-    const { items } = await kv.getItemsLightPaged({
-      offset: 0,
-      limit: 100,
-      categoryFilter: "meetup",
-    });
-    const days = items
-      .filter((item: any) =>
-        typeof item.eventDate === "string" && item.eventDate.startsWith(monthStr)
-      )
+    const doMes = await varreCategoria(
+      "meetup",
+      (item: any) =>
+        typeof item.eventDate === "string" && item.eventDate.startsWith(monthStr),
+    );
+    const days = doMes
       .map((item: any) => ({
         date: item.eventDate,
         type: item.meetupType || null,
@@ -1690,18 +1721,13 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   // Buscar itens de lembrete ativos. limit baixo (50) porque alarmes são poucos
   // e o cron roda a cada minuto — queries grandes aqui desperdiçam Disk IO.
   // Versão "light" basta: todos os campos de lembrete são pequenos e mantidos.
-  const { items: allItems } = await kv.getItemsLightPaged({
-    offset: 0,
-    limit: 50,
-    categoryFilter: "alarm",
-  });
-
-  const alarmItems = allItems.filter((item: any) =>
-    item.category === "alarm" &&
-    item.reminderActive !== false &&
-    item.reminderTime &&
-    Array.isArray(item.reminderDays) &&
-    item.reminderDays.length > 0
+  const alarmItems = await varreCategoria(
+    "alarm",
+    (item: any) =>
+      item.reminderActive !== false &&
+      item.reminderTime &&
+      Array.isArray(item.reminderDays) &&
+      item.reminderDays.length > 0,
   );
 
   const fired: string[] = [];
@@ -1732,7 +1758,7 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
       url: "/",
     };
 
-    const sends: Promise<void>[] = [];
+    const sends: Promise<boolean>[] = [];
     if (item.reminderForMateus) sends.push(sendPushToUser("Mateus", payload));
     if (item.reminderForAmanda) sends.push(sendPushToUser("Amanda", payload));
     await Promise.all(sends);
@@ -1749,12 +1775,10 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
   if (Math.abs(nowMinutes - MEETUP_REMINDER_MINUTES) <= 1) {
     const meetupReminderKey = "meetup-reminder-last-fired";
     if ((await kv.get(meetupReminderKey)) !== todayStr) {
-      const { items: meetupItems } = await kv.getItemsLightPaged({
-        offset: 0,
-        limit: 50,
-        categoryFilter: "meetup",
-      });
-      const todayMeetup = meetupItems.find((item: any) => item.eventDate === todayStr && item.status === "done");
+      const todayMeetup = (await varreCategoria(
+        "meetup",
+        (item: any) => item.eventDate === todayStr && item.status === "done",
+      ))[0];
       if (todayMeetup) {
         const payload = {
           title: "Hoje é dia de encontro! 💕",
@@ -1780,19 +1804,10 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
       // 50 mais recentes deixaria de fora justamente as mais antigas, que são
       // as que estão abrindo hoje. A projeção é leve (sem mídia) e isso roda
       // uma vez por dia, às 08:00.
-      const opening: any[] = [];
-      const CAPSULE_PAGE = 100;
-      for (let offset = 0; ; offset += CAPSULE_PAGE) {
-        const { items: page, total } = await kv.getItemsLightPaged({
-          offset,
-          limit: CAPSULE_PAGE,
-          categoryFilter: "capsule",
-        });
-        for (const item of page as any[]) {
-          if (item.eventDate === todayStr) opening.push(item);
-        }
-        if (page.length === 0 || offset + CAPSULE_PAGE >= total) break;
-      }
+      const opening = await varreCategoria(
+        "capsule",
+        (item: any) => item.eventDate === todayStr,
+      );
       for (const capsule of opening) {
         const payload = {
           title: "Uma cápsula do tempo abriu! 🎉",
