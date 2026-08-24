@@ -447,13 +447,28 @@ export default function Home() {
             return merged;
           });
         } else {
-          // Refresh completo: fetchedItems é a resposta real do servidor (100 mais
-          // recentes). Preserva itens do mural que já estavam em `prev` mas ficaram
-          // fora dos 100 gerais (o refreshCategoryItems busca até 200 especificamente).
+          // Refresh completo: fetchedItems é a resposta real do servidor (os
+          // 100 mais recentes). Preserva o que ficou FORA dessa janela — o que
+          // já estava na tela e é mais antigo que o item mais antigo devolvido
+          // agora. Antes só o mural era preservado, então qualquer categoria
+          // carregada pelo refreshCategoryItems (que busca até 200) sumia da
+          // tela no refresh geral seguinte.
+          //
+          // A preservação só vale quando houve corte de fato (a página veio
+          // cheia). Sem isso, um item apagado pelo outro voltaria à tela: ele
+          // some da resposta e seria confundido com "ficou fora da janela".
           setItems(prev => {
             const serverIds = new Set(fetchedItems.map(i => i.id));
-            const extraMuralItems = prev.filter(i => i.category === 'mural' && !serverIds.has(i.id));
-            const merged = confirmAndMergePending([...fetchedItems, ...extraMuralItems]);
+            const houveCorte = result.hasMore || fetchedItems.length >= 100;
+            const maisAntigoDoServidor = fetchedItems.reduce<string | null>(
+              (menor, i) => (i.createdAt && (!menor || i.createdAt < menor) ? i.createdAt : menor),
+              null,
+            );
+            const foraDaJanela = houveCorte && maisAntigoDoServidor
+              ? prev.filter(i =>
+                  !serverIds.has(i.id) && !!i.createdAt && i.createdAt < maisAntigoDoServidor)
+              : [];
+            const merged = confirmAndMergePending([...fetchedItems, ...foraDaJanela]);
             saveItemsToStorage(merged);
             return merged;
           });
