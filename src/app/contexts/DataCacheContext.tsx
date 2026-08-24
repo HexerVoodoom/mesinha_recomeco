@@ -109,52 +109,40 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
-  // Atualiza um item no cache local imediatamente (optimistic update)
-  const updateItem = useCallback((id: string, updates: Partial<ListItem>) => {
-    setItems(prev => prev.map(item => 
-      item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
-    ));
-    
-    // Atualiza o cache do localStorage também
+  // O localStorage é gravado a partir da lista NOVA calculada dentro do
+  // setItems. Gravar a partir do `items` capturado pelo callback usava uma
+  // lista velha: duas ações seguidas (adicionar dois itens, curtir e comentar)
+  // salvavam por cima uma da outra e o cache voltava com o estado anterior no
+  // próximo reload.
+  const persistCache = (novaLista: ListItem[]) => {
     try {
-      const updatedItems = items.map(item => 
-        item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
-      );
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updatedItems));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(novaLista));
     } catch (err) {
       console.error('[DataCache] Error updating cache:', err);
     }
-  }, [items]);
+    return novaLista;
+  };
+
+  // Atualiza um item no cache local imediatamente (optimistic update)
+  const updateItem = useCallback((id: string, updates: Partial<ListItem>) => {
+    setItems(prev => persistCache(prev.map(item =>
+      item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
+    )));
+  }, []);
 
   // Adiciona um item no cache local imediatamente
   const addItem = useCallback((item: ListItem) => {
     setItems(prev => {
       // Evita duplicatas
       if (prev.some(i => i.id === item.id)) return prev;
-      return [...prev, item];
+      return persistCache([...prev, item]);
     });
-    
-    // Atualiza o cache do localStorage também
-    try {
-      const updatedItems = [...items, item];
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updatedItems));
-    } catch (err) {
-      console.error('[DataCache] Error updating cache:', err);
-    }
-  }, [items]);
+  }, []);
 
   // Remove um item no cache local imediatamente
   const deleteItem = useCallback((id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
-    
-    // Atualiza o cache do localStorage também
-    try {
-      const updatedItems = items.filter(item => item.id !== id);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updatedItems));
-    } catch (err) {
-      console.error('[DataCache] Error updating cache:', err);
-    }
-  }, [items]);
+    setItems(prev => persistCache(prev.filter(item => item.id !== id)));
+  }, []);
 
   const value = {
     items,

@@ -23,7 +23,11 @@ const callbacks: Set<SyncCallback> = new Set();
 
 // Inicializa o canal (chamado automaticamente)
 function initChannel() {
-  if (channelInstance && isSubscribed) {
+  // Enquanto o canal existir ele é reaproveitado, mesmo que a subscrição ainda
+  // esteja em andamento. Antes, qualquer chamada durante a conexão criava um
+  // canal NOVO por cima: o anterior ficava pendurado sem unsubscribe e a
+  // promise de subscrição era trocada no meio do caminho.
+  if (channelInstance) {
     return channelInstance;
   }
 
@@ -51,6 +55,15 @@ function initChannel() {
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           isSubscribed = true;
+          resolve();
+          return;
+        }
+        // Erro/timeout/canal fechado também resolvem: a promise só era
+        // resolvida no sucesso, então um realtime fora do ar deixava
+        // `broadcastSync` esperando PARA SEMPRE — e com ele o salvar item, que
+        // dá await nele depois de o servidor já ter gravado tudo.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          isSubscribed = false;
           resolve();
         }
       });
@@ -82,12 +95,20 @@ export function subscribeToSync(callback: SyncCallback): () => void {
 }
 
 // Envia um evento para todos os clientes conectados
+/** Teto de espera pela conexão do realtime antes de mandar o broadcast. */
+const SUBSCRIBE_TIMEOUT_MS = 5000;
+
 export async function broadcastSync(event: SyncEvent): Promise<void> {
   const channel = initChannel();
-  
-  // Aguardar até que o canal esteja subscrito antes de enviar
+
+  // Aguardar até que o canal esteja subscrito antes de enviar — com teto de
+  // tempo. O broadcast é um extra (o dado JÁ foi salvo no servidor), então ele
+  // nunca pode segurar a interface se o realtime estiver lento.
   if (subscriptionPromise && !isSubscribed) {
-    await subscriptionPromise;
+    await Promise.race([
+      subscriptionPromise,
+      new Promise<void>((resolve) => setTimeout(resolve, SUBSCRIBE_TIMEOUT_MS)),
+    ]);
   }
   
   try {
