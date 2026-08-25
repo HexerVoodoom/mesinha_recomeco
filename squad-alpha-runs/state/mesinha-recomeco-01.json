@@ -1,0 +1,32 @@
+{
+  "run": "mesinha-recomeco-01",
+  "alvo": "mesinha_recomeco",
+  "workdir": "C:/Users/spera/Desktop/desktop/mesinha_recomeco/squad-alpha-runs",
+  "contexto": {
+    "resolvido": true,
+    "lacunas": [
+      "§1 intencao/estagio",
+      "§2 o alvo do recomeco",
+      "§4 integral (nenhuma instrumentacao, e a ausencia e promessa escrita em privacy.html)",
+      "§5 prazo/orcamento",
+      "§6 postura LGPD",
+      "§10 integral"
+    ]
+  },
+  "phase": { "current": 0, "total": 6, "label": "discovery" },
+  "perfil": "[a definir]",
+  "modo": "validar",
+  "entrada": 0,
+  "herdado": [],
+  "invalidados": [],
+  "pendencias": [
+    "P1 o que e o recomeco (Play Store como app novo / refundacao tecnica / nativo / outro) — redefine o run inteiro",
+    "P2 existe data-alvo",
+    "P5 a senha hardcoded muda com a publicacao (default: registrar e nao implementar nada)",
+    "P7 push e FCM, Web Push ou os dois — suspeita de causa raiz das notificacoes duplicadas",
+    "alpha-delivery-ops inativo ate o rastreador ser declarado (§8)",
+    "working tree local 11 dias atras do origin/main — git fetch antes de ler o disco como verdade"
+  ],
+  "status": "checkpoint",
+  "updatedAt": "2026-08-25"
+}
