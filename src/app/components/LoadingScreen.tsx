@@ -8,31 +8,38 @@ interface LoadingScreenProps {
 
 // Quanto tempo a animação fica na tela antes do fade.
 const DURACAO_INTRO = 3000;
-// Se o vídeo não estiver pronto nesse tempo (rede/aparelho lento), a gente vai
-// direto pro app — melhor abrir rápido do que travar na abertura.
+// Se o vídeo não começar a tocar nesse tempo (aparelho/rede lentos), a gente
+// vai direto pro app — melhor abrir rápido do que travar na abertura.
 const ESPERA_MAXIMA = 2000;
 
 export function LoadingScreen({ onComplete }: LoadingScreenProps) {
   const [startFade, setStartFade] = useState(false);
+  // O vídeo só aparece depois que já está rodando: enquanto ele está parado,
+  // a WebView desenha o botão de "play" por cima, e era isso que piscava na
+  // tela por um segundo no começo.
+  const [tocando, setTocando] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const contando = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Só começa a contar os 3s quando o vídeo tem quadro pra mostrar, pra
-  // animação rodar do começo e não aparecer pela metade.
   useEffect(() => {
-    const comecarIntro = () => {
+    const video = videoRef.current;
+
+    // Só começa a contar os 3s quando o vídeo realmente começou a rodar, pra
+    // animação ser vista do começo.
+    const aoComecar = () => {
+      setTocando(true);
       if (contando.current) return;
       contando.current = true;
       timerRef.current = setTimeout(() => setStartFade(true), DURACAO_INTRO);
     };
 
-    const video = videoRef.current;
-    if (video && video.readyState >= 2) {
-      comecarIntro();
-    } else {
-      video?.addEventListener('loadeddata', comecarIntro, { once: true });
-    }
+    video?.addEventListener('playing', aoComecar);
+    // Alguns navegadores engasgam no autoplay do atributo; pedir na mão ajuda.
+    video?.play().catch(() => {
+      // autoplay bloqueado: não trava a abertura, segue pro app
+      setStartFade(true);
+    });
 
     // Rede ruim: não segura a abertura esperando o vídeo.
     const desistir = setTimeout(() => {
@@ -42,7 +49,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     }, ESPERA_MAXIMA);
 
     return () => {
-      video?.removeEventListener('loadeddata', comecarIntro);
+      video?.removeEventListener('playing', aoComecar);
       clearTimeout(desistir);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -66,6 +73,17 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       }}
       onClick={handleSkip}
     >
+      {/* Esconde o botão de play e os controles que a WebView/iOS desenham
+          por cima do vídeo enquanto ele não está tocando. */}
+      <style>{`
+        .intro-video::-webkit-media-controls,
+        .intro-video::-webkit-media-controls-panel,
+        .intro-video::-webkit-media-controls-start-playback-button,
+        .intro-video::-webkit-media-controls-overlay-play-button {
+          display: none !important;
+          -webkit-appearance: none;
+        }
+      `}</style>
       <video
         ref={videoRef}
         src={introVideo}
@@ -73,8 +91,11 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
         muted
         playsInline
         preload="auto"
-        // Sem loop: 3s é bem menos que o vídeo, então ele nunca chega ao fim.
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        controls={false}
+        disablePictureInPicture
+        disableRemotePlayback
+        className="intro-video absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200"
+        style={{ opacity: tocando ? 1 : 0 }}
         // Se o vídeo falhar por qualquer motivo, passa direto pro app.
         onError={() => setStartFade(true)}
       />
