@@ -1,67 +1,50 @@
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import introVideo from '../../assets/intro-abertura.mp4';
 
 interface LoadingScreenProps {
   onComplete: () => void;
 }
 
-const INTRO_GIF = 'https://i.imgur.com/RfJIuEz.gif';
-
-// Quanto tempo a animação fica na tela depois que o GIF realmente carregou.
+// Quanto tempo a animação fica na tela antes do fade.
 const DURACAO_INTRO = 3000;
-// Se a internet estiver ruim e o GIF não chegar nesse tempo, a gente desiste
-// dele e vai direto pro app (melhor abrir rápido do que travar na abertura).
-const ESPERA_MAXIMA_DO_GIF = 2000;
+// Se o vídeo não estiver pronto nesse tempo (rede/aparelho lento), a gente vai
+// direto pro app — melhor abrir rápido do que travar na abertura.
+const ESPERA_MAXIMA = 2000;
 
 export function LoadingScreen({ onComplete }: LoadingScreenProps) {
   const [startFade, setStartFade] = useState(false);
-  // Só mostra o <img> quando o GIF já está no cache do navegador — assim a
-  // animação começa do primeiro quadro em vez de aparecer pela metade.
-  const [gifPronto, setGifPronto] = useState(false);
-  const finalizado = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const contando = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Pré-carrega o GIF e só então começa a contar o tempo da intro.
+  // Só começa a contar os 3s quando o vídeo tem quadro pra mostrar, pra
+  // animação rodar do começo e não aparecer pela metade.
   useEffect(() => {
-    let cancelado = false;
-
     const comecarIntro = () => {
-      if (cancelado || finalizado.current) return;
-      finalizado.current = true;
-      setTimeout(() => setStartFade(true), DURACAO_INTRO);
+      if (contando.current) return;
+      contando.current = true;
+      timerRef.current = setTimeout(() => setStartFade(true), DURACAO_INTRO);
     };
 
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = INTRO_GIF;
-
-    const aoCarregar = () => {
-      if (cancelado) return;
-      setGifPronto(true);
+    const video = videoRef.current;
+    if (video && video.readyState >= 2) {
       comecarIntro();
-    };
-
-    if (img.complete) {
-      aoCarregar();
     } else {
-      img.onload = aoCarregar;
-      img.onerror = () => {
-        // Sem GIF, não faz sentido segurar a tela: passa direto.
-        if (!cancelado) setStartFade(true);
-      };
+      video?.addEventListener('loadeddata', comecarIntro, { once: true });
     }
 
-    // Rede ruim: não deixa a abertura travando esperando o GIF.
+    // Rede ruim: não segura a abertura esperando o vídeo.
     const desistir = setTimeout(() => {
-      if (cancelado || finalizado.current) return;
-      finalizado.current = true;
+      if (contando.current) return;
+      contando.current = true;
       setStartFade(true);
-    }, ESPERA_MAXIMA_DO_GIF);
+    }, ESPERA_MAXIMA);
 
     return () => {
-      cancelado = true;
+      video?.removeEventListener('loadeddata', comecarIntro);
       clearTimeout(desistir);
-      img.onload = null;
-      img.onerror = null;
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
@@ -75,7 +58,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       className="fixed inset-0 z-[100] overflow-hidden cursor-pointer bg-black"
       initial={{ opacity: 1 }}
       animate={{ opacity: startFade ? 0 : 1 }}
-      transition={{ duration: 1, ease: "easeInOut" }}
+      transition={{ duration: 1, ease: 'easeInOut' }}
       onAnimationComplete={() => {
         if (startFade) {
           onComplete();
@@ -83,22 +66,18 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       }}
       onClick={handleSkip}
     >
-      {/* Background com GIF animado */}
-      <div 
-        className="absolute inset-0 w-full h-full"
-      >
-        {gifPronto && (
-          <img 
-            src={INTRO_GIF}
-            alt="Background"
-            className="w-full h-full object-cover"
-            style={{ 
-              imageRendering: 'auto',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
-      </div>
+      <video
+        ref={videoRef}
+        src={introVideo}
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        // Sem loop: 3s é bem menos que o vídeo, então ele nunca chega ao fim.
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        // Se o vídeo falhar por qualquer motivo, passa direto pro app.
+        onError={() => setStartFade(true)}
+      />
     </motion.div>
   );
 }
