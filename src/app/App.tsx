@@ -4,16 +4,10 @@ import { router } from './routes';
 import { Toaster } from 'sonner';
 import Login from './pages/Login';
 import { LoadingScreen } from './components/LoadingScreen';
-import { PreLoadingScreen } from './components/PreLoadingScreen';
-
-// Liga/desliga a tela de abertura do ninho (a do tap and hold secreto de 10s).
-// Pra ligar de novo é só trocar pra `true`.
-const TELA_DE_ABERTURA_ATIVA = false;
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showPreLoading, setShowPreLoading] = useState(TELA_DE_ABERTURA_ATIVA);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [userProfile, setUserProfile] = useState<'Amanda' | 'Mateus' | null>(null);
 
@@ -52,11 +46,6 @@ export default function App() {
   const handleLoadingComplete = () => {
     setShowLoadingScreen(false);
   };
-
-  // Tela de abertura travada (tap and hold) vem antes de tudo
-  if (showPreLoading) {
-    return <PreLoadingScreen onComplete={() => setShowPreLoading(false)} />;
-  }
 
   // Mostrar loading screen primeiro
   if (showLoadingScreen) {
