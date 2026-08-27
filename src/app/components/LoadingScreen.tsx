@@ -8,6 +8,8 @@ interface LoadingScreenProps {
 
 // Quanto tempo a animação fica na tela antes do fade.
 const DURACAO_INTRO = 3000;
+// O primeiro segundo do vídeo é parado, então a intro começa depois dele.
+const COMECO_DO_VIDEO = 1;
 // Se o vídeo não começar a tocar nesse tempo (aparelho/rede lentos), a gente
 // vai direto pro app — melhor abrir rápido do que travar na abertura.
 const ESPERA_MAXIMA = 2000;
@@ -24,6 +26,18 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
 
   useEffect(() => {
     const video = videoRef.current;
+
+    // Pula a parte estática do começo assim que dá pra posicionar o vídeo.
+    const pularParteParada = () => {
+      if (video && video.currentTime < COMECO_DO_VIDEO) {
+        video.currentTime = COMECO_DO_VIDEO;
+      }
+    };
+    if (video && video.readyState >= 1) {
+      pularParteParada();
+    } else {
+      video?.addEventListener('loadedmetadata', pularParteParada, { once: true });
+    }
 
     // Só começa a contar os 3s quando o vídeo realmente começou a rodar, pra
     // animação ser vista do começo.
@@ -50,6 +64,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
 
     return () => {
       video?.removeEventListener('playing', aoComecar);
+      video?.removeEventListener('loadedmetadata', pularParteParada);
       clearTimeout(desistir);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
