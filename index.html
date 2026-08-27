@@ -16,8 +16,9 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Preload main image for faster loading -->
-    <link rel="preload" as="image" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" />
+    <!-- GIF da abertura: começa a baixar junto com o HTML, antes do JS -->
+    <link rel="preconnect" href="https://i.imgur.com" crossorigin />
+    <link rel="preload" as="image" href="https://i.imgur.com/RfJIuEz.gif" fetchpriority="high" />
     
     <!-- Primary Meta Tags -->
     <title>Mesinha - Listas Compartilhadas</title>
