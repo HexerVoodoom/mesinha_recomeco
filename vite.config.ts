@@ -59,6 +59,22 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
+            // GIF da abertura: depois da primeira vez abre direto do cache,
+            // sem esperar a rede (importante quando o app abre pela notificação).
+            urlPattern: /^https:\/\/i\.imgur\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'intro-gif-cache',
+              expiration: {
+                maxEntries: 5,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 ano
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
