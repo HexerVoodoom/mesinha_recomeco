@@ -20,7 +20,7 @@ const categoryEmojis: Record<string, string> = {
   chore: '🧹',
   bucket: '✨',
   gratitude: '🫶',
-  mood: '🌤️',
+  mood: '🍯',
 };
 
 const categoryMessages: Record<string, string> = {
@@ -39,7 +39,7 @@ const categoryMessages: Record<string, string> = {
   chore: 'Dividam as tarefas de casa com rodízio automático',
   bucket: 'Listem os sonhos pra realizar juntos',
   gratitude: 'Guardem os agradecimentos do dia a dia',
-  mood: 'Registrem como cada um está se sentindo',
+  mood: 'Registrem que gosto teve o dia de cada um',
 };
 
 export function EmptyState({ category }: EmptyStateProps) {

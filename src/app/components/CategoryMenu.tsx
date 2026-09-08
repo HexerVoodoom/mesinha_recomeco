@@ -116,7 +116,7 @@ const categoryIcons: Partial<Record<Category | 'search', string>> = {
 const tools = [
   { id: 'meetup' as const, icon: CalendarHeart, label: 'Encontros' },
   { id: 'map' as const, icon: MapPinned, label: 'Mapa' },
-  { id: 'mood' as const, icon: SmilePlus, label: 'Humor' },
+  { id: 'mood' as const, icon: SmilePlus, label: 'Sabor do Dia' },
   { id: 'question' as const, icon: MessageCircleQuestion, label: 'Pergunta do Dia' },
   { id: 'garden' as const, icon: Sprout, label: 'Nosso Jardim' },
   { id: 'roleta' as const, icon: Dices, label: 'Roleta' },

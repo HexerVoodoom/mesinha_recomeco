@@ -68,9 +68,9 @@ export const FEATURE_SCHEDULE: ScheduledFeature[] = [
   {
     id: 'mood',
     step: 1,
-    name: 'Humor do Dia',
-    emoji: '🌤️',
-    blurb: 'Marque como você tá hoje e veja o do outro, com um calendário dos últimos 14 dias.',
+    name: 'Sabor do Dia',
+    emoji: '🍯',
+    blurb: 'Marque que gosto teve seu dia e veja o do outro, com um calendário dos últimos 14 dias.',
   },
   {
     id: 'question',

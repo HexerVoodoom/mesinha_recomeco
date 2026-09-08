@@ -26,7 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   chore: 'Tarefas',
   bucket: 'Sonhos',
   gratitude: 'Gratidão',
-  mood: 'Humor',
+  mood: 'Sabor do Dia',
   meetup: 'Encontros',
   question: 'Perguntas',
 };
