@@ -55,7 +55,7 @@ export interface ListItem {
   // Cápsula do Tempo (categoria capsule): true enquanto o servidor esconde o
   // conteúdo (a data de abertura em eventDate ainda não chegou)
   capsuleLocked?: boolean;
-  // Check-in de humor (categoria mood)
+  // Check-in de sabor do dia (categoria mood)
   moodEmoji?: string;
   // Tarefas de casa (categoria chore)
   choreAssignee?: 'Amanda' | 'Mateus';

@@ -316,14 +316,18 @@ app.post("/make-server-19717bce/items", async (c) => {
       }).catch(console.error);
     }
 
-    // Check-in de humor: avisa o parceiro só no PRIMEIRO check-in do dia (o id
-    // é determinístico por pessoa+dia, então trocar o humor depois só atualiza
-    // o mesmo item e não dispara push de novo).
+    // Check-in de sabor do dia: avisa o parceiro só no PRIMEIRO registro
+    // daquele dia (o id é determinístico por pessoa+dia, então trocar o sabor
+    // depois só atualiza o mesmo item e não dispara push de novo). Registro
+    // retroativo avisa com a data em vez de "hoje".
     if (item.category === "mood" && !existingItem && item.createdBy) {
       const otherUser = item.createdBy === "Amanda" ? "Mateus" : "Amanda";
       const note = item.comment ? ` "${String(item.comment).slice(0, 60)}"` : "";
+      const today = new Date().toISOString().slice(0, 10);
+      const [, mm, dd] = String(item.eventDate || today).split("-");
+      const when = item.eventDate && item.eventDate !== today ? `de ${dd}/${mm}` : "de hoje";
       sendPushToUser(otherUser, {
-        title: `${item.createdBy} registrou o humor de hoje ${item.moodEmoji || "💭"}`,
+        title: `${item.createdBy} registrou o sabor ${when} ${item.moodEmoji || "💭"}`,
         body: `${item.title}${note}`,
         tag: "mesinha-mood",
         url: "/",

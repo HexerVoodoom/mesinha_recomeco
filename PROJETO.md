@@ -168,7 +168,7 @@ aberto **não recebe a fila de avisos atrasados** (`backfillAnnouncementsOnFirst
 | `alarm` | Lembretes com horário, dias e destinatário |
 | `lista` | Listas compartilhadas |
 | `capsule` | Cápsula do tempo: carta/foto que só abre na data (`eventDate`). O conteúdo é escondido **no servidor** enquanto lacrada (`capsuleLocked: true` na resposta); push ao lacrar e no dia da abertura (cron 08:00) |
-| `mood` | Check-in de humor. Id determinístico `mood-<perfil>-<data>` (upsert) => 1 registro por pessoa por dia e push no máximo 1x/dia |
+| `mood` | Sabor do Dia (doce, salgado, azedo, amargo, apimentado, umami, agridoce, sem gosto). Id determinístico `mood-<perfil>-<data>` (upsert) => 1 registro por pessoa por dia e push no máximo 1x/dia. Aceita registro retroativo (tocar num dia vazio do calendário) e tocar num sabor já registrado abre o modal com o recadinho |
 | `question` | Pergunta do dia. Id `question-<data>`, com `answerAmanda`/`answerMateus` |
 | `chore` | Tarefa de casa com rodízio (`choreAssignee`, `choreRotates`, `choreDoneCount`, `choreLastDoneBy/At`) |
 | `bucket` | Lista de sonhos (com barra de progresso) |

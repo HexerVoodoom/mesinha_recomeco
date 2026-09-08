@@ -989,18 +989,20 @@ export default function Home() {
   const handleToggleMeetupCalendar = () => togglePanel('meetup');
   const handleToggleMap = () => togglePanel('map');
 
-  // Check-in de humor: upsert de um item por pessoa por dia (id determinístico),
-  // então trocar o humor no mesmo dia atualiza a linha em vez de criar outra —
-  // e o servidor só notifica o parceiro no primeiro check-in do dia.
-  const handleMoodCheckIn = async (emoji: string, label: string, note: string) => {
+  // Check-in de sabor do dia: upsert de um item por pessoa por dia (id
+  // determinístico), então trocar o sabor no mesmo dia atualiza a linha em vez
+  // de criar outra — e o servidor só notifica o parceiro no primeiro registro
+  // daquele dia. `dateStr` permite registrar retroativamente um dia anterior.
+  const handleMoodCheckIn = async (emoji: string, label: string, note: string, dateStr?: string) => {
     const todayStr = new Date().toLocaleDateString('sv-SE');
-    const id = moodItemId(userProfile, todayStr);
+    const day = dateStr || todayStr;
+    const id = moodItemId(userProfile, day);
     const moodItem: Partial<ListItem> = {
       id,
       title: label,
       comment: note,
       category: 'mood',
-      eventDate: todayStr,
+      eventDate: day,
       moodEmoji: emoji,
       createdBy: userProfile,
       status: 'pending',
@@ -1021,10 +1023,15 @@ export default function Home() {
         saveItemsToStorage(merged);
         return merged;
       });
-      toast.success(`Humor de hoje: ${emoji} ${label}`);
+      const [, m, d] = day.split('-');
+      toast.success(
+        day === todayStr
+          ? `Sabor de hoje: ${emoji} ${label}`
+          : `Sabor de ${d}/${m}: ${emoji} ${label}`
+      );
     } catch (error) {
       console.error('Failed to save mood:', error);
-      toast.error('Não deu pra salvar o humor. Tenta de novo!');
+      toast.error('Não deu pra salvar o sabor. Tenta de novo!');
     }
   };
 
