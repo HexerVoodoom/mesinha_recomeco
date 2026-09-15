@@ -320,3 +320,68 @@ node weekly-summary.mjs
 ```
 
 Requer `ANTHROPIC_API_KEY` e `API_BASE_URL` no `.env.local` (na raiz do projeto).
+
+---
+
+## Mapa: localização em tempo real
+
+A aba Mapa mostra os dois no mapa de Goiânia. Tem dois modos de compartilhamento:
+
+| Modo | Dura | Funciona com o app fechado? |
+|---|---|---|
+| `temporario` | 1 hora | Não |
+| `sempre` | até desligar | Sim, **só no app Android instalado** |
+
+### Por que o modo "sempre" precisa do app nativo
+
+O `navigator.geolocation` da WebView só roda com o app na frente — tela apagada,
+o Android congela a WebView e o compartilhamento morre. Por isso o modo "sempre"
+é entregue ao `LocationSharingService` (serviço em primeiro plano, Kotlin), que
+usa o `FusedLocationProvider` e continua mandando posição com o app fechado.
+
+No navegador o modo "sempre" ainda funciona, mas só enquanto o Mesinha estiver
+aberto — a interface avisa isso.
+
+### Cadência adaptativa (a conta de bateria)
+
+Rastreio de alta precisão contínuo custa **20–35% de bateria por dia**. Com três
+degraus, cai para **5–8%**:
+
+| Situação | Precisão | Intervalo |
+|---|---|---|
+| Parado (não saiu 30m do último envio) | balanceada (Wi-Fi/torre) | 60s |
+| Em movimento | balanceada | 15s |
+| O outro está com a aba Mapa aberta | alta (GPS) | 8s |
+
+O sinal "o outro está olhando" vem do endpoint `POST /location/watching`,
+renovado a cada minuto enquanto a tela do Mapa está visível. O servidor devolve
+`partnerWatching` na resposta do próprio `PUT /location`, então descobrir isso
+não gasta requisição extra. A mesma lógica existe nos dois lados
+(`useLocationSharing.ts` no PWA, `LocationSharingService.kt` no app).
+
+### Condições para o "sempre" funcionar de verdade
+
+1. App Android instalado (o PWA no navegador não dá conta).
+2. Permissão de localização **"Permitir o tempo todo"** — pedida em duas etapas,
+   como o Android exige.
+3. Isenção da otimização de bateria (o app abre o diálogo ao ligar o modo).
+4. Em Xiaomi/Oppo/Realme, autostart liberado na mão nas configurações da ROM.
+5. Notificação permanente na barra — obrigatória, o Android não deixa esconder.
+   E é justo: ninguém deve ser localizado sem ver o aviso.
+
+Autocura: o serviço é `START_STICKY`, volta no boot (`BootReceiver`) e é
+religado toda vez que o app abre (`MainActivity`), porque várias fabricantes
+matam serviços sem avisar. Se a localização do sistema for desligada, o serviço
+se encerra em vez de deixar uma posição velha passando por atual.
+
+### Skin do mapa
+
+Os tiles são do OpenStreetMap, com um filtro CSS (`MapSkin.css`) que joga o mapa
+para a paleta bege/marrom do app. O filtro é aplicado só na camada de tiles —
+marcadores e popups mantêm as cores. A classe `.mesinha-map-skin` é o ponto de
+troca para o mapa de Goiânia desenhado à mão, quando a ilustração existir.
+
+O mapa é travado na região metropolitana de Goiânia (`GOIANIA_BOUNDS`, zoom
+mínimo 11). Se alguém estiver fora do retângulo (viagem), os limites são
+liberados automaticamente — um limite que esconde a pessoa justo quando ela está
+longe seria o pior momento possível para ser rígido.

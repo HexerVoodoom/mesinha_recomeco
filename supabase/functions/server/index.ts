@@ -1491,44 +1491,91 @@ app.get("/make-server-19717bce/memories/on-this-day", async (c) => {
 // ── Compartilhamento de localização em tempo real (aba "Mapa") ───────────────
 //
 // Estado efêmero (não é um "item"): cada perfil tem no máximo uma sessão de
-// compartilhamento ativa por vez, guardada em `location:<profile>` com um
-// `expiresAt` de 1h a partir do início. O cliente também transmite as
-// atualizações de posição via Supabase Realtime Broadcast (baixa latência);
-// este endpoint é a fonte de verdade persistida — usada no primeiro load do
-// mapa e como fallback caso o broadcast realtime seja perdido.
+// compartilhamento ativa por vez, guardada em `location:<profile>`.
+//
+// Dois modos:
+//   - "temporario": sessão de 1h com `expiresAt` (o comportamento antigo, para
+//     quando a pessoa só quer compartilhar durante um deslocamento);
+//   - "sempre": `expiresAt: null`, não expira sozinha. É o modo usado pelo
+//     serviço em primeiro plano do app Android, que continua mandando posição
+//     com o app fechado. Só para quando a pessoa desliga.
+//
+// O cliente também transmite as atualizações via Supabase Realtime Broadcast
+// (baixa latência); este endpoint é a fonte de verdade persistida — usada no
+// primeiro load do mapa e como fallback caso o broadcast seja perdido.
 
-const LOCATION_SHARE_DURATION_MS = 60 * 60 * 1000; // 1 hora
+const LOCATION_SHARE_DURATION_MS = 60 * 60 * 1000; // 1 hora (modo "temporario")
 
-function isLocationFresh(loc: any): boolean {
-  return !!loc && typeof loc.expiresAt === "string" && new Date(loc.expiresAt).getTime() > Date.now();
+// Quanto tempo um "estou olhando o mapa" vale. O app do parceiro consulta esse
+// sinal para subir a cadência do GPS só enquanto alguém está de fato olhando —
+// é daí que vem quase toda a economia de bateria do modo "sempre".
+const LOCATION_WATCH_TTL_MS = 3 * 60 * 1000; // 3 minutos
+
+type LocationMode = "temporario" | "sempre";
+
+function normalizeMode(mode: unknown): LocationMode {
+  return mode === "sempre" ? "sempre" : "temporario";
 }
 
-// Inicia (ou reinicia) uma sessão de compartilhamento de 1h para o perfil e
-// notifica o parceiro para que ele também ative o mapa.
+// Uma sessão "sempre" nunca expira por tempo; uma "temporario" vale até o
+// `expiresAt`. `expiresAt` ausente/nulo agora significa "sem prazo", então a
+// checagem de tipo string de antes viraria um falso negativo aqui.
+function isLocationFresh(loc: any): boolean {
+  if (!loc) return false;
+  if (loc.expiresAt == null) return true;
+  return typeof loc.expiresAt === "string" && new Date(loc.expiresAt).getTime() > Date.now();
+}
+
+function isWatchFresh(watch: any): boolean {
+  return !!watch && typeof watch.until === "string" && new Date(watch.until).getTime() > Date.now();
+}
+
+async function readWatching(): Promise<{ Amanda: boolean; Mateus: boolean }> {
+  const [amanda, mateus] = await Promise.all([
+    kv.get("location:watching:Amanda"),
+    kv.get("location:watching:Mateus"),
+  ]);
+  return { Amanda: isWatchFresh(amanda), Mateus: isWatchFresh(mateus) };
+}
+
+// Inicia (ou reinicia) uma sessão de compartilhamento para o perfil e notifica
+// o parceiro. No modo "sempre" a push só sai na primeira vez — senão o app
+// avisaria o outro a cada religada do serviço (reboot, autocura).
 app.post("/make-server-19717bce/location/start", async (c) => {
   try {
-    const { profile, lat, lng } = await c.req.json();
+    const { profile, lat, lng, mode, accuracy, battery } = await c.req.json();
     if (profile !== "Amanda" && profile !== "Mateus") {
       return c.json({ error: "Invalid profile" }, 400);
     }
+    const shareMode = normalizeMode(mode);
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + LOCATION_SHARE_DURATION_MS).toISOString();
+    const previous = await kv.get(`location:${profile}`);
     const location = {
       profile,
       lat: typeof lat === "number" ? lat : null,
       lng: typeof lng === "number" ? lng : null,
+      accuracy: typeof accuracy === "number" ? accuracy : null,
+      battery: typeof battery === "number" ? battery : null,
+      mode: shareMode,
       updatedAt: now.toISOString(),
-      expiresAt,
+      expiresAt: shareMode === "sempre"
+        ? null
+        : new Date(now.getTime() + LOCATION_SHARE_DURATION_MS).toISOString(),
     };
     await kv.set(`location:${profile}`, location);
 
-    const otherUser = profile === "Amanda" ? "Mateus" : "Amanda";
-    sendPushToUser(otherUser, {
-      title: `${profile} quer compartilhar a localização! 📍`,
-      body: "Abre o Mapa no app pra ver em tempo real (e compartilhar a sua também) por 1h.",
-      tag: "mesinha-location",
-      url: "/",
-    }).catch(console.error);
+    const jaEstavaCompartilhando = isLocationFresh(previous) && previous.mode === shareMode;
+    if (!jaEstavaCompartilhando) {
+      const otherUser = profile === "Amanda" ? "Mateus" : "Amanda";
+      sendPushToUser(otherUser, {
+        title: `${profile} está compartilhando a localização! 📍`,
+        body: shareMode === "sempre"
+          ? "Agora dá pra ver onde ela/ele está a qualquer hora, é só abrir o Mapa."
+          : "Abre o Mapa no app pra ver em tempo real (e compartilhar a sua também) por 1h.",
+        tag: "mesinha-location",
+        url: "/",
+      }).catch(console.error);
+    }
 
     return c.json({ location });
   } catch (error) {
@@ -1537,10 +1584,12 @@ app.post("/make-server-19717bce/location/start", async (c) => {
   }
 });
 
-// Atualiza a posição atual — só é aceito enquanto a sessão de 1h não expirou.
+// Atualiza a posição atual. Devolve junto o `watching` — assim o app que está
+// mandando posição descobre, na própria resposta, se alguém está olhando o
+// mapa e precisa de cadência alta, sem gastar uma requisição extra pra isso.
 app.put("/make-server-19717bce/location", async (c) => {
   try {
-    const { profile, lat, lng } = await c.req.json();
+    const { profile, lat, lng, accuracy, battery } = await c.req.json();
     if (profile !== "Amanda" && profile !== "Mateus") {
       return c.json({ error: "Invalid profile" }, 400);
     }
@@ -1551,25 +1600,55 @@ app.put("/make-server-19717bce/location", async (c) => {
     if (!isLocationFresh(existing)) {
       return c.json({ error: "Sessão de compartilhamento expirada ou inexistente" }, 410);
     }
-    const location = { ...existing, lat, lng, updatedAt: new Date().toISOString() };
+    const location = {
+      ...existing,
+      lat,
+      lng,
+      accuracy: typeof accuracy === "number" ? accuracy : existing.accuracy ?? null,
+      battery: typeof battery === "number" ? battery : existing.battery ?? null,
+      updatedAt: new Date().toISOString(),
+    };
     await kv.set(`location:${profile}`, location);
-    return c.json({ location });
+
+    const watching = await readWatching();
+    const otherUser = profile === "Amanda" ? "Mateus" : "Amanda";
+    return c.json({ location, partnerWatching: watching[otherUser] });
   } catch (error) {
     console.error("[PUT /location] Error:", error);
     return c.json({ error: "Failed to update location", details: String(error) }, 500);
   }
 });
 
+// "Estou com o mapa aberto" — renovado enquanto a aba Mapa está visível.
+app.post("/make-server-19717bce/location/watching", async (c) => {
+  try {
+    const { profile } = await c.req.json();
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Invalid profile" }, 400);
+    }
+    await kv.set(`location:watching:${profile}`, {
+      profile,
+      until: new Date(Date.now() + LOCATION_WATCH_TTL_MS).toISOString(),
+    });
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[POST /location/watching] Error:", error);
+    return c.json({ error: "Failed to register watcher", details: String(error) }, 500);
+  }
+});
+
 // Estado atual dos dois — usado ao abrir o Mapa (o realtime cobre o resto).
 app.get("/make-server-19717bce/location", async (c) => {
   try {
-    const [amanda, mateus] = await Promise.all([
+    const [amanda, mateus, watching] = await Promise.all([
       kv.get("location:Amanda"),
       kv.get("location:Mateus"),
+      readWatching(),
     ]);
     return c.json({
       Amanda: isLocationFresh(amanda) ? amanda : null,
       Mateus: isLocationFresh(mateus) ? mateus : null,
+      watching,
     });
   } catch (error) {
     console.error("[GET /location] Error:", error);
@@ -1577,7 +1656,7 @@ app.get("/make-server-19717bce/location", async (c) => {
   }
 });
 
-// Para de compartilhar (usuário tocou em "Parar" ou fechou a tela do mapa).
+// Para de compartilhar (usuário tocou em "Parar" ou desligou o modo "sempre").
 app.delete("/make-server-19717bce/location", async (c) => {
   try {
     const { profile } = await c.req.json();

@@ -83,6 +83,11 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
+    // Localização fundida (modo "sempre" do Mapa). O FusedLocationProvider é o
+    // que permite a cadência adaptativa por prioridade/distância — com o
+    // LocationManager cru, "parado em casa" acordaria o GPS do mesmo jeito.
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     // Firebase Cloud Messaging (notificações push no app instalado).
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-messaging")
