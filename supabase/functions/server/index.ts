@@ -1564,18 +1564,9 @@ app.post("/make-server-19717bce/location/start", async (c) => {
     };
     await kv.set(`location:${profile}`, location);
 
-    const jaEstavaCompartilhando = isLocationFresh(previous) && previous.mode === shareMode;
-    if (!jaEstavaCompartilhando) {
-      const otherUser = profile === "Amanda" ? "Mateus" : "Amanda";
-      sendPushToUser(otherUser, {
-        title: `${profile} está compartilhando a localização! 📍`,
-        body: shareMode === "sempre"
-          ? "Agora dá pra ver onde ela/ele está a qualquer hora, é só abrir o Mapa."
-          : "Abre o Mapa no app pra ver em tempo real (e compartilhar a sua também) por 1h.",
-        tag: "mesinha-location",
-        url: "/",
-      }).catch(console.error);
-    }
+    // Sem push ao ligar o compartilhamento: quem quiser ver abre o Mapa.
+    // (Decisão de 2026-09-15 — o aviso a cada religada incomodava.)
+    void previous;
 
     return c.json({ location });
   } catch (error) {
