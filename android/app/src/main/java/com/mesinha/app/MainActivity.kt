@@ -91,8 +91,19 @@ class MainActivity : AppCompatActivity() {
     // que é como o sistema exige — pedir as duas juntas faz o Android negar as
     // duas. Não é bloqueante: o serviço em primeiro plano já recebe posição sem
     // ela; ela é o que permite religar sozinho depois de um reboot.
+    //
+    // A isenção de bateria e o serviço só são acionados no callback: lançar a
+    // tela de permissão e o diálogo de bateria em sequência fazia o segundo
+    // cancelar o primeiro, e a tela "Permitir o tempo todo" nunca aparecia.
+    private var pendingBackgroundProfile: String? = null
     private val backgroundLocationLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */ }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */
+            pendingBackgroundProfile?.let { profile ->
+                pendingBackgroundProfile = null
+                LocationSharing.requestBatteryExemption(this)
+                LocationSharing.start(this, profile)
+            }
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -256,7 +267,9 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             !LocationSharing.hasBackgroundLocation(this)
         ) {
+            pendingBackgroundProfile = profile
             backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            return
         }
         LocationSharing.requestBatteryExemption(this)
         LocationSharing.start(this, profile)
