@@ -46,6 +46,13 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Sem isto a action tenta instalar o pacote "tools" do SDK, que o
+          # Google aposentou — o cmdline-tools novo do runner responde
+          # "Failed to find package 'tools'" e o build morre antes de compilar
+          # qualquer coisa. O Gradle baixa sozinho a platform e as
+          # build-tools que o projeto pede, então não falta nada.
+          packages: ''
 
       - name: Decode upload keystore
         run: |
