@@ -103,12 +103,33 @@ export interface GardenStats {
 }
 
 // Compartilhamento de localização em tempo real (aba "Mapa")
+export type LocationMode = 'temporario' | 'sempre';
+
 export interface LocationShare {
   profile: 'Amanda' | 'Mateus';
   lat: number;
   lng: number;
+  /** Raio de precisão em metros reportado pelo GPS (null quando desconhecido). */
+  accuracy?: number | null;
+  /** Bateria do aparelho que mandou a posição, de 0 a 1 (null quando desconhecida). */
+  battery?: number | null;
+  mode?: LocationMode;
   updatedAt: string;
-  expiresAt: string; // sessão de 1h a partir do início do compartilhamento
+  /** ISO no modo "temporario" (1h); `null` no modo "sempre", que não expira. */
+  expiresAt: string | null;
+}
+
+export interface LocationsResponse {
+  Amanda: LocationShare | null;
+  Mateus: LocationShare | null;
+  /** Quem está com a aba Mapa aberta agora (renovado a cada ~1min). */
+  watching?: { Amanda: boolean; Mateus: boolean };
+}
+
+/** Dados opcionais que acompanham uma posição. */
+export interface LocationMeta {
+  accuracy?: number | null;
+  battery?: number | null;
 }
 
 export interface Settings {
@@ -344,17 +365,36 @@ export const api = {
   },
 
   // Compartilhamento de localização em tempo real (aba "Mapa")
-  startLocationShare: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<{ location: LocationShare }> => {
+  startLocationShare: async (
+    profile: 'Amanda' | 'Mateus',
+    lat: number,
+    lng: number,
+    mode: LocationMode = 'temporario',
+    meta: LocationMeta = {},
+  ): Promise<{ location: LocationShare }> => {
     return await fetchAPI('/location/start', {
       method: 'POST',
-      body: JSON.stringify({ profile, lat, lng }),
+      body: JSON.stringify({ profile, lat, lng, mode, ...meta }),
     });
   },
 
-  updateLocation: async (profile: 'Amanda' | 'Mateus', lat: number, lng: number): Promise<{ location: LocationShare }> => {
+  updateLocation: async (
+    profile: 'Amanda' | 'Mateus',
+    lat: number,
+    lng: number,
+    meta: LocationMeta = {},
+  ): Promise<{ location: LocationShare; partnerWatching?: boolean }> => {
     return await fetchAPI('/location', {
       method: 'PUT',
-      body: JSON.stringify({ profile, lat, lng }),
+      body: JSON.stringify({ profile, lat, lng, ...meta }),
+    });
+  },
+
+  /** Avisa que este perfil está com o Mapa aberto (vale ~3min no servidor). */
+  pingLocationWatching: async (profile: 'Amanda' | 'Mateus'): Promise<void> => {
+    await fetchAPI('/location/watching', {
+      method: 'POST',
+      body: JSON.stringify({ profile }),
     });
   },
 
@@ -365,7 +405,7 @@ export const api = {
     });
   },
 
-  getLocations: async (): Promise<{ Amanda: LocationShare | null; Mateus: LocationShare | null }> => {
+  getLocations: async (): Promise<LocationsResponse> => {
     return await fetchAPI('/location');
   },
 

@@ -14,6 +14,19 @@
     <!-- Localização (aba Mapa: navigator.geolocation dentro da WebView). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+      Modo "sempre" do Mapa: rastreio contínuo num serviço em primeiro plano.
+      - ACCESS_BACKGROUND_LOCATION ("Permitir o tempo todo") é o que deixa o
+        serviço voltar sozinho depois de um reboot; com o app aberto, o serviço
+        em primeiro plano já recebe posição sem ela.
+      - FOREGROUND_SERVICE_LOCATION é obrigatória a partir do Android 14.
+      - A isenção de otimização de bateria é o que impede Doze e as camadas das
+        fabricantes de derrubarem o serviço depois de algumas horas.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".MesinhaApp"
@@ -174,6 +187,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!--
+          Serviço em primeiro plano do modo "sempre" do Mapa. Mostra uma
+          notificação permanente enquanto está rastreando — o Android exige, e
+          é justo: ninguém deve ficar sendo localizado sem ver o aviso.
+        -->
+        <service
+            android:name=".LocationSharingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- Serviço do Firebase Cloud Messaging (recebe as notificações). -->
         <service

@@ -71,7 +71,28 @@ class MainActivity : AppCompatActivity() {
             pendingGeoOrigin?.let { origin -> pendingGeoCallback?.invoke(origin, granted, false) }
             pendingGeoOrigin = null
             pendingGeoCallback = null
+
+            // A pessoa pediu o modo "sempre" e ainda não tinha dado a permissão:
+            // agora que deu, liga de fato (ou avisa que sem permissão não rola).
+            pendingAlwaysProfile?.let { profile ->
+                pendingAlwaysProfile = null
+                if (granted) {
+                    ligarLocalizacaoSempre(profile)
+                } else {
+                    Toast.makeText(this, "Sem permissão de localização não dá pra compartilhar", Toast.LENGTH_LONG).show()
+                }
+            }
         }
+
+    // Perfil aguardando a permissão de localização pra ligar o modo "sempre".
+    private var pendingAlwaysProfile: String? = null
+
+    // "Permitir o tempo todo" (Android 10+). Pedida DEPOIS da permissão normal,
+    // que é como o sistema exige — pedir as duas juntas faz o Android negar as
+    // duas. Não é bloqueante: o serviço em primeiro plano já recebe posição sem
+    // ela; ela é o que permite religar sozinho depois de um reboot.
+    private val backgroundLocationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* opcional */ }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -172,6 +193,10 @@ class MainActivity : AppCompatActivity() {
 
         webView.loadUrl(MESINHA_URL)
 
+        // Autocura do rastreio: se o modo "sempre" está ligado mas alguma
+        // fabricante matou o serviço (ou o boot não conseguiu subi-lo), religa.
+        LocationSharing.restartIfEnabled(this)
+
         // Autocura: ao abrir o app, força os widgets a re-renderizar (frase do dia
         // e coração do Calendário de Encontros) e buscar dados novos do servidor,
         // mesmo que o alarme diário tenha sido descartado pela otimização de bateria.
@@ -223,8 +248,51 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Liga o rastreio contínuo: permissão "o tempo todo" (best effort), isenção
+     * de bateria e o serviço em primeiro plano.
+     */
+    private fun ligarLocalizacaoSempre(profile: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            !LocationSharing.hasBackgroundLocation(this)
+        ) {
+            backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+        LocationSharing.requestBatteryExemption(this)
+        LocationSharing.start(this, profile)
+    }
+
     /** Exposto ao PWA como `window.MesinhaNative`. */
     inner class NativeBridge {
+
+        /**
+         * Modo "sempre" do Mapa. O PWA chama isto quando a pessoa liga o
+         * compartilhamento permanente — daí em diante quem manda a posição é o
+         * serviço nativo, que continua com o app fechado.
+         *
+         * Vem da thread do JS: tudo que toca UI/permissão vai pra thread principal.
+         */
+        @JavascriptInterface
+        fun startAlwaysSharing(profile: String) {
+            if (profile != "Amanda" && profile != "Mateus") return
+            runOnUiThread {
+                if (LocationSharing.hasForegroundLocation(this@MainActivity)) {
+                    ligarLocalizacaoSempre(profile)
+                } else {
+                    pendingAlwaysProfile = profile
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun stopAlwaysSharing() {
+            runOnUiThread { LocationSharing.stop(this@MainActivity) }
+        }
+
+        @JavascriptInterface
+        fun isAlwaysSharing(): Boolean = LocationSharing.isEnabled(this@MainActivity)
+
         @JavascriptInterface
         fun setProfile(profile: String) {
             if (profile != "Amanda" && profile != "Mateus") return

@@ -1,0 +1,59 @@
+/*
+ * Skin do mapa da Mesinha.
+ *
+ * Os tiles vêm do OpenStreetMap (verde/azul/cinza padrão), que destoa do resto
+ * do app — bege, marrom e cantos arredondados. Em vez de trocar a fonte dos
+ * tiles por um servidor de terceiro (que exigiria chave de API e poderia sair
+ * do ar), a skin é um filtro CSS aplicado só na camada de tiles: os marcadores,
+ * popups e controles ficam fora dele e mantêm as cores originais.
+ *
+ * `.mesinha-map-skin` é o ponto de troca: quando existir o mapa de Goiânia
+ * desenhado à mão, basta uma classe irmã (ex.: `.mesinha-map-desenhado`) com
+ * a ilustração como fundo e `opacity: 0` nos tiles — o resto do MapView, com
+ * os limites e os marcadores, continua igual.
+ */
+
+.mesinha-map-skin .leaflet-tile-pane {
+  /* sepia joga tudo pro bege; hue-rotate puxa pro marrom da paleta;
+     saturate/contrast/brightness tiram o excesso de cor e clareiam o papel. */
+  filter: sepia(0.55) saturate(0.75) hue-rotate(-12deg) brightness(1.04) contrast(0.92);
+}
+
+/* O fundo que aparece nas bordas (fora dos tiles) acompanha o papel do app. */
+.mesinha-map-skin.leaflet-container {
+  background: #F3EEE8;
+}
+
+/* Controles de zoom no visual dos botões do app. */
+.mesinha-map-skin .leaflet-control-zoom a {
+  background: #FFFFFF;
+  color: #2B2A28;
+  border-color: #E9E4DF;
+}
+
+.mesinha-map-skin .leaflet-control-zoom a:hover {
+  background: #F3EEE8;
+}
+
+/* Popup com o mesmo arredondamento dos cards. */
+.mesinha-map-skin .leaflet-popup-content-wrapper,
+.mesinha-map-skin .leaflet-popup-tip {
+  background: #FFFFFF;
+  color: #2B2A28;
+  border-radius: 12px;
+}
+
+.mesinha-map-skin .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 9px;
+}
+
+/*
+ * A skin é decorativa. Quem pediu pra reduzir efeitos visuais no sistema vê o
+ * mapa original — que tem mais contraste e é mais fácil de ler.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .mesinha-map-skin .leaflet-tile-pane {
+    filter: none;
+  }
+}
