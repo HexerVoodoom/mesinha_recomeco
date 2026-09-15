@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.mesinha.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.mesinha.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         // O CI de publicação automática sobrescreve esses dois via
         // `-PversionCode=N -PversionName=X` (usando o número do run do GitHub
         // Actions), garantindo um versionCode sempre novo e crescente sem
