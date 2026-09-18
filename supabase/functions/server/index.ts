@@ -245,10 +245,11 @@ app.post("/make-server-19717bce/items", async (c) => {
       return c.json({ error: "Foto muito grande. Use uma imagem menor que 6MB." }, 400);
     }
 
-    // Validate mural content size (max 8MB base64)
-    if (body.muralContent && typeof body.muralContent === "string" && body.muralContent.length > 10000000) {
+    // Validate mural content size (GIFs não são recomprimidos no cliente para manter a
+    // animação, então o base64 pode ficar maior que o de uma imagem comprimida - até ~20MB)
+    if (body.muralContent && typeof body.muralContent === "string" && body.muralContent.length > 20000000) {
       console.warn("Mural content rejected: too large", body.muralContent.length);
-      return c.json({ error: "Imagem do mural muito grande. Use uma foto menor que 6MB." }, 400);
+      return c.json({ error: "Imagem do mural muito grande. Use uma foto/GIF menor que 15MB." }, 400);
     }
 
     // If the client sends an id that already exists (e.g. a retried/duplicated sync push),
