@@ -73,6 +73,39 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     });
   };
 
+  // Gera só a miniatura estática (JPEG) de uma imagem, sem re-codificar o
+  // arquivo original — usado para GIFs, cujo arquivo original precisa ser
+  // preservado intacto para manter a animação.
+  const generateImageThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxSize = 600;
+          let width = img.width;
+          let height = img.height;
+          if (width > height && width > maxSize) {
+            height = (height / width) * maxSize;
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = (width / height) * maxSize;
+            height = maxSize;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Captura o primeiro frame de um vídeo como miniatura JPEG leve (poster),
   // para que o preview do mural apareça sem precisar baixar o vídeo inteiro.
   const generateVideoThumbnail = (file: File): Promise<string> => {
@@ -133,19 +166,38 @@ export function AddMuralModal({ isOpen, onClose, onAdd }: AddMuralModalProps) {
     const fileSizeMB = file.size / (1024 * 1024);
     
     if (contentType === 'image') {
-      if (fileSizeMB > 10) {
-        toast.error('Imagem muito grande. Máximo 10MB');
+      const isGif = file.type === 'image/gif';
+      const maxMB = isGif ? 15 : 10;
+      if (fileSizeMB > maxMB) {
+        toast.error(`Imagem muito grande. Máximo ${maxMB}MB`);
         return;
       }
 
       try {
-        toast.info('Processando imagem...');
-        const { full, thumbnail } = await compressImage(file);
-        setMediaFile(full);
-        setMediaThumbnail(thumbnail);
-        toast.success('Imagem adicionada!');
+        if (isGif) {
+          // GIF: preserva o arquivo original (animado) e gera só uma
+          // miniatura estática para o preview — comprimir via canvas
+          // achataria a animação num único frame.
+          toast.info('Processando GIF...');
+          const reader = new FileReader();
+          const full = await new Promise<string>((resolve, reject) => {
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          const thumbnail = await generateImageThumbnail(file);
+          setMediaFile(full);
+          setMediaThumbnail(thumbnail);
+          toast.success('GIF adicionado!');
+        } else {
+          toast.info('Processando imagem...');
+          const { full, thumbnail } = await compressImage(file);
+          setMediaFile(full);
+          setMediaThumbnail(thumbnail);
+          toast.success('Imagem adicionada!');
+        }
       } catch (error) {
-        console.error('Error compressing image:', error);
+        console.error('Error processing image:', error);
         toast.error('Erro ao processar imagem');
       }
     } else if (contentType === 'video') {
