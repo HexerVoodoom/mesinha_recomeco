@@ -1102,6 +1102,22 @@ export default function Home() {
             today.setHours(0, 0, 0, 0);
             const days = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
             if (days < 0) return null;
+
+            // Depois dos 500 dias, no dia seguinte à comemoração, troca pra
+            // uma segunda contagem regressiva (500 → 0) pareada com os
+            // tsurus subindo até 1000 no dia 0 — rumo aos 1000 dias juntos.
+            if (days > 500) {
+              const diasDesdeMarco = days - 501;
+              const diasRestantes = Math.max(0, 500 - diasDesdeMarco);
+              const tsurus = Math.min(1000, 2 * (diasDesdeMarco + 1));
+              return (
+                <p className="font-['Quicksand',sans-serif] text-sm text-[#8A847D] mt-1">
+                  <span className="font-bold text-[#4D989B]">{diasRestantes}</span> dias -{' '}
+                  <span className="font-bold text-[#4D989B]">{tsurus}</span> tsurus 🕊️
+                </p>
+              );
+            }
+
             return (
               <p className="font-['Quicksand',sans-serif] text-sm text-[#8A847D] mt-1">
                 juntos há <span className="font-bold text-[#4D989B]">{days}</span> dias 💗
