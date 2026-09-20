@@ -2,8 +2,28 @@ import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import webpush from "npm:web-push";
+import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { sendFcmToUser } from "./fcm.tsx";
+
+/**
+ * Cria a chave só se ela ainda não existir (INSERT ... ON CONFLICT DO
+ * NOTHING) e devolve o valor que ficou gravado — o que já estava lá, se
+ * alguém chegou primeiro, ou o `value` recém-criado. Ao contrário de
+ * `kv.set` (upsert cego), isso é atômico: duas requisições concorrentes
+ * nunca mais pisam uma na resposta da outra.
+ */
+async function kvCreateIfAbsent(key: string, value: any): Promise<any> {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+  const { error } = await supabase
+    .from("kv_store_19717bce")
+    .upsert({ key, value }, { onConflict: "key", ignoreDuplicates: true });
+  if (error) throw new Error(error.message);
+  return await kv.get(key);
+}
 
 const VAPID_PUBLIC_KEY = "BEeyyQPVJ900xV1F1Jo8Q2TNc2DK7jb9jyiqmQQX3QnUwzJYxy1j5BByQ0vJFDSbPTGacjS3oUtpOKCtxAF5WIY";
 const VAPID_PRIVATE_KEY = "V9PFLTWJWHdqXPGmuJZHfJds-L0nmme4kti5dD_nF5o";
@@ -945,10 +965,17 @@ async function garanteQuestionDoDia(todayStr: string): Promise<any> {
     answerAmanda: null,
     answerMateus: null,
   };
-  await kv.set(`item:${itemId}`, item);
-  // Guarda as últimas 60 usadas para não repetir tão cedo.
-  await kv.set("question-used", [...usedQuestions, question].slice(-60));
-  return item;
+  // Atômico: se duas requisições caírem aqui juntas (GET de um lado, POST de
+  // resposta do outro), só a primeira cria o item — a segunda recebe de
+  // volta o que a primeira gravou, em vez de sobrescrever com um item em
+  // branco e apagar a resposta que acabou de ser salva.
+  const criado = await kvCreateIfAbsent(`item:${itemId}`, item);
+  // Guarda as últimas 60 usadas para não repetir tão cedo (só quando foi essa
+  // chamada que de fato criou a pergunta).
+  if (criado?.createdAt === item.createdAt) {
+    await kv.set("question-used", [...usedQuestions, question].slice(-60));
+  }
+  return criado;
 }
 
 // Pergunta de hoje — cria na primeira chamada do dia (mesma para os dois).
@@ -1913,6 +1940,34 @@ app.post("/make-server-19717bce/trigger-reminders", async (c) => {
         console.log(`[Reminders] Capsule opened: "${capsule.title}"`);
       }
       await kv.set(capsuleReminderKey, todayStr);
+    }
+
+    // Marco dos 500 dias juntos: comemora quando bate e, no dia seguinte,
+    // libera a segunda contagem (500 dias + tsurus) exibida no Home.
+    const milestoneKey = "milestone-500-fired";
+    if ((await kv.get(milestoneKey)) !== todayStr) {
+      const settings = await kv.get("settings");
+      const togetherSince: string | undefined = settings?.togetherSince;
+      if (togetherSince && /^\d{4}-\d{2}-\d{2}$/.test(togetherSince)) {
+        const [y, m, d] = togetherSince.split("-").map(Number);
+        const start = new Date(y, m - 1, d);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const days = Math.floor((today.getTime() - start.getTime()) / 86400000);
+        if (days === 500) {
+          const payload = {
+            title: "500 dias juntos! 🎉💗",
+            body: "Chegaram nos 500 dias! A partir de amanhã começa a contagem dos tsurus, rumo aos 1000 dias 🕊️",
+            tag: "mesinha-milestone-500",
+            url: "/",
+          };
+          await Promise.all([
+            sendPushToUser("Amanda", payload),
+            sendPushToUser("Mateus", payload),
+          ]);
+          console.log("[Reminders] Milestone de 500 dias comemorado");
+        }
+      }
+      await kv.set(milestoneKey, todayStr);
     }
   }
 
