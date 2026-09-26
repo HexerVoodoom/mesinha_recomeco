@@ -41,7 +41,7 @@ object Dialogues {
         DialoguePair("Lembrou de marcar a data importante?", "Sim! Com notificação e tudo!"),
         DialoguePair("Alguém ganhou o Top 3 de hoje?", "Empate! Os dois têm bom gosto."),
         DialoguePair("Que lugar faz tempo que querem ir?", "Machu Picchu está na lista há séculos!"),
-        DialoguePair("Stardew Valley ou Unravel Two hoje?", "Precisa de uma votação rápida!"),
+        DialoguePair("Stardew Valley ou Ak-xolotl: Together hoje?", "Precisa de uma votação rápida!"),
         DialoguePair("Quantos itens pendentes na lista?", "Bastante! Mas faz parte do charme!"),
         DialoguePair("Já mandaram um post fofo no Mural?", "Ainda não! Vai lá e surpreende!"),
         DialoguePair("Culinária nova na lista de comidas?", "Japonesa está esperando uma chance!"),

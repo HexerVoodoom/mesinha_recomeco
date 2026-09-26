@@ -612,7 +612,7 @@ const DEFAULT_WIDGET_PHRASES: { dupla: any[]; amanda: string[]; mateus: string[]
     { corvinho: "Lembrou de marcar a data importante?", alpaquinha: "Sim! Com notificação e tudo!" },
     { corvinho: "Alguém ganhou o Top 3 de hoje?", alpaquinha: "Empate! Os dois têm bom gosto." },
     { corvinho: "Que lugar faz tempo que querem ir?", alpaquinha: "Machu Picchu está na lista há séculos!" },
-    { corvinho: "Stardew Valley ou Unravel Two hoje?", alpaquinha: "Precisa de uma votação rápida!" },
+    { corvinho: "Stardew Valley ou Ak-xolotl: Together hoje?", alpaquinha: "Precisa de uma votação rápida!" },
     { corvinho: "Quantos itens pendentes na lista?", alpaquinha: "Bastante! Mas faz parte do charme!" },
     { corvinho: "Já mandaram um post fofo no Mural?", alpaquinha: "Ainda não! Vai lá e surpreende!" },
     { corvinho: "Culinária nova na lista de comidas?", alpaquinha: "Japonesa está esperando uma chance!" },
