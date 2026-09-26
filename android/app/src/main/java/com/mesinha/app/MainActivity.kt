@@ -3,6 +3,8 @@ package com.mesinha.app
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -119,7 +121,28 @@ class MainActivity : AppCompatActivity() {
             settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             settings.allowFileAccess = false
             settings.setGeolocationEnabled(true) // navigator.geolocation na aba Mapa
-            webViewClient = WebViewClient()          // navega dentro da WebView
+            // Navega dentro da WebView, exceto o link da Play Store (botão
+            // "Baixar versão mais recente" em Configurações): esse precisa
+            // abrir de verdade no app da Play Store (ou no navegador, se não
+            // tiver instalado) — a versão web da Play Store dentro da WebView
+            // não deixa instalar/atualizar nada.
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?
+                ): Boolean {
+                    val url = request?.url ?: return false
+                    if (url.host?.endsWith("play.google.com") == true) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, url))
+                        } catch (_: ActivityNotFoundException) {
+                            // sem app/navegador capaz de abrir; ignora
+                        }
+                        return true
+                    }
+                    return false
+                }
+            }
 
             // Ponte JS↔nativo: o PWA informa quem está logado para registrarmos o
             // token FCM sob o perfil certo (Amanda/Mateus).

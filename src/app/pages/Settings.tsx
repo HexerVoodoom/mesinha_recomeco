@@ -8,11 +8,12 @@ import { toast } from 'sonner';
 import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
 import { isFeatureUnlocked } from '../utils/featureSchedule';
 
-// URL fixa: sempre baixa o APK da GitHub Release mais recente (gerada
-// automaticamente pelo workflow "Build & Publish Release AAB" a cada merge
-// em main que mexe em android/**). Funciona tanto no navegador quanto dentro
-// do app nativo (a WebView já sabe lidar com o download, ver MainActivity.kt).
-const LATEST_APK_URL = 'https://github.com/HexerVoodoom/mesinha_recomeco/releases/latest/download/app-release.apk';
+// Manda pra ficha do app na Play Store em vez do APK direto do GitHub.
+// Misturar os dois canais faz o Android recusar a atualização (assinaturas
+// diferentes — Play App Signing re-assina o .aab, o APK do GitHub usa a
+// chave de upload); ver RELEASE.md, seção 5. Ficando só na Play Store, quem
+// já instalou por ela sempre recebe a atualização certinho.
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mesinha.app';
 
 // Dias completos desde a data (YYYY-MM-DD), no fuso local.
 function daysTogether(since: string): number {
@@ -193,15 +194,17 @@ export default function Settings() {
           </div>
           )}
 
-          {/* Baixar a versão mais recente do app (APK direto, sem Play Store) */}
+          {/* Baixar a versão mais recente do app (via Play Store) */}
           <a
-            href={LATEST_APK_URL}
+            href={PLAY_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full bg-card rounded-xl p-6 border border-border flex items-center gap-3 hover:bg-muted/30 transition-colors"
           >
             <Download className="w-6 h-6" />
             <div className="flex-1 text-left">
               <div className="text-base font-medium">Baixar versão mais recente</div>
-              <div className="text-sm text-muted-foreground">Instala o APK mais atual direto no celular</div>
+              <div className="text-sm text-muted-foreground">Abre a ficha do app na Play Store</div>
             </div>
           </a>
 
