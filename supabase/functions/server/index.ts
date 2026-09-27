@@ -754,6 +754,45 @@ app.get("/make-server-19717bce/widget-phrases", async (c) => {
   }
 });
 
+// Atualiza a lista "dupla" (a conversa Corvinho/Alpaquinha do widget duplo).
+// Cada perfil só grava o próprio lado de cada par — o lado do outro é sempre
+// lido do que já estava salvo, nunca do que o cliente mandou, então nem um
+// cliente adulterado consegue sobrescrever a fala do parceiro.
+app.put("/make-server-19717bce/widget-phrases/dupla", async (c) => {
+  try {
+    const body = await c.req.json();
+    const profile = body?.profile;
+    if (profile !== "Amanda" && profile !== "Mateus") {
+      return c.json({ error: "Sem permissao para editar esta lista" }, 403);
+    }
+    if (!Array.isArray(body?.pairs)) {
+      return c.json({ error: "pairs deve ser uma lista" }, 400);
+    }
+    const ownField = profile === "Mateus" ? "corvinho" : "alpaquinha";
+    const otherField = ownField === "corvinho" ? "alpaquinha" : "corvinho";
+    const stored = (await kv.get(WIDGET_PHRASES_KEY)) || {};
+    const merged: any = mergedWidgetPhrases(stored);
+    const oldDupla: any[] = merged.dupla;
+    const pairs = body.pairs
+      .slice(0, MAX_PHRASES)
+      .map((p: any, i: number) => {
+        const own = String(p?.[ownField] ?? "").trim().substring(0, MAX_PHRASE_LEN);
+        const other = String(oldDupla[i]?.[otherField] ?? "").trim();
+        return { [ownField]: own, [otherField]: other };
+      })
+      .filter((p: any) => p.corvinho.length > 0 || p.alpaquinha.length > 0);
+    if (pairs.length === 0) {
+      return c.json({ error: "Adicione pelo menos uma fala" }, 400);
+    }
+    merged.dupla = pairs;
+    await kv.set(WIDGET_PHRASES_KEY, merged);
+    return c.json({ success: true, list: "dupla", count: pairs.length });
+  } catch (error) {
+    console.log("Error updating dupla widget phrases:", error);
+    return c.json({ error: "Falha ao salvar frases", details: String(error) }, 500);
+  }
+});
+
 // Atualiza a lista de um personagem. Mateus edita "mateus" (Corvinho); Amanda edita "amanda" (Alpaquinha).
 app.put("/make-server-19717bce/widget-phrases/:list", async (c) => {
   try {

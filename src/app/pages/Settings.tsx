@@ -6,6 +6,7 @@ import { syncApi } from '../utils/syncApi';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { toast } from 'sonner';
 import { WidgetPhrasesEditor } from '../components/WidgetPhrasesEditor';
+import { DuplaPhrasesEditor } from '../components/DuplaPhrasesEditor';
 import { isFeatureUnlocked } from '../utils/featureSchedule';
 
 // Manda pra ficha do app na Play Store em vez do APK direto do GitHub.
@@ -245,6 +246,9 @@ export default function Settings() {
 
           {/* Editor de falas do widget (cada um edita o seu personagem) */}
           <WidgetPhrasesEditor profile={userProfile} />
+
+          {/* Editor da conversa dupla (cada um edita só a sua fala em cada par) */}
+          <DuplaPhrasesEditor profile={userProfile} />
 
         </div>
       )}
