@@ -3,23 +3,39 @@ import { MessagesSquare, Plus, Trash2, Loader2 } from 'lucide-react';
 import { api, DuplaPhrase, WIDGET_PHRASE_MAX_LEN, WIDGET_PHRASE_MAX_COUNT } from '../utils/api';
 import { toast } from 'sonner';
 
+type CharacterField = 'corvinho' | 'alpaquinha';
+type Tab = 'perguntas' | 'respostas';
+
+const LABEL: Record<CharacterField, string> = {
+  corvinho: 'Corvinho 🐦‍⬛',
+  alpaquinha: 'Alpaquinha 🦙',
+};
+
+function askerOf(pair: DuplaPhrase): CharacterField {
+  return pair.asker === 'alpaquinha' ? 'alpaquinha' : 'corvinho';
+}
+
+function otherOf(field: CharacterField): CharacterField {
+  return field === 'corvinho' ? 'alpaquinha' : 'corvinho';
+}
+
 /**
- * Editor da conversa do widget duplo (Corvinho + Alpaquinha na mesma tela).
- * Cada par tem uma fala de cada personagem, mas cada pessoa só edita a sua:
- * Mateus mexe no lado do Corvinho, Amanda no lado da Alpaquinha — o lado do
- * outro aparece travado (o servidor também garante isso, nunca confiando no
- * que vier do cliente pro campo alheio).
+ * Editor da conversa do widget duplo, dividido em duas abas:
+ * - "Perguntas": a fala de quem inicia cada par.
+ * - "Respostas": a fala de quem responde nesse mesmo par.
+ *
+ * Cada pessoa só edita a fala do seu personagem, esteja ela perguntando ou
+ * respondendo — Mateus mexe no lado do Corvinho, Amanda no da Alpaquinha. O
+ * lado do outro sempre aparece travado (o servidor também garante isso).
  */
 export function DuplaPhrasesEditor({ profile }: { profile: 'Amanda' | 'Mateus' }) {
-  const ownField: keyof DuplaPhrase = profile === 'Mateus' ? 'corvinho' : 'alpaquinha';
-  const otherField: keyof DuplaPhrase = ownField === 'corvinho' ? 'alpaquinha' : 'corvinho';
-  const ownLabel = ownField === 'corvinho' ? 'Corvinho 🐦‍⬛' : 'Alpaquinha 🦙';
-  const otherLabel = otherField === 'corvinho' ? 'Corvinho 🐦‍⬛' : 'Alpaquinha 🦙';
+  const ownField: CharacterField = profile === 'Mateus' ? 'corvinho' : 'alpaquinha';
 
   const [pairs, setPairs] = useState<DuplaPhrase[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('perguntas');
 
   useEffect(() => {
     let active = true;
@@ -39,10 +55,10 @@ export function DuplaPhrasesEditor({ profile }: { profile: 'Amanda' | 'Mateus' }
     };
   }, []);
 
-  const updateOwn = (i: number, value: string) => {
+  const updateField = (i: number, field: CharacterField, value: string) => {
     setPairs((prev) =>
       prev.map((pair, idx) =>
-        idx === i ? { ...pair, [ownField]: value.slice(0, WIDGET_PHRASE_MAX_LEN) } : pair
+        idx === i ? { ...pair, [field]: value.slice(0, WIDGET_PHRASE_MAX_LEN) } : pair
       )
     );
   };
@@ -54,13 +70,15 @@ export function DuplaPhrasesEditor({ profile }: { profile: 'Amanda' | 'Mateus' }
       toast.info(`Máximo de ${WIDGET_PHRASE_MAX_COUNT} falas`);
       return;
     }
-    setPairs((prev) => [...prev, { corvinho: '', alpaquinha: '' }]);
+    // A pergunta nova nasce com o personagem de quem está adicionando; a
+    // resposta fica em branco até o outro preencher a dela na aba Respostas.
+    setPairs((prev) => [...prev, { corvinho: '', alpaquinha: '', asker: ownField }]);
   };
 
   const handleSave = async () => {
     const cleaned = pairs
       .map((p) => ({ ...p, [ownField]: p[ownField].trim() }) as DuplaPhrase)
-      .filter((p) => p[ownField].length > 0 || p[otherField].trim().length > 0);
+      .filter((p) => p.corvinho.trim().length > 0 || p.alpaquinha.trim().length > 0);
     if (cleaned.length === 0) {
       toast.error('Adicione pelo menos uma fala');
       return;
@@ -78,6 +96,10 @@ export function DuplaPhrasesEditor({ profile }: { profile: 'Amanda' | 'Mateus' }
       setSaving(false);
     }
   };
+
+  // field mostrado na aba atual, por par: quem pergunta ou quem responde.
+  const fieldForTab = (pair: DuplaPhrase): CharacterField =>
+    tab === 'perguntas' ? askerOf(pair) : otherOf(askerOf(pair));
 
   return (
     <div className="bg-card rounded-xl p-6 border border-border">
@@ -103,59 +125,79 @@ export function DuplaPhrasesEditor({ profile }: { profile: 'Amanda' | 'Mateus' }
             </div>
           ) : (
             <>
+              <div className="flex gap-1 p-1 rounded-lg bg-muted/50">
+                <button
+                  onClick={() => setTab('perguntas')}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
+                    tab === 'perguntas' ? 'bg-card shadow-sm' : 'text-muted-foreground'
+                  }`}
+                >
+                  Perguntas
+                </button>
+                <button
+                  onClick={() => setTab('respostas')}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
+                    tab === 'respostas' ? 'bg-card shadow-sm' : 'text-muted-foreground'
+                  }`}
+                >
+                  Respostas
+                </button>
+              </div>
+
               <p className="text-xs text-muted-foreground">
-                Cada fala tem no máximo {WIDGET_PHRASE_MAX_LEN} caracteres. Você só edita a fala do{' '}
-                {ownLabel.split(' ')[0]}; a do {otherLabel.split(' ')[0]} fica travada aqui, pra edição
-                do outro.
+                {tab === 'perguntas'
+                  ? 'A fala de quem começa a conversa em cada par.'
+                  : 'A fala de quem responde, no mesmo par da aba Perguntas.'}{' '}
+                Cada fala tem no máximo {WIDGET_PHRASE_MAX_LEN} caracteres — você só edita a do{' '}
+                {LABEL[ownField].split(' ')[0]}.
               </p>
 
-              {pairs.map((pair, i) => (
-                <div key={i} className="rounded-lg border border-border p-3 space-y-2">
-                  <div>
+              {pairs.map((pair, i) => {
+                const field = fieldForTab(pair);
+                const editable = field === ownField;
+                return (
+                  <div key={i} className="rounded-lg border border-border p-3 space-y-2">
                     <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {ownLabel}
+                      {LABEL[field]}
+                      {!editable && ' (edição do outro)'}
                     </label>
                     <input
                       type="text"
-                      value={pair[ownField]}
+                      value={pair[field]}
+                      disabled={!editable}
                       maxLength={WIDGET_PHRASE_MAX_LEN}
-                      onChange={(e) => updateOwn(i, e.target.value)}
-                      placeholder="Digite sua fala..."
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      onChange={(e) => editable && updateField(i, field, e.target.value)}
+                      placeholder={editable ? 'Digite sua fala...' : 'Ainda sem fala...'}
+                      className={
+                        editable
+                          ? 'w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+                          : 'w-full px-3 py-2 rounded-lg border border-dashed border-border bg-muted/40 text-sm text-muted-foreground cursor-not-allowed'
+                      }
                     />
-                    <div className="text-[10px] text-muted-foreground text-right mt-0.5">
-                      {pair[ownField].length}/{WIDGET_PHRASE_MAX_LEN}
-                    </div>
+                    {editable && (
+                      <div className="text-[10px] text-muted-foreground text-right">
+                        {pair[field].length}/{WIDGET_PHRASE_MAX_LEN}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => removeAt(i)}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover par
+                    </button>
                   </div>
+                );
+              })}
 
-                  <div>
-                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {otherLabel} (edição do outro)
-                    </label>
-                    <input
-                      type="text"
-                      value={pair[otherField]}
-                      disabled
-                      placeholder="Ainda sem fala..."
-                      className="w-full px-3 py-2 rounded-lg border border-dashed border-border bg-muted/40 text-sm text-muted-foreground cursor-not-allowed"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => removeAt(i)}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Remover par
-                  </button>
-                </div>
-              ))}
-
-              <button
-                onClick={addPair}
-                className="flex items-center gap-2 text-sm text-primary font-medium py-1"
-              >
-                <Plus className="w-4 h-4" /> Adicionar par de falas
-              </button>
+              {tab === 'perguntas' && (
+                <button
+                  onClick={addPair}
+                  className="flex items-center gap-2 text-sm text-primary font-medium py-1"
+                >
+                  <Plus className="w-4 h-4" /> Adicionar pergunta
+                </button>
+              )}
 
               <button
                 onClick={handleSave}
