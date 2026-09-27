@@ -349,7 +349,7 @@ export const api = {
   },
 
   // Falas dos widgets (Corvinho/Alpaquinha). Editáveis pelo app, lidas pelo widget nativo.
-  getWidgetPhrases: async (): Promise<{ dupla: any[]; amanda: string[]; mateus: string[] }> => {
+  getWidgetPhrases: async (): Promise<{ dupla: DuplaPhrase[]; amanda: string[]; mateus: string[] }> => {
     return await fetchAPI('/widget-phrases');
   },
 
@@ -361,6 +361,18 @@ export const api = {
     return await fetchAPI(`/widget-phrases/${list}`, {
       method: 'PUT',
       body: JSON.stringify({ phrases, profile }),
+    });
+  },
+
+  // Conversa do widget duplo: cada perfil só grava o próprio lado de cada par
+  // (o servidor ignora o que vier no campo do outro e mantém o que já estava salvo).
+  updateDuplaPhrases: async (
+    pairs: DuplaPhrase[],
+    profile: 'Amanda' | 'Mateus'
+  ): Promise<{ success: boolean; count: number }> => {
+    return await fetchAPI('/widget-phrases/dupla', {
+      method: 'PUT',
+      body: JSON.stringify({ pairs, profile }),
     });
   },
 
@@ -481,3 +493,9 @@ export const api = {
 // Limite de caracteres por fala (deve casar com o servidor).
 export const WIDGET_PHRASE_MAX_LEN = 60;
 export const WIDGET_PHRASE_MAX_COUNT = 60;
+
+// Um par de falas do widget duplo (conversa Corvinho/Alpaquinha).
+export interface DuplaPhrase {
+  corvinho: string;
+  alpaquinha: string;
+}
