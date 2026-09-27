@@ -498,4 +498,6 @@ export const WIDGET_PHRASE_MAX_COUNT = 60;
 export interface DuplaPhrase {
   corvinho: string;
   alpaquinha: string;
+  /** Quem pergunta (inicia) nesse par — o outro responde. */
+  asker?: 'corvinho' | 'alpaquinha';
 }
