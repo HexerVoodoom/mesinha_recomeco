@@ -253,6 +253,15 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Despertador tocando e a pessoa abriu o app (ex.: notificação
+        // bloqueada ou dispensada): leva direto pra tela de desligar.
+        if (WakeupRingService.ringingIds.isNotEmpty()) {
+            startActivity(Intent(this, WakeupActivity::class.java))
+        }
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
@@ -351,7 +360,7 @@ class MainActivity : AppCompatActivity() {
             return org.json.JSONObject()
                 .put("exact", WakeupScheduler.canScheduleExact(this@MainActivity))
                 .put("fullScreen", fullScreen)
-                .put("notifications", nm.areNotificationsEnabled())
+                .put("notifications", nm.areNotificationsEnabled() && WakeupRingService.channelEnabled(this@MainActivity))
                 .put("battery", pm.isIgnoringBatteryOptimizations(packageName))
                 .toString()
         }
@@ -388,8 +397,10 @@ class MainActivity : AppCompatActivity() {
         fun setProfile(profile: String) {
             if (profile != "Amanda" && profile != "Mateus") return
             val prefs = getSharedPreferences("fcm", MODE_PRIVATE)
-            val mudou = prefs.getString("profile", null) != profile
+            val mudou = prefs.getString("profile", null) != profile ||
+                WakeupStore.profile(this@MainActivity) != profile
             prefs.edit().putString("profile", profile).apply()
+            WakeupStore.setProfile(this@MainActivity, profile)
             // Os despertadores deste aparelho dependem de quem está logado.
             if (mudou) WakeupSync.syncAsync(this@MainActivity)
             // Pega o token atual e registra sob esse perfil.

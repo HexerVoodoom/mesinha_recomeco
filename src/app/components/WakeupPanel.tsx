@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Plus, Trash2, Play, Square, BellRing, Volume1, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import {
   describeDays,
   describeNext,
   hasNativeWakeups,
+  isEffectivelyOn,
   nativeWakeupPermissions,
   nextOccurrence,
   notifyNativeWakeupsChanged,
@@ -91,11 +92,13 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
   const [perms, setPerms] = useState<WakeupPermissions | null>(null);
   const [, setTick] = useState(0);
 
-  const load = useCallback(async () => {
+  /** Devolve true se conseguiu baixar a lista. */
+  const load = useCallback(async (): Promise<boolean> => {
     try {
       setWakeups(await wakeupApi.list());
+      return true;
     } catch (_) {
-      // mantém o que já estava na tela
+      return false; // mantém o que já estava na tela
     } finally {
       setLoading(false);
     }
@@ -107,29 +110,40 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
     load();
   }, [load]);
 
-  // Status ao vivo: a cada 8s (pra ver "tocando" virar "desligou") e ao
-  // voltar das configurações do Android (relê as permissões).
+  // Status ao vivo: a cada 5s pergunta só o carimbo de versão (leitura
+  // baratinha) e rebaixa a lista quando algo mudou — "tocando" vira
+  // "desligou" sem martelar o banco. Pausa com o app em segundo plano.
   useEffect(() => {
-    load();
+    let version = -1;
+    const poll = async () => {
+      setTick(t => t + 1); // atualiza "hoje/amanhã", "tocando há X"
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const v = await wakeupApi.version();
+        // O carimbo só é "gasto" se a lista veio mesmo; senão tenta de novo.
+        if (v !== version && (await load())) version = v;
+      } catch (_) { /* sem internet: fica com o que tem */ }
+    };
+    poll();
     setPerms(nativeWakeupPermissions());
-    const poll = window.setInterval(() => { load(); setTick(t => t + 1); }, 8000);
+    const timer = window.setInterval(poll, 5000);
     const onVisible = () => {
-      if (document.visibilityState === 'visible') { setPerms(nativeWakeupPermissions()); load(); }
+      if (document.visibilityState === 'visible') { setPerms(nativeWakeupPermissions()); poll(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      window.clearInterval(poll);
+      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [load]);
 
   const toggle = async (w: Wakeup) => {
-    const enabled = !w.enabled;
-    setWakeups(list => list.map(x => (x.id === w.id ? { ...x, enabled } : x)));
+    // Um "uma vez" que já tocou aparece desligado: tocar liga pra próxima vez.
+    const enabled = !isEffectivelyOn(w);
+    const date = !w.days.length && enabled ? oneShotDateFor(w.time) : w.date;
+    setWakeups(list => list.map(x => (x.id === w.id ? { ...x, enabled, date } : x)));
     try {
-      // Religando um "uma vez" que já passou: vale pra próxima vez desse horário.
-      const date = !w.days.length && enabled ? oneShotDateFor(w.time) : w.date;
-      await wakeupApi.update(w.id, { enabled, date });
+      await wakeupApi.update(w.id, { enabled, date }, userProfile);
       changed();
     } catch (_) {
       toast.error('Não deu pra mudar agora');
@@ -248,6 +262,7 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
   onToggle: () => void;
 }) {
   const next = nextOccurrence(w);
+  const on = isEffectivelyOn(w);
   const targets = targetsOf(w);
   const ringing = targets.some(p => isRinging(w, p));
   const targetLabel = w.target === 'both' ? 'pra vocês dois' : w.target === userProfile ? 'pra você' : toPrep(w.target);
@@ -258,7 +273,7 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
       onClick={onEdit}
       className={`rounded-2xl border-2 p-4 cursor-pointer transition-colors ${
         ringing ? 'border-[#4D989B] bg-[#81D8D0]/15'
-          : w.enabled ? 'border-[#E9E4DF] bg-white'
+          : on ? 'border-[#E9E4DF] bg-white'
           : 'border-[#E9E4DF] bg-[#F8F6F4] opacity-60'
       }`}
     >
@@ -278,10 +293,10 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
         </div>
         <button
           onClick={e => { e.stopPropagation(); onToggle(); }}
-          className={`relative w-12 h-7 rounded-full shrink-0 transition-colors ${w.enabled ? 'bg-[#4D989B]' : 'bg-[#E9E4DF]'}`}
-          aria-label={w.enabled ? 'Desligar despertador' : 'Ligar despertador'}
+          className={`relative w-12 h-7 rounded-full shrink-0 transition-colors ${on ? 'bg-[#4D989B]' : 'bg-[#E9E4DF]'}`}
+          aria-label={on ? 'Desligar despertador' : 'Ligar despertador'}
         >
-          <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${w.enabled ? 'left-6' : 'left-1'}`} />
+          <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${on ? 'left-6' : 'left-1'}`} />
         </button>
       </div>
 
@@ -294,7 +309,7 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {targets.map(p => <RingStatus key={p} wakeup={w} person={p} userProfile={userProfile} />)}
-        {w.enabled && !ringing && (
+        {on && !ringing && (
           <span className="text-[11px] font-bold text-[#4D989B] bg-[#4D989B]/10 px-2.5 py-1 rounded-full">
             ⏰ {describeNext(next)}
           </span>
@@ -358,16 +373,21 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
 
+  // Só para o som se for a prévia DESTE editor tocando — nunca o despertador
+  // do navegador, que usa o mesmo tocador.
+  const previewingRef = useRef(false);
+  previewingRef.current = previewing;
+
   useEffect(() => {
     if (editing === 'new') setForm(emptyForm());
     else if (editing) {
       const { target, time, days, date, volume, note, enabled } = editing;
       setForm({ target, time, days, date, volume, note, enabled });
     }
-    if (!editing) { stopWakeupTune(); setPreviewing(false); }
+    if (!editing && previewingRef.current) { stopWakeupTune(); setPreviewing(false); }
   }, [editing]);
 
-  useEffect(() => () => stopWakeupTune(), []);
+  useEffect(() => () => { if (previewingRef.current) stopWakeupTune(); }, []);
 
   const save = async () => {
     if (saving || !editing) return;
@@ -386,7 +406,7 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
           ? 'Despertador criado ⏰'
           : `Despertador criado! ${partner === 'Amanda' ? 'A Amanda' : 'O Mateus'} já vai ficar sabendo ⏰💌`);
       } else {
-        await wakeupApi.update(editing.id, input);
+        await wakeupApi.update(editing.id, input, userProfile);
         toast.success('Despertador atualizado ⏰');
       }
       onSaved();
@@ -412,6 +432,7 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
   const togglePreview = async () => {
     if (previewing) { stopWakeupTune(); setPreviewing(false); return; }
     const ok = await playWakeupTune(form.volume, true);
+    if (ok === null) return;
     setPreviewing(ok);
     if (!ok) toast.error('O navegador não deixou tocar o som');
   };
