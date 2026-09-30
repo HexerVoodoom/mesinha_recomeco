@@ -301,21 +301,14 @@ object WakeupScheduler {
         )
 
         try {
-            if (canScheduleExact(context)) {
-                // setAlarmClock: exato, fura o Doze, deixa subir o serviço em
-                // primeiro plano e mostra o ícone de despertador na barra.
-                // Tocar no ícone abre o Mesinha.
-                val show = PendingIntent.getActivity(
-                    context, REQUEST_CODE,
-                    Intent(context, MainActivity::class.java), flags
-                )
-                am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTime, show), fire)
-            } else {
-                // Sem permissão de alarme exato (não deveria acontecer: o app
-                // declara USE_EXACT_ALARM). Melhor esforço; o receiver tem
-                // plano B se o Android não deixar subir o serviço.
-                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTime, fire)
-            }
+            // setAlarmClock não exige a permissão de alarme exato: é exato,
+            // fura o Doze, deixa subir o serviço em primeiro plano e mostra o
+            // ícone de despertador na barra. Tocar no ícone abre o Mesinha.
+            val show = PendingIntent.getActivity(
+                context, REQUEST_CODE,
+                Intent(context, MainActivity::class.java), flags
+            )
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTime, show), fire)
         } catch (e: SecurityException) {
             Log.w("Wakeup", "Sem permissão de alarme exato", e)
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTime, fire)

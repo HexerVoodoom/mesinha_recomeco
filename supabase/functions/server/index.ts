@@ -1865,7 +1865,9 @@ app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
     const { profile, occurrence, status, at } = await c.req.json();
     if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
     if (status !== "ringing" && status !== "missed") return c.json({ error: "Status inválido" }, 400);
-    if (typeof occurrence !== "string" || !occurrence) return c.json({ error: "Toque inválido" }, 400);
+    if (typeof occurrence !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(occurrence)) {
+      return c.json({ error: "Toque inválido" }, 400);
+    }
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
     if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);
@@ -1907,7 +1909,9 @@ app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
     if (!WAKEUP_DISMISS_MESSAGES.includes(msg)) {
       return c.json({ error: "Escolhe um dos recadinhos pra desligar" }, 400);
     }
-    if (typeof occurrence !== "string" || !occurrence) return c.json({ error: "Toque inválido" }, 400);
+    if (typeof occurrence !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(occurrence)) {
+      return c.json({ error: "Toque inválido" }, 400);
+    }
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
     if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);
@@ -1916,7 +1920,7 @@ app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
     if (atual?.occurrence && occurrence < atual.occurrence) return c.json({ ignored: "antigo" });
     // Retentativa do mesmo "desligou" (o celular reenvia quando estava sem
     // internet): não manda o push de novo.
-    if (atual?.occurrence === occurrence && atual.status === "dismissed") return c.json({ ignored: "repetido" });
+    const repetido = atual?.occurrence === occurrence && atual.status === "dismissed";
 
     const quando = reportedTime(at);
     const ring = {
@@ -1928,22 +1932,28 @@ app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
       endedAt: quando,
       message: msg,
     };
-    await kv.set(`${WAKEUP_RING_PREFIX}${id}:${profile}`, ring);
-    await bumpWakeupVersion();
+    if (!repetido) {
+      await kv.set(`${WAKEUP_RING_PREFIX}${id}:${profile}`, ring);
+      await bumpWakeupVersion();
+    }
 
     // Dois despertadores no mesmo minuto desligam juntos: um push só pro outro.
+    // Numa repetição do mesmo "desligou" cai aqui de novo: se o push anterior
+    // falhou (chave ainda não gravada), tenta outra vez.
     const pushKey = `wakeup-push-last:${profile}`;
     const assinatura = `${occurrence}|${msg}`;
     if ((await kv.get(pushKey)) !== assinatura) {
-      await kv.set(pushKey, assinatura);
-      await sendPushToUser(outroPerfil(profile), {
+      const entregue = await sendPushToUser(outroPerfil(profile), {
         title: `⏰ ${profile} desligou o despertador`,
         body: msg,
         tag: `mesinha-wakeup-${occurrence}`,
         url: "/",
       }).catch(() => false);
+      // Só marca depois de sair: se falhou, a próxima tentativa do celular
+      // (o "desligou" repetido) ainda manda o push.
+      if (entregue) await kv.set(pushKey, assinatura);
     }
-    return c.json({ ring });
+    return c.json({ ring: repetido ? atual : ring });
   } catch (error) {
     console.error("[POST /wakeups/:id/dismiss] Error:", error);
     return c.json({ error: "Falha ao desligar despertador" }, 500);

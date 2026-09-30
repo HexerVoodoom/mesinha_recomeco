@@ -394,11 +394,15 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
     setSaving(true);
     try {
       // "Uma vez": a data é a próxima vez que esse horário acontece.
+      // Editando: mantém ligado/desligado (só o recadinho mudou, por exemplo) e
+      // a data do "uma vez", a não ser que horário ou dias tenham mudado.
+      const before = editing !== 'new' ? editing : null;
+      const timingChanged = !before || before.time !== form.time || before.days.join() !== form.days.join();
       const input: WakeupInput = {
         ...form,
-        date: form.days.length ? null : oneShotDateFor(form.time),
+        date: form.days.length ? null : (!timingChanged && before?.date ? before.date : oneShotDateFor(form.time)),
         volume: Math.max(WAKEUP_MIN_VOLUME, form.volume),
-        enabled: true,
+        enabled: before && !timingChanged ? before.enabled : true,
       };
       if (editing === 'new') {
         await wakeupApi.create(userProfile, input);
