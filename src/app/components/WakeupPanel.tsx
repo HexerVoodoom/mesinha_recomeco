@@ -83,7 +83,6 @@ interface WakeupPanelProps {
 }
 
 export function WakeupPanel({ userProfile }: WakeupPanelProps) {
-  const partner: Profile = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
   const native = hasNativeWakeups();
 
   const [wakeups, setWakeups] = useState<Wakeup[]>([]);
@@ -159,35 +158,8 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
     ? (Object.keys(PERMISSION_TEXTS) as (keyof WakeupPermissions)[]).filter(k => perms[k] === false)
     : [];
 
-  const ringingNow = wakeups.some(w => targetsOf(w).some(p => isRinging(w, p)));
-
   return (
     <div className="px-6 pb-24 font-['Quicksand',sans-serif]">
-      {/* Cabeçalho: os dois dormindo, esperando o despertador */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border-2 border-[#E9E4DF] bg-[#F8F6F4] p-5 mb-4"
-      >
-        <p className="font-bold text-xs uppercase tracking-tight text-[#4D989B] mb-3">
-          {ringingNow ? '🔔 Tem despertador tocando!' : 'Despertador'}
-        </p>
-        <div className="flex items-center gap-3">
-          <div className="flex items-end shrink-0">
-            <motion.div animate={ringingNow ? { rotate: [-6, 6, -6] } : { y: [0, -2, 0] }} transition={{ repeat: Infinity, duration: ringingNow ? 0.3 : 2.4 }}>
-              <CharacterFace profile="Amanda" className="w-12 h-12" />
-            </motion.div>
-            <motion.div animate={ringingNow ? { rotate: [6, -6, 6] } : { y: [0, -2, 0] }} transition={{ repeat: Infinity, duration: ringingNow ? 0.3 : 2.4, delay: 0.4 }}>
-              <CharacterFace profile="Mateus" className="w-12 h-12" />
-            </motion.div>
-          </div>
-          <p className="font-bold text-lg text-[#2B2A28] leading-snug">Acordar juntinho ☀️</p>
-        </div>
-        <p className="text-sm text-[#8A847D] leading-snug mt-3">
-          Toca mesmo com a Mesinha fechada. Pra desligar, tem que mandar um recadinho pro outro 💌
-        </p>
-      </motion.div>
-
       {missingPerms.length > 0 && (
         <div className="rounded-2xl border-2 border-[#F6C177] bg-[#FFF8EC] p-4 mb-4">
           <p className="font-bold text-xs uppercase tracking-tight text-[#B7791F] mb-2">Falta liberar pra tocar certinho</p>
@@ -210,25 +182,8 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
         </div>
       )}
 
-      {!native && (
-        <div className="rounded-2xl border-2 border-[#E9E4DF] bg-white p-4 mb-4 flex gap-3 items-start">
-          <span className="text-lg">📱</span>
-          <p className="text-xs text-[#8A847D] leading-relaxed">
-            No navegador o despertador só toca com a Mesinha aberta. No app Android ele toca com tudo fechado — até no silencioso.
-          </p>
-        </div>
-      )}
-
       {loading ? (
         <div className="text-center py-10 text-muted-foreground">Dando corda no despertador...</div>
-      ) : wakeups.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-[#E9E4DF] p-6 mb-4 flex flex-col items-center text-center">
-          <div className="flex items-start gap-2 mb-3">
-            <CharacterFace profile={userProfile} className="w-12 h-12" />
-            <SpeechBubble profile={userProfile}>Bora criar um pra acordar {partner === 'Amanda' ? 'a Amanda' : 'o Mateus'} amanhã? ☀️</SpeechBubble>
-          </div>
-          <p className="text-sm text-[#8A847D]">Nenhum despertador ainda.</p>
-        </div>
       ) : (
         <div className="space-y-3 mb-4">
           {wakeups.map(w => (
