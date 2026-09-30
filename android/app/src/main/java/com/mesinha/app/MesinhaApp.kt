@@ -17,5 +17,6 @@ class MesinhaApp : Application() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.ensureChannel(this)
+        WakeupRingService.ensureChannel(this)
     }
 }

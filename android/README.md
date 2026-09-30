@@ -39,6 +39,12 @@ App Android nativo do Mesinha. Ele faz duas coisas:
      alguns segundos; o limite do servidor (1 cutucada a cada 3 min) aparece
      nesse aviso e num Toast.
 
+3. **Despertador** (`Wakeups.kt`, `WakeupReceiver`, `WakeupRingService`,
+   `WakeupActivity`, `WakeupTune`): toca no horário com o app fechado, no
+   canal de alarme, com volume mínimo de 20% e tela cheia por cima da tela de
+   bloqueio; desliga escolhendo um de 6 recadinhos que vai pro outro. Detalhes
+   no `PROJETO.md` (seção "Despertador").
+
 > **`updatePeriodMillis="0"` é uma armadilha:** um widget com 0 não recebe
 > nenhuma atualização periódica, então ele depende de um único `onUpdate`. Se
 > esse broadcast se perder (o processo do app morrer no meio da entrega), o

@@ -27,6 +27,19 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!--
+      Despertador: toca na hora certa com o app fechado e por cima de tudo.
+      - SCHEDULE_EXACT_ALARM: `setAlarmClock` (a pessoa libera em "Alarmes e
+        lembretes"; o app avisa se estiver faltando).
+      - USE_FULL_SCREEN_INTENT: tela do despertador por cima da tela de
+        bloqueio (no Android 14+ a Play pede a declaração "despertador").
+      - FOREGROUND_SERVICE_MEDIA_PLAYBACK: o serviço que toca o som.
+      - VIBRATE: vibra junto.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".MesinhaApp"
@@ -197,6 +210,37 @@
             android:name=".LocationSharingService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- Despertador: recebe o disparo do AlarmManager e reagenda quando o relógio muda. -->
+        <receiver
+            android:name=".WakeupReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.mesinha.app.ACTION_WAKEUP_FIRE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Despertador: toca o som (canal de alarme) até escolherem um recadinho. -->
+        <service
+            android:name=".WakeupRingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Despertador: tela cheia por cima da tela de bloqueio. -->
+        <activity
+            android:name=".WakeupActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:turnScreenOn="true" />
 
         <!-- Serviço do Firebase Cloud Messaging (recebe as notificações). -->
         <service

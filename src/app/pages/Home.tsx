@@ -20,6 +20,9 @@ import { SearchContent } from '../components/SearchContent';
 import { MeetupCalendar } from '../components/MeetupCalendar';
 import { MapView } from '../components/MapView';
 import { NudgeModal } from '../components/NudgeModal';
+import { WakeupModal } from '../components/WakeupModal';
+import { WakeupWebRinger } from '../components/WakeupWebRinger';
+import { hasNativeWakeups } from '../utils/wakeups';
 import { DateRouletteModal } from '../components/DateRouletteModal';
 import { OnThisDayCard } from '../components/OnThisDayCard';
 import { MoodPanel, moodItemId } from '../components/MoodPanel';
@@ -149,6 +152,7 @@ export default function Home() {
   const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showNudgeModal, setShowNudgeModal] = useState(false);
+  const [showWakeupModal, setShowWakeupModal] = useState(false);
   const [showRouletteModal, setShowRouletteModal] = useState(false);
   const [showMood, setShowMood] = useState(false);
   const [showQuestion, setShowQuestion] = useState(false);
@@ -1162,6 +1166,7 @@ export default function Home() {
           onOpenRoulette={() => setShowRouletteModal(true)}
           onOpenGames={() => setShowGamesModal(true)}
           onOpenNudge={() => setShowNudgeModal(true)}
+          onOpenWakeup={() => setShowWakeupModal(true)}
         />
 
         {error && (
@@ -1370,6 +1375,17 @@ export default function Home() {
         onClose={() => setShowNudgeModal(false)}
         userProfile={userProfile}
       />
+
+      <WakeupModal
+        isOpen={showWakeupModal}
+        onClose={() => setShowWakeupModal(false)}
+        userProfile={userProfile}
+      />
+
+      {/* Despertador no navegador: no app Android quem toca é o serviço nativo. */}
+      {!hasNativeWakeups() && (userProfile === 'Amanda' || userProfile === 'Mateus') && (
+        <WakeupWebRinger userProfile={userProfile} />
+      )}
 
       <DateRouletteModal
         isOpen={showRouletteModal}

@@ -153,3 +153,40 @@ export async function sendFcmToUser(
   console.log(`[FCM] enviado para ${user}`);
   return true;
 }
+
+/**
+ * Mensagem SÓ de dados (sem `notification`), com prioridade alta. O Android
+ * entrega isso direto no `onMessageReceived` do app — mesmo fechado — sem
+ * mostrar nada na tela. Usado pelo Despertador: quando alguém cria/edita um
+ * despertador pro outro, o celular dele acorda e reagenda o alarme local.
+ */
+export async function sendFcmDataToUser(
+  user: string,
+  data: Record<string, string>,
+): Promise<boolean> {
+  const sa = await getServiceAccount();
+  if (!sa) return false;
+
+  const token = await kv.get(`fcm-token:${user}`);
+  if (!token || typeof token !== "string") return false;
+
+  const accessToken = await getAccessToken(sa);
+  const res = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: { token, data, android: { priority: "high" } },
+      }),
+    },
+  );
+  if (!res.ok) {
+    console.error(`[FCM] dados falharam para ${user}: ${res.status} ${await res.text()}`);
+    return false;
+  }
+  return true;
+}

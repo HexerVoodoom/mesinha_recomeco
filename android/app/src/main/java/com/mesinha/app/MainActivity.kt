@@ -236,6 +236,10 @@ class MainActivity : AppCompatActivity() {
         // mesmo que o alarme diário tenha sido descartado pela otimização de bateria.
         refreshWidgets()
 
+        // Despertador: confere a lista no servidor e reagenda o próximo toque
+        // (autocura caso algum FCM de sincronização tenha se perdido).
+        WakeupSync.syncAsync(this)
+
         // Botão "voltar" navega no histórico da WebView antes de sair do app.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -329,11 +333,65 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isAlwaysSharing(): Boolean = LocationSharing.isEnabled(this@MainActivity)
 
+        /** Despertador: o PWA mexeu na lista — baixa de novo e reagenda já. */
+        @JavascriptInterface
+        fun wakeupsChanged() {
+            WakeupSync.syncAsync(this@MainActivity)
+        }
+
+        /**
+         * Despertador: o que está faltando pra tocar certinho com o app
+         * fechado. O PWA mostra um aviso com botão pra cada item `false`.
+         */
+        @JavascriptInterface
+        fun wakeupPermissions(): String {
+            val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val fullScreen = if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
+            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            return org.json.JSONObject()
+                .put("exact", WakeupScheduler.canScheduleExact(this@MainActivity))
+                .put("fullScreen", fullScreen)
+                .put("notifications", nm.areNotificationsEnabled())
+                .put("battery", pm.isIgnoringBatteryOptimizations(packageName))
+                .toString()
+        }
+
+        /** Abre a tela do sistema pra liberar uma das permissões do despertador. */
+        @JavascriptInterface
+        fun openWakeupSettings(kind: String) {
+            runOnUiThread {
+                val pkg = Uri.parse("package:$packageName")
+                val intent = when (kind) {
+                    "exact" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                        Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, pkg) else null
+                    "fullScreen" -> if (Build.VERSION.SDK_INT >= 34)
+                        Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkg) else null
+                    "notifications" -> Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                    "battery" -> {
+                        LocationSharing.requestBatteryExemption(this@MainActivity)
+                        null
+                    }
+                    else -> null
+                }
+                if (intent != null) {
+                    try {
+                        startActivity(intent)
+                    } catch (_: ActivityNotFoundException) {
+                        startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))
+                    }
+                }
+            }
+        }
+
         @JavascriptInterface
         fun setProfile(profile: String) {
             if (profile != "Amanda" && profile != "Mateus") return
             val prefs = getSharedPreferences("fcm", MODE_PRIVATE)
+            val mudou = prefs.getString("profile", null) != profile
             prefs.edit().putString("profile", profile).apply()
+            // Os despertadores deste aparelho dependem de quem está logado.
+            if (mudou) WakeupSync.syncAsync(this@MainActivity)
             // Pega o token atual e registra sob esse perfil.
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (task.isSuccessful) {
