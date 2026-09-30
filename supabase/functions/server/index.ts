@@ -1716,6 +1716,13 @@ function pushNovoDespertador(p: Perfil, criador: Perfil, w: any) {
   }).catch(() => false);
 }
 
+/** "YYYY-MM-DDTHH:MM" válido e a no máximo 1 dia de distância de agora (nem lixo, nem 2099). */
+function isPlausibleOccurrence(o: unknown): o is string {
+  if (typeof o !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(o)) return false;
+  const t = Date.parse(o + ":00Z"); // só compara ordem de grandeza: o fuso do aparelho não importa aqui
+  return Number.isFinite(t) && Math.abs(t - Date.now()) < 36 * 3600 * 1000;
+}
+
 /**
  * Horário informado pelo aparelho (o celular pode ter ficado sem internet e
  * mandar o aviso só depois): aceito se for plausível, senão vale o do servidor.
@@ -1865,9 +1872,7 @@ app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
     const { profile, occurrence, status, at } = await c.req.json();
     if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
     if (status !== "ringing" && status !== "missed") return c.json({ error: "Status inválido" }, 400);
-    if (typeof occurrence !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(occurrence)) {
-      return c.json({ error: "Toque inválido" }, 400);
-    }
+    if (!isPlausibleOccurrence(occurrence)) return c.json({ error: "Toque inválido" }, 400);
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
     if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);
@@ -1909,9 +1914,7 @@ app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
     if (!WAKEUP_DISMISS_MESSAGES.includes(msg)) {
       return c.json({ error: "Escolhe um dos recadinhos pra desligar" }, 400);
     }
-    if (typeof occurrence !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(occurrence)) {
-      return c.json({ error: "Toque inválido" }, 400);
-    }
+    if (!isPlausibleOccurrence(occurrence)) return c.json({ error: "Toque inválido" }, 400);
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
     if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);

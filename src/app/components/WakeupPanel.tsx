@@ -127,12 +127,16 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
     poll();
     setPerms(nativeWakeupPermissions());
     const timer = window.setInterval(poll, 5000);
+    // O tocador do navegador avisa quando alguém desliga/muda: atualiza na hora.
+    const onChanged = () => { load(); };
+    window.addEventListener(WAKEUPS_CHANGED_EVENT, onChanged);
     const onVisible = () => {
       if (document.visibilityState === 'visible') { setPerms(nativeWakeupPermissions()); poll(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.clearInterval(timer);
+      window.removeEventListener(WAKEUPS_CHANGED_EVENT, onChanged);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [load]);
