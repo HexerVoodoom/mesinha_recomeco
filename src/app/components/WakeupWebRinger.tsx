@@ -19,14 +19,23 @@ import { CharacterFace, SpeechBubble } from './WakeupPanel';
 // aberto — o navegador não deixa nada tocar com a aba fechada. No app
 // Android quem toca é o serviço nativo, e este componente nem é montado.
 
-const HANDLED_KEY = 'wakeupWebHandled';
-const PENDING_KEY = 'wakeupWebPendingDismiss';
+const HANDLED_KEY = 'wakeupWebHandled'; // toques já desligados/perdidos neste navegador
+const RINGING_KEY = 'wakeupWebRinging'; // o que está tocando agora (volta se recarregar a página)
+const PENDING_KEY = 'wakeupWebPendingDismiss'; // "desliguei" que ainda não chegou no servidor
 // Aba congelada/tela apagada pode pular o minuto exato: toca o que venceu há
 // até 10 min (e que ninguém desligou), em vez de perder em silêncio.
 const CATCH_UP_MS = 10 * 60 * 1000;
+// Toque atrasado só depois de conferir a lista fresquinha (pode já ter sido
+// desligado no celular).
+const FRESH_LIST_MS = 20 * 1000;
 
 function readJson<T>(key: string, fallback: T): T {
-  try { return JSON.parse(localStorage.getItem(key) || '') as T; } catch (_) { return fallback; }
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch (_) {
+    return fallback;
+  }
 }
 
 function writeJson(key: string, value: unknown) {
@@ -34,32 +43,36 @@ function writeJson(key: string, value: unknown) {
 }
 
 function markHandled(keys: string[]) {
-  writeJson(HANDLED_KEY, [...readJson<string[]>(HANDLED_KEY, []), ...keys].slice(-50));
+  if (keys.length) writeJson(HANDLED_KEY, [...readJson<string[]>(HANDLED_KEY, []), ...keys].slice(-50));
 }
 
-interface PendingDismiss { id: string; occurrence: string; message: string; at: string }
+interface PendingDismiss { id: string; occurrence: string; message: string; at: string; profile: Profile }
 
-/** Manda os "desliguei" que ficaram pendentes (sem internet na hora). */
+/** Manda os "desliguei" pendentes (sem internet na hora). */
 let flushing = false;
+let flushAgain = false;
 async function flushPendingDismiss(profile: Profile) {
-  if (flushing) return;
+  if (flushing) { flushAgain = true; return; }
   flushing = true;
   try {
-    const pending = readJson<PendingDismiss[]>(PENDING_KEY, []);
-    const done = new Set<string>();
-    for (const p of pending) {
-      const key = `${p.id}|${p.occurrence}`;
-      try {
-        await wakeupApi.dismiss(p.id, profile, p.occurrence, p.message, p.at);
-        done.add(key);
-      } catch (e) {
-        // Recusa definitiva do servidor (apagado, não é seu...): não adianta repetir.
-        const msg = e instanceof Error ? e.message : '';
-        if (/não encontrado|não é seu|inválid|Escolhe um/i.test(msg)) done.add(key);
+    do {
+      flushAgain = false;
+      const pending = readJson<PendingDismiss[]>(PENDING_KEY, []).filter(p => (p.profile ?? profile) === profile);
+      const done = new Set<string>();
+      for (const p of pending) {
+        const key = `${p.id}|${p.occurrence}`;
+        try {
+          await wakeupApi.dismiss(p.id, profile, p.occurrence, p.message, p.at);
+          done.add(key);
+        } catch (e) {
+          // Recusa definitiva do servidor (apagado, não é seu...): não adianta repetir.
+          const msg = e instanceof Error ? e.message : '';
+          if (/não encontrado|não é seu|inválid|Escolhe um/i.test(msg)) done.add(key);
+        }
       }
-    }
-    // Relê antes de gravar: pode ter entrado um recado novo enquanto isso.
-    writeJson(PENDING_KEY, readJson<PendingDismiss[]>(PENDING_KEY, []).filter(p => !done.has(`${p.id}|${p.occurrence}`)));
+      // Relê antes de gravar: pode ter entrado um recado novo enquanto isso.
+      writeJson(PENDING_KEY, readJson<PendingDismiss[]>(PENDING_KEY, []).filter(p => !done.has(`${p.id}|${p.occurrence}`)));
+    } while (flushAgain);
   } finally {
     flushing = false;
   }
@@ -71,58 +84,97 @@ interface RingItem {
   startedAt: number;
 }
 
+/** O servidor já sabe que esse toque acabou (desligado em outro aparelho, perdido, apagado)? */
+function isResolved(item: RingItem, list: Wakeup[], profile: Profile): boolean {
+  const w = list.find(x => x.id === item.wakeup.id);
+  if (!w || !w.enabled) return true;
+  const st = w.ring?.[profile];
+  return st?.occurrence === item.occurrence && (st.status === 'dismissed' || st.status === 'missed');
+}
+
 export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
   const partner: Profile = userProfile === 'Amanda' ? 'Mateus' : 'Amanda';
   const listRef = useRef<Wakeup[]>([]);
+  const listAtRef = useRef(0);
   const versionRef = useRef<number>(-1);
-  const [ringing, setRinging] = useState<RingItem[]>([]);
+  const [ringing, setRingingState] = useState<RingItem[]>([]);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const ringingRef = useRef<RingItem[]>([]);
-  ringingRef.current = ringing;
 
-  const refresh = useCallback(async () => {
-    try { listRef.current = await wakeupApi.list(); } catch (_) { /* mantém a lista anterior */ }
-  }, []);
-
-  // Pergunta só o carimbo de versão (barato) e rebaixa a lista quando muda.
-  const refreshIfChanged = useCallback(async () => {
-    try {
-      const v = await wakeupApi.version();
-      if (v !== versionRef.current) {
-        versionRef.current = v;
-        await refresh();
-      }
-    } catch (_) { /* sem internet: fica com a lista que tem */ }
-  }, [refresh]);
-
-  const startSound = useCallback((items: RingItem[]) => {
-    const volume = Math.max(...items.map(r => r.wakeup.volume));
-    playWakeupTune(volume, true).then(ok => setSoundBlocked(!ok));
-  }, []);
-
-  // Tira despertadores da tela; quando não sobra nenhum, para o som.
-  const removeRinging = useCallback((ids: Set<string>) => {
-    const left = ringingRef.current.filter(r => !ids.has(r.wakeup.id));
-    ringingRef.current = left;
-    setRinging(left);
-    if (!left.length) {
+  const setRinging = useCallback((items: RingItem[]) => {
+    ringingRef.current = items;
+    setRingingState(items);
+    writeJson(RINGING_KEY, items);
+    if (!items.length) {
       stopWakeupTune();
       setSoundBlocked(false);
     }
   }, []);
 
-  // Lista: ao abrir, a cada 30s (só o carimbo) e quando o painel mexe nela.
+  const startSound = useCallback((items: RingItem[]) => {
+    const volume = Math.max(...items.map(r => r.wakeup.volume));
+    playWakeupTune(volume, true).then(ok => { if (ok !== null) setSoundBlocked(!ok); });
+  }, []);
+
+  /** Tira da tela o que já acabou em outro lugar. */
+  const reconcile = useCallback(() => {
+    const left = ringingRef.current.filter(r => !isResolved(r, listRef.current, userProfile));
+    if (left.length !== ringingRef.current.length) {
+      markHandled(ringingRef.current.filter(r => !left.includes(r)).map(r => `${r.wakeup.id}|${r.occurrence}`));
+      setRinging(left);
+    }
+  }, [setRinging, userProfile]);
+
+  /** Baixa a lista; devolve true se conseguiu. */
+  const refresh = useCallback(async (): Promise<boolean> => {
+    try {
+      listRef.current = await wakeupApi.list();
+      listAtRef.current = Date.now();
+      reconcile();
+      return true;
+    } catch (_) {
+      return false; // mantém a lista anterior
+    }
+  }, [reconcile]);
+
+  // Pergunta só o carimbo de versão (barato); o carimbo só é "gasto" quando
+  // a lista veio mesmo — um soluço de rede não faz perder a mudança.
+  const refreshIfChanged = useCallback(async () => {
+    try {
+      const v = await wakeupApi.version();
+      if (v !== versionRef.current && (await refresh())) versionRef.current = v;
+    } catch (_) { /* sem internet: fica com a lista que tem */ }
+  }, [refresh]);
+
+  // Recarregou a página no meio do toque: volta a tocar o que ainda vale.
+  useEffect(() => {
+    const now = Date.now();
+    const handled = new Set(readJson<string[]>(HANDLED_KEY, []));
+    const saved = readJson<RingItem[]>(RINGING_KEY, []).filter(r =>
+      r?.wakeup?.id && now - r.startedAt < WAKEUP_MAX_RING_MS && !handled.has(`${r.wakeup.id}|${r.occurrence}`) &&
+      (r.wakeup.target === 'both' || r.wakeup.target === userProfile)
+    );
+    if (saved.length) {
+      setRinging(saved);
+      startSound(saved);
+    } else {
+      writeJson(RINGING_KEY, []);
+    }
+  }, [setRinging, startSound, userProfile]);
+
+  // Lista: ao abrir, a cada 20s (só o carimbo) e quando o painel mexe nela.
   useEffect(() => {
     refresh();
     flushPendingDismiss(userProfile);
     const t = window.setInterval(() => {
       refreshIfChanged();
       flushPendingDismiss(userProfile);
-    }, 30 * 1000);
-    window.addEventListener(WAKEUPS_CHANGED_EVENT, refresh);
+    }, FRESH_LIST_MS);
+    const onChanged = () => { refresh(); };
+    window.addEventListener(WAKEUPS_CHANGED_EVENT, onChanged);
     return () => {
       window.clearInterval(t);
-      window.removeEventListener(WAKEUPS_CHANGED_EVENT, refresh);
+      window.removeEventListener(WAKEUPS_CHANGED_EVENT, onChanged);
     };
   }, [refresh, refreshIfChanged, userProfile]);
 
@@ -130,10 +182,19 @@ export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
   // o som não pode continuar sem ter como desligar.
   useEffect(() => () => stopWakeupTune(), []);
 
-  // Relógio: confere a cada 5s se algum despertador meu venceu.
+  // Relógio: confere a cada 5s se algum despertador meu venceu; e dá como
+  // perdido o que tocou 30 min sem ninguém desligar.
   useEffect(() => {
     const check = () => {
       const now = new Date();
+
+      const vencidos = ringingRef.current.filter(r => now.getTime() - r.startedAt >= WAKEUP_MAX_RING_MS);
+      if (vencidos.length) {
+        vencidos.forEach(r => wakeupApi.ring(r.wakeup.id, userProfile, r.occurrence, 'missed').catch(() => {}));
+        markHandled(vencidos.map(r => `${r.wakeup.id}|${r.occurrence}`));
+        setRinging(ringingRef.current.filter(r => !vencidos.includes(r)));
+      }
+
       const handled = new Set(readJson<string[]>(HANDLED_KEY, []));
       const tocando = new Set(ringingRef.current.map(r => r.wakeup.id));
       const due: RingItem[] = [];
@@ -141,17 +202,27 @@ export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
         if (!w.enabled || !(w.target === 'both' || w.target === userProfile) || tocando.has(w.id)) continue;
         const at = nextOccurrence(w, new Date(now.getTime() - CATCH_UP_MS));
         if (!at || at > now) continue;
+        // Criado/editado depois desse horário (ex.: às 07:05 um "07:00 todo
+        // dia"): vale a partir do próximo, não toca agora.
+        const since = Date.parse(w.updatedAt || w.createdAt || '');
+        if (Number.isFinite(since) && at.getTime() < since) continue;
         const occ = occurrenceKey(at);
         if (handled.has(`${w.id}|${occ}`)) continue;
-        // Já resolvido em outro aparelho (ex.: celular) neste mesmo toque.
-        const r = w.ring?.[userProfile];
-        if (r?.occurrence === occ && (r.status === 'dismissed' || r.status === 'missed')) continue;
-        due.push({ wakeup: w, occurrence: occ, startedAt: at.getTime() });
+        const item = { wakeup: w, occurrence: occ, startedAt: at.getTime() };
+        if (isResolved(item, listRef.current, userProfile)) continue;
+        due.push(item);
       }
       if (!due.length) return;
-      markHandled(due.map(r => `${r.wakeup.id}|${r.occurrence}`));
+
+      // Toque atrasado com lista velha: confere primeiro (pode já ter sido
+      // desligado no celular) e decide na próxima volta.
+      const atrasado = due.some(r => now.getTime() - r.startedAt > 60 * 1000);
+      if (atrasado && now.getTime() - listAtRef.current > FRESH_LIST_MS) {
+        refresh();
+        return;
+      }
+
       const all = [...ringingRef.current, ...due];
-      ringingRef.current = all;
       setRinging(all);
       startSound(all);
       due.forEach(r => wakeupApi.ring(r.wakeup.id, userProfile, r.occurrence, 'ringing').catch(() => {}));
@@ -159,50 +230,19 @@ export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
     check();
     const t = window.setInterval(check, 5000);
     return () => window.clearInterval(t);
-  }, [userProfile, startSound]);
-
-  // Enquanto toca: cada despertador desiste depois de 30 min, e para se
-  // desligarem em outro aparelho.
-  const ringingKey = ringing.map(r => `${r.wakeup.id}|${r.occurrence}`).join(',');
-  useEffect(() => {
-    if (!ringing.length) return;
-    const tick = window.setInterval(async () => {
-      const now = Date.now();
-      const vencidos = ringingRef.current.filter(r => now - r.startedAt >= WAKEUP_MAX_RING_MS);
-      vencidos.forEach(r => wakeupApi.ring(r.wakeup.id, userProfile, r.occurrence, 'missed').catch(() => {}));
-      if (vencidos.length) removeRinging(new Set(vencidos.map(r => r.wakeup.id)));
-
-      try {
-        const v = await wakeupApi.version();
-        if (v === versionRef.current) return;
-        versionRef.current = v;
-        const list = await wakeupApi.list();
-        listRef.current = list;
-        const byId = new Map(list.map(w => [w.id, w]));
-        const resolvidos = ringingRef.current.filter(r => {
-          const w = byId.get(r.wakeup.id);
-          if (!w || !w.enabled) return true; // apagado/desligado no meio do toque
-          const st = w.ring?.[userProfile];
-          return st?.occurrence === r.occurrence && st.status === 'dismissed';
-        });
-        if (resolvidos.length) removeRinging(new Set(resolvidos.map(r => r.wakeup.id)));
-      } catch (_) { /* sem internet: continua tocando */ }
-    }, 20000);
-    return () => window.clearInterval(tick);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ringingKey, userProfile, removeRinging]);
+  }, [userProfile, startSound, setRinging, refresh]);
 
   if (!ringing.length) return null;
 
   const dismiss = (message: string) => {
     const at = new Date().toISOString();
-    const pending = readJson<PendingDismiss[]>(PENDING_KEY, []);
     // Grava antes de mandar: se cair a internet agora, o recado sai depois.
     writeJson(PENDING_KEY, [
-      ...pending,
-      ...ringing.map(r => ({ id: r.wakeup.id, occurrence: r.occurrence, message, at })),
+      ...readJson<PendingDismiss[]>(PENDING_KEY, []),
+      ...ringing.map(r => ({ id: r.wakeup.id, occurrence: r.occurrence, message, at, profile: userProfile })),
     ]);
-    removeRinging(new Set(ringing.map(r => r.wakeup.id)));
+    markHandled(ringing.map(r => `${r.wakeup.id}|${r.occurrence}`));
+    setRinging([]);
     flushPendingDismiss(userProfile);
   };
 

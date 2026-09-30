@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Plus, Trash2, Play, Square, BellRing, Volume1, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -92,11 +92,13 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
   const [perms, setPerms] = useState<WakeupPermissions | null>(null);
   const [, setTick] = useState(0);
 
-  const load = useCallback(async () => {
+  /** Devolve true se conseguiu baixar a lista. */
+  const load = useCallback(async (): Promise<boolean> => {
     try {
       setWakeups(await wakeupApi.list());
+      return true;
     } catch (_) {
-      // mantém o que já estava na tela
+      return false; // mantém o que já estava na tela
     } finally {
       setLoading(false);
     }
@@ -118,10 +120,8 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
       if (document.visibilityState !== 'visible') return;
       try {
         const v = await wakeupApi.version();
-        if (v !== version) {
-          version = v;
-          await load();
-        }
+        // O carimbo só é "gasto" se a lista veio mesmo; senão tenta de novo.
+        if (v !== version && (await load())) version = v;
       } catch (_) { /* sem internet: fica com o que tem */ }
     };
     poll();
@@ -373,16 +373,21 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
 
+  // Só para o som se for a prévia DESTE editor tocando — nunca o despertador
+  // do navegador, que usa o mesmo tocador.
+  const previewingRef = useRef(false);
+  previewingRef.current = previewing;
+
   useEffect(() => {
     if (editing === 'new') setForm(emptyForm());
     else if (editing) {
       const { target, time, days, date, volume, note, enabled } = editing;
       setForm({ target, time, days, date, volume, note, enabled });
     }
-    if (!editing) { stopWakeupTune(); setPreviewing(false); }
+    if (!editing && previewingRef.current) { stopWakeupTune(); setPreviewing(false); }
   }, [editing]);
 
-  useEffect(() => () => stopWakeupTune(), []);
+  useEffect(() => () => { if (previewingRef.current) stopWakeupTune(); }, []);
 
   const save = async () => {
     if (saving || !editing) return;
@@ -427,6 +432,7 @@ function WakeupEditorSheet({ editing, userProfile, onClose, onSaved }: {
   const togglePreview = async () => {
     if (previewing) { stopWakeupTune(); setPreviewing(false); return; }
     const ok = await playWakeupTune(form.volume, true);
+    if (ok === null) return;
     setPreviewing(ok);
     if (!ok) toast.error('O navegador não deixou tocar o som');
   };

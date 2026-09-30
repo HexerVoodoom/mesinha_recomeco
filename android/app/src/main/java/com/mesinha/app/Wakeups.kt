@@ -60,6 +60,8 @@ data class Wakeup(
     val volume: Int,
     val note: String,
     val enabled: Boolean,
+    /** Última edição (millis): um toque ANTES disso não vale (criado às 07:05 um "07:00"). */
+    val updatedAt: Long = 0L,
 ) {
     fun isFor(profile: String) = target == "both" || target == profile
 
@@ -68,8 +70,9 @@ data class Wakeup(
      * Cada dia é calculado do zero a partir da data + hora (java.time): assim
      * uma virada de horário de verão num dia não "empurra" os dias seguintes.
      */
-    fun nextAfter(after: Long, zone: ZoneId = ZoneId.systemDefault()): Long? {
+    fun nextAfter(afterArg: Long, zone: ZoneId = ZoneId.systemDefault()): Long? {
         if (!enabled) return null
+        val after = maxOf(afterArg, updatedAt)
         if (days.isEmpty()) {
             val d = try { LocalDate.parse(date ?: return null) } catch (_: Exception) { return null }
             return d.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli().takeIf { it > after }
@@ -104,6 +107,9 @@ data class Wakeup(
                 volume = o.optInt("volume", 70).coerceIn(WakeupStore.MIN_VOLUME, 100),
                 note = o.optString("note"),
                 enabled = o.optBoolean("enabled", true),
+                updatedAt = try {
+                    Instant.parse(o.optString("updatedAt").ifEmpty { o.optString("createdAt") }).toEpochMilli()
+                } catch (_: Exception) { 0L },
             )
         }
     }
@@ -127,11 +133,12 @@ object WakeupStore {
      * primeiro desbloqueio). Na primeira vez com o celular desbloqueado, move
      * pra lá o que estava no armazenamento antigo.
      */
+    @Synchronized
     private fun prefs(context: Context): android.content.SharedPreferences {
         val dp = context.createDeviceProtectedStorageContext()
         if (!migrated && isUnlocked(context)) {
-            migrated = true
             try { dp.moveSharedPreferencesFrom(context, PREFS) } catch (_: Exception) { }
+            migrated = true
             // O perfil mora nas prefs do FCM (só legíveis desbloqueado): guarda uma cópia aqui.
             val fcmProfile = context.getSharedPreferences("fcm", Context.MODE_PRIVATE).getString("profile", null)
             if (fcmProfile != null) {
@@ -173,12 +180,19 @@ object WakeupStore {
     // Volume de alarme de antes do toque — guardado em disco pra voltar ao
     // normal mesmo que o processo morra no meio do toque.
     fun saveOriginalVolume(context: Context, v: Int) =
-        prefs(context).edit().putInt(KEY_ORIGINAL_VOLUME, v).apply()
+        prefs(context).edit().putInt(KEY_ORIGINAL_VOLUME, v)
+            .putLong("${KEY_ORIGINAL_VOLUME}_at", System.currentTimeMillis()).commit()
 
-    fun originalVolume(context: Context): Int = prefs(context).getInt(KEY_ORIGINAL_VOLUME, -1)
+    /** -1 se não houver (ou se for de um toque de horas atrás que ficou sem restaurar). */
+    fun originalVolume(context: Context): Int {
+        val p = prefs(context)
+        val at = p.getLong("${KEY_ORIGINAL_VOLUME}_at", 0L)
+        if (System.currentTimeMillis() - at > 2 * 60 * 60 * 1000L) return -1
+        return p.getInt(KEY_ORIGINAL_VOLUME, -1)
+    }
 
     fun clearOriginalVolume(context: Context) =
-        prefs(context).edit().remove(KEY_ORIGINAL_VOLUME).apply()
+        prefs(context).edit().remove(KEY_ORIGINAL_VOLUME).remove("${KEY_ORIGINAL_VOLUME}_at").apply()
 
     // Toques já encerrados neste aparelho ("id|occurrence"): um START
     // reentregue depois de o processo morrer não pode voltar a tocar um
@@ -208,11 +222,25 @@ object WakeupStore {
         prefs(context).edit().putString(KEY_QUEUE, arr.toString()).apply()
     }
 
+    /** Cópia da fila (os itens só saem dela depois de enviados — ver [removeFromQueue]). */
     @Synchronized
-    fun drainQueue(context: Context): JSONArray {
-        val raw = prefs(context).getString(KEY_QUEUE, "[]")
-        prefs(context).edit().putString(KEY_QUEUE, "[]").apply()
-        return try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
+    fun peekQueue(context: Context): List<JSONObject> {
+        val arr = try { JSONArray(prefs(context).getString(KEY_QUEUE, "[]")) } catch (_: Exception) { JSONArray() }
+        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+    }
+
+    @Synchronized
+    fun removeFromQueue(context: Context, item: JSONObject) {
+        val alvo = item.toString()
+        val arr = try { JSONArray(prefs(context).getString(KEY_QUEUE, "[]")) } catch (_: Exception) { JSONArray() }
+        val novo = JSONArray()
+        var removido = false
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (!removido && o.toString() == alvo) { removido = true; continue }
+            novo.put(o)
+        }
+        prefs(context).edit().putString(KEY_QUEUE, novo.toString()).commit()
     }
 }
 
@@ -342,21 +370,25 @@ object WakeupApi {
         return false
     }
 
-    /** Reenvia a fila; se ainda sobrar algo, agenda outra tentativa. */
+    /**
+     * Reenvia a fila. Cada item só sai da fila DEPOIS de enviado: se o
+     * processo morrer no meio, nada se perde. Para no primeiro erro de rede
+     * (e agenda outra tentativa) e manda no máximo 10 por vez, pra caber no
+     * tempo que o Android dá a um receiver.
+     */
     fun flushQueue(context: Context) {
-        val queue = WakeupStore.drainQueue(context)
-        var failed = false
-        for (i in 0 until queue.length()) {
-            val item = queue.optJSONObject(i) ?: continue
+        val fila = WakeupStore.peekQueue(context)
+        for (item in fila.take(10)) {
             val path = item.optString("path")
-            val body = item.optJSONObject("body") ?: continue
-            if (failed || request("POST", path, body) == null) {
-                // Sem internet: não adianta insistir no resto agora.
-                failed = true
-                WakeupStore.enqueue(context, path, body)
+            val body = item.optJSONObject("body")
+            if (body == null) { WakeupStore.removeFromQueue(context, item); continue }
+            if (request("POST", path, body) == null) {
+                WakeupScheduler.scheduleReportRetry(context, 15 * 60 * 1000L)
+                return
             }
+            WakeupStore.removeFromQueue(context, item)
         }
-        if (failed) WakeupScheduler.scheduleReportRetry(context, 15 * 60 * 1000L)
+        if (fila.size > 10) WakeupScheduler.scheduleReportRetry(context, 60 * 1000L)
     }
 }
 

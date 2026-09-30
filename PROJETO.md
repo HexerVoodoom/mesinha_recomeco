@@ -97,10 +97,11 @@ Todos prefixados em `/make-server-19717bce`:
 | GET | `/garden` | Sequência, nível do jardim e retrospectiva (cache diário, invalidado por contagem) |
 | GET | `/meetup-month` | Dias com encontro de um mês (tipo + confirmação) — usado pelos widgets nativos de calendário; `?month=YYYY-MM` opcional (padrão: mês atual) |
 | GET | `/wakeups` | Lista os despertadores (com o status do último toque de cada um). `?native=<perfil>` marca o aparelho como apto a receber o FCM de sincronização |
+| GET | `/wakeups/version` | Carimbo que muda a cada alteração (leitura por chave, barata). As telas perguntam isso e só baixam a lista quando muda |
 | POST | `/wakeups` | Cria despertador (pra si, pro outro ou pros dois) — push avisando quem vai ser acordado + FCM de sincronização |
 | PUT/DELETE | `/wakeups/:id` | Edita / apaga (e sincroniza os celulares) |
-| POST | `/wakeups/:id/ring` | O aparelho avisa que começou a tocar (`ringing`) ou que tocou 30 min sem ninguém desligar (`missed`) |
-| POST | `/wakeups/:id/dismiss` | Desligou: grava o recadinho escolhido e manda ele de push pro outro |
+| POST | `/wakeups/:id/ring` | O aparelho avisa que começou a tocar (`ringing`) ou que tocou 30 min sem ninguém desligar (`missed`). Aviso de um toque mais antigo que o gravado é ignorado |
+| POST | `/wakeups/:id/dismiss` | Desligou: grava o recadinho (só aceita um dos 6) e manda de push pro outro — um push só se dois despertadores desligarem juntos |
 
 ### Padrões de chave no KV
 
@@ -116,7 +117,10 @@ Todos prefixados em `/make-server-19717bce`:
 | `question-used` | Últimas 60 perguntas usadas (evita repetir) |
 | `card-deck` | Cartas dos jogos escritas pelo casal, por tipo |
 | `garden:<data>` | Cache diário da sequência/retrospectiva |
-| `wakeup:<id>` | Despertador (horário, dias, destinatário, volume, recadinho e `ring` = status do último toque por pessoa) |
+| `wakeup:<id>` | Despertador (horário, dias, destinatário, volume, recadinho) |
+| `wakeupring:<id>:<perfil>` | Status do último toque DAQUELA pessoa (chave própria: com "nós dois" os celulares avisam no mesmo segundo e, num objeto só, um aviso apagava o outro) |
+| `wakeupversion` | Carimbo que muda a cada alteração de despertador/toque |
+| `wakeup-push-last:<perfil>` | Último push de "desligou" (evita push repetido com dois despertadores no mesmo minuto) |
 | `wakeup-native:<perfil>` | O app Android dessa pessoa já tem despertador (recebe o FCM `wakeup-sync`) |
 
 ---
@@ -363,14 +367,34 @@ o Mateus criou pra Amanda tocar no celular dela mesmo que ela nunca abra o app.
 Os avisos de "tocando"/"desligou" que falham sem internet ficam numa fila e
 são reenviados no próximo sync.
 
-**Permissões** (a tela do Despertador mostra um aviso com botão "Liberar" pro
-que estiver faltando): "Alarmes e lembretes" (`SCHEDULE_EXACT_ALARM` — sem ela
-cai pra um alarme inexato que pode atrasar), tela cheia (`USE_FULL_SCREEN_INTENT`
-— no Android 14+ a Play Console pede a declaração, categoria "despertador"),
-notificações e bateria sem restrição.
+**Permissões:** alarme exato via `USE_EXACT_ALARM` (Android 13+, concedida na
+instalação; no Android 12 `SCHEDULE_EXACT_ALARM`). É obrigatória: sem alarme
+exato o Android 12+ não deixa subir o serviço que toca a música. A Play Console
+pede a declaração de app de despertador pra ela e pra tela cheia
+(`USE_FULL_SCREEN_INTENT`). A tela do Despertador mostra um aviso com botão
+"Liberar" pro que estiver faltando (tela cheia, notificações, bateria).
+
+**Robustez** (vista em duas rodadas de QA, testada num emulador Android 14):
+- *Reinício do celular:* a lista fica no armazenamento protegido pelo aparelho
+  (direct boot) e o `BootReceiver` escuta `LOCKED_BOOT_COMPLETED` — o
+  despertador volta a ser agendado antes do primeiro desbloqueio.
+- *Processo morto no meio do toque:* `START_REDELIVER_INTENT` recria o serviço
+  e ele volta a tocar; toques já desligados ficam marcados no aparelho e não
+  voltam. O volume original fica salvo em disco e é restaurado.
+- *Reagendar bem na hora do toque* olha 90s pra trás (não troca o toque de
+  hoje pelo de amanhã); um despertador criado/editado depois do próprio
+  horário só vale a partir do próximo (`updatedAt`).
+- *Sem internet:* os avisos de tocando/desligou ficam numa fila, saem dela só
+  depois de enviados, com nova tentativa agendada.
+- *Plano B:* se o Android recusar o serviço, uma notificação de alarme (som do
+  sistema em loop, some em 30 min) abre a tela de desligar, que liga a música.
+- *Abrir o app com despertador tocando* leva direto pra tela de desligar.
 
 **No navegador** (fora do app) o despertador só toca com o Mesinha aberto
-(`WakeupWebRinger`), com a mesma tela dos 6 recadinhos.
+(`WakeupWebRinger`), com a mesma tela dos 6 recadinhos. Toca também o que
+venceu há até 10 min (aba congelada), confere a lista antes de um toque
+atrasado, volta a tocar se a página recarregar, para se desligarem em outro
+aparelho e guarda o recado pra reenviar se estiver sem internet.
 
 ### O toque: "Abertura de Anime" (procedural)
 

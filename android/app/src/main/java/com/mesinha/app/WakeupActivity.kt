@@ -104,12 +104,20 @@ class WakeupActivity : AppCompatActivity() {
                     .putExtra(WakeupRingService.EXTRA_OCCURRENCE, occurrence)
             )
             waitingService = true
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            // Não subiu: tira a notificação de reserva (senão ela fica tocando sem ter como parar).
+            androidx.core.app.NotificationManagerCompat.from(this).cancel(WakeupRingService.FALLBACK_NOTIFICATION_ID)
+        }
     }
 
     private var waitingService = false
 
+    private val animators = mutableListOf<android.animation.Animator>()
+
     private fun render() {
+        // Redesenho (entrou outro despertador): para as animações da tela velha.
+        animators.forEach { it.cancel() }
+        animators.clear()
         setContentView(buildUi())
     }
 
@@ -192,7 +200,7 @@ class WakeupActivity : AppCompatActivity() {
             clock,
             android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.04f, 1f),
             android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.04f, 1f)
-        ).apply { duration = 800; repeatCount = android.animation.ValueAnimator.INFINITE; start() }
+        ).apply { duration = 800; repeatCount = android.animation.ValueAnimator.INFINITE; start() }.also { animators += it }
 
         col.addView(TextView(this).apply {
             text = "Hora de acordar!"
@@ -225,7 +233,7 @@ class WakeupActivity : AppCompatActivity() {
             android.animation.ObjectAnimator.ofFloat(bicho, View.ROTATION, -8f, 8f).apply {
                 duration = 175; repeatMode = android.animation.ValueAnimator.REVERSE
                 repeatCount = android.animation.ValueAnimator.INFINITE; start()
-            }
+            }.also { animators += it }
             addView(LinearLayout(this@WakeupActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

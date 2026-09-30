@@ -119,7 +119,8 @@ class WakeupRingService : Service() {
         fun postFallbackNotification(context: Context, ids: List<String>, occurrence: String) {
             ensureChannel(context)
             val pi = PendingIntent.getActivity(
-                context, 7105, activityIntent(context, ids, occurrence),
+                // Um PendingIntent por toque: dois toques de reserva não se sobrescrevem.
+                context, 7105 + (occurrence.hashCode() and 0xffff), activityIntent(context, ids, occurrence),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             val n = NotificationCompat.Builder(context, FALLBACK_CHANNEL_ID)
@@ -133,6 +134,8 @@ class WakeupRingService : Service() {
                 .setOngoing(true)
                 .setContentIntent(pi)
                 .setFullScreenIntent(pi, true)
+                // Igual ao toque normal: desiste depois de 30 min.
+                .setTimeoutAfter(MAX_RING_MS)
                 .build()
             n.flags = n.flags or Notification.FLAG_INSISTENT // som em loop até abrir
             try {
@@ -199,10 +202,12 @@ class WakeupRingService : Service() {
                 val v = WakeupApi.request("GET", "/wakeups/version")
                     ?.let { try { JSONObject(it).optLong("version", -1) } catch (_: Exception) { -1L } } ?: -1L
                 if (v == -1L || v == lastVersion) return@Thread
-                lastVersion = v
                 val text = WakeupApi.request("GET", "/wakeups") ?: return@Thread
                 try {
                     val arr = JSONObject(text).optJSONArray("wakeups") ?: return@Thread
+                    // O carimbo só é "gasto" com a lista em mãos: um soluço de
+                    // rede não faz perder um "desligou" vindo de outro aparelho.
+                    lastVersion = v
                     val byId = (0 until arr.length()).map { arr.getJSONObject(it) }.associateBy { it.optString("id") }
                     val parar = snapshot.filter { (id, r) ->
                         val w = byId[id] ?: return@filter true // apagado
@@ -212,7 +217,8 @@ class WakeupRingService : Service() {
                     }.keys
                     if (parar.isNotEmpty()) handler.post {
                         WakeupStore.markHandled(this@WakeupRingService, parar.mapNotNull { id -> snapshot[id]?.let { "$id|${it.occurrence}" } })
-                        parar.forEach { ringing.remove(it) }
+                        // Só remove se ainda é o MESMO toque (não um mais novo do mesmo despertador).
+                        parar.forEach { id -> if (ringing[id]?.occurrence == snapshot[id]?.occurrence) ringing.remove(id) }
                         afterRemoval()
                     }
                 } catch (_: Exception) { }
@@ -245,8 +251,20 @@ class WakeupRingService : Service() {
         val occurrenceTime = try {
             java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US).parse(occurrence)?.time ?: now
         } catch (_: Exception) { now }
-        val validos = novos.filter { it !in ringing && !WakeupStore.isHandled(this, "$it|$occurrence") }
-            .takeIf { now - occurrenceTime <= MAX_RING_MS }.orEmpty()
+        val naoTratados = novos.filter { it !in ringing && !WakeupStore.isHandled(this, "$it|$occurrence") }
+        val expirado = now - occurrenceTime > MAX_RING_MS
+        val validos = if (expirado) emptyList() else naoTratados
+        if (expirado && naoTratados.isNotEmpty()) {
+            // START reentregue depois de o processo morrer, mas o toque já
+            // venceu: registra como perdido (senão o outro vê "tocando" pra sempre).
+            WakeupStore.markHandled(this, naoTratados.map { "$it|$occurrence" })
+            val profile = WakeupStore.profile(this)
+            if (profile != null) report(naoTratados.map { id ->
+                "/wakeups/$id/ring" to JSONObject().put("profile", profile)
+                    .put("occurrence", occurrence).put("status", "missed")
+                    .put("at", WakeupScheduler.isoUtc(now))
+            })
+        }
 
         // Os ids ficam visíveis ANTES da notificação: a tela cheia pode abrir
         // na hora e, sem eles, ela acharia que nada está tocando e fecharia.
@@ -260,17 +278,30 @@ class WakeupRingService : Service() {
         // repetido, reentregue ou de um toque já desligado): quem chamou
         // startForegroundService exige isso em 5s, senão o Android derruba o app.
         ensureChannel(this)
-        ServiceCompat.startForeground(
-            this, NOTIFICATION_ID, buildNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
-        )
+        NotificationManagerCompat.from(this).cancel(FALLBACK_NOTIFICATION_ID)
+        try {
+            // Sem nada pra tocar: notificação sem tela cheia (não acende a tela à toa).
+            ServiceCompat.startForeground(
+                this, NOTIFICATION_ID, buildNotification(fullScreen = ringing.isNotEmpty()),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
+            )
+        } catch (e: Exception) {
+            // O Android não deixou (ex.: START reentregue com o app em segundo
+            // plano): plano B com a notificação de alarme.
+            Log.w("Wakeup", "startForeground recusado", e)
+            val ids = ringing.keys.toList()
+            ringing.clear()
+            ringingIds = emptyList()
+            if (ids.isNotEmpty()) postFallbackNotification(this, ids, occurrence)
+            stopSelfResult(lastStartId)
+            return
+        }
         if (ringing.isEmpty()) {
             stopPlayback()
             return
         }
         if (validos.isEmpty()) return // já estava tocando esses
-        NotificationManagerCompat.from(this).cancel(FALLBACK_NOTIFICATION_ID)
 
         val profile = WakeupStore.profile(this)
         if (profile != null) {
@@ -366,6 +397,7 @@ class WakeupRingService : Service() {
         restoreVolume()
         wakeLock?.let { if (it.isHeld) it.release() }
         ringingIds = emptyList()
+        NotificationManagerCompat.from(this).cancel(FALLBACK_NOTIFICATION_ID)
         sendBroadcast(Intent(ACTION_FINISHED).setPackage(packageName))
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         maybeStopSelf()
@@ -378,9 +410,12 @@ class WakeupRingService : Service() {
             try { track?.release() } catch (_: Exception) { }
             vibrator()?.cancel()
             restoreVolume()
-            wakeLock?.let { if (it.isHeld) it.release() }
         }
+        wakeLock?.let { if (it.isHeld) it.release() }
         ringingIds = emptyList()
+        // Encerrado pelo sistema (ex.: "Parar" no gerenciador de apps): a
+        // tela de desligar não pode ficar aberta falando com um serviço morto.
+        sendBroadcast(Intent(ACTION_FINISHED).setPackage(packageName))
         super.onDestroy()
     }
 
@@ -467,13 +502,15 @@ class WakeupRingService : Service() {
         if (wakeLock == null) {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "mesinha:despertador")
+                .apply { setReferenceCounted(false) }
         }
-        // acquire com prazo renova o prazo a cada despertador novo.
+        // Sem contagem de referência: cada acquire só renova o prazo, e um
+        // release solta de vez.
         wakeLock?.acquire(MAX_RING_MS + 2 * 60_000)
     }
 
-    private fun buildNotification(): Notification {
-        val fullScreen = PendingIntent.getActivity(
+    private fun buildNotification(fullScreen: Boolean = true): Notification {
+        val tela = PendingIntent.getActivity(
             this, 7102,
             Intent(this, WakeupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -488,8 +525,8 @@ class WakeupRingService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
-            .setContentIntent(fullScreen)
-            .setFullScreenIntent(fullScreen, true)
+            .setContentIntent(tela)
+            .apply { if (fullScreen) setFullScreenIntent(tela, true) }
             .build()
     }
 }

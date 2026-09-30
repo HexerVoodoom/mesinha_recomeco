@@ -1657,7 +1657,7 @@ function sanitizeWakeupFields(body: any, base: any = {}): any | string {
   }
   if (body.volume !== undefined) {
     const v = Number(body.volume);
-    if (body.volume === null || !Number.isFinite(v)) return "Volume inválido";
+    if (typeof body.volume !== "number" || !Number.isFinite(v)) return "Volume inválido";
     out.volume = Math.round(Math.min(100, Math.max(WAKEUP_MIN_VOLUME, v)));
   }
   if (body.note !== undefined) {
@@ -1674,7 +1674,9 @@ function sanitizeWakeupFields(body: any, base: any = {}): any | string {
 }
 
 async function bumpWakeupVersion(): Promise<void> {
-  await kv.set(WAKEUP_VERSION_KEY, Date.now());
+  // Aleatório junto do relógio: duas gravações no mesmo milissegundo (ou em
+  // isolados com relógios um pouco diferentes) nunca dão o mesmo carimbo.
+  await kv.set(WAKEUP_VERSION_KEY, Date.now() * 1000 + Math.floor(Math.random() * 1000));
 }
 
 /**
@@ -1811,6 +1813,11 @@ app.put("/make-server-19717bce/wakeups/:id", async (c) => {
     await kv.set(WAKEUP_PREFIX + id, wakeup);
     await bumpWakeupVersion();
 
+    // Quem deixou de ser acordado perde o status antigo (senão ele reapareceria
+    // se voltasse a ser alvo depois).
+    const saiu = wakeupTargets(current).filter((p) => !wakeupTargets(wakeup).includes(p));
+    if (saiu.length) await kv.mdel(saiu.map((p) => `${WAKEUP_RING_PREFIX}${id}:${p}`));
+
     // Quem passou a ser acordado agora (ex.: "pra mim" → "nós dois") fica sabendo.
     const antes = new Set(wakeupTargets(current));
     const autor: Perfil | null = isPerfil(body?.editedBy) ? body.editedBy : null;
@@ -1867,6 +1874,10 @@ app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
     if (atual?.occurrence && occurrence < atual.occurrence) return c.json({ ignored: "antigo" });
     if (atual?.occurrence === occurrence && atual.status === "dismissed") return c.json({ ignored: "já desligado" });
     if (atual?.occurrence === occurrence && atual.status === status) return c.json({ ignored: "repetido" });
+    // "tocando" atrasado (fila offline, outro aparelho) não ressuscita um toque já dado como perdido.
+    if (atual?.occurrence === occurrence && atual.status === "missed" && status === "ringing") {
+      return c.json({ ignored: "já perdido" });
+    }
 
     const quando = reportedTime(at);
     const ring = {

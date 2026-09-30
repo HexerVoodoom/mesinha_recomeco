@@ -156,8 +156,12 @@ let cached: AudioBuffer | null = null;
 // navegador liberar o áudio não pode começar a tocar depois de um stop.
 let generation = 0;
 
-/** Toca o loop (ou só uma vez) no volume dado (20–100). Devolve false se o navegador bloquear. */
-export async function playWakeupTune(volumePercent: number, loop = true): Promise<boolean> {
+/**
+ * Toca o loop (ou só uma vez) no volume dado (20–100). Devolve true se tocou,
+ * false se o navegador bloqueou e null se outro play/stop passou na frente
+ * (aí quem chamou não deve mexer na tela).
+ */
+export async function playWakeupTune(volumePercent: number, loop = true): Promise<boolean | null> {
   try {
     stopWakeupTune();
     const mine = generation;
@@ -172,7 +176,7 @@ export async function playWakeupTune(volumePercent: number, loop = true): Promis
         new Promise(resolve => setTimeout(resolve, 700)),
       ]);
     }
-    if (mine !== generation) return false; // alguém mandou parar enquanto isso
+    if (mine !== generation) return null; // alguém mandou parar/tocar de novo enquanto isso
     if (ctx.state !== 'running') return false;
     if (!cached || cached.sampleRate !== ctx.sampleRate) {
       const pcm = renderWakeupTune(ctx.sampleRate);
