@@ -27,7 +27,10 @@ class MesinhaMessagingService : FirebaseMessagingService() {
         // mudou um despertador — baixa a lista e reagenda aqui mesmo (esta
         // chamada já roda fora da thread principal).
         if (message.data["type"] == "wakeup-sync") {
-            WakeupSync.syncNow(applicationContext)
+            // Primeiro baixa e reagenda (cabe na janela de ~20s do FCM); a fila
+            // de avisos pendentes vai numa thread à parte pra não segurar isso.
+            WakeupSync.syncNow(applicationContext, flush = false)
+            Thread { WakeupApi.flushQueue(applicationContext) }.start()
             return
         }
         val title = message.notification?.title ?: message.data["title"] ?: "Mesinha"

@@ -152,15 +152,28 @@ export function renderWakeupTune(sampleRate: number): Float32Array {
 let ctx: AudioContext | null = null;
 let source: AudioBufferSourceNode | null = null;
 let cached: AudioBuffer | null = null;
+// Cada play/stop ganha um número: um play que ainda estava esperando o
+// navegador liberar o áudio não pode começar a tocar depois de um stop.
+let generation = 0;
 
 /** Toca o loop (ou só uma vez) no volume dado (20–100). Devolve false se o navegador bloquear. */
 export async function playWakeupTune(volumePercent: number, loop = true): Promise<boolean> {
   try {
     stopWakeupTune();
+    const mine = generation;
     const Ctor = window.AudioContext || (window as any).webkitAudioContext;
     if (!Ctor) return false;
     ctx = ctx || new Ctor();
-    if (ctx.state === 'suspended') await ctx.resume();
+    if (ctx.state !== 'running') {
+      // Sem um toque recente na tela, o resume() fica pendurado pra sempre
+      // (regra de autoplay): espera no máximo 700ms e desiste.
+      await Promise.race([
+        ctx.resume().catch(() => undefined),
+        new Promise(resolve => setTimeout(resolve, 700)),
+      ]);
+    }
+    if (mine !== generation) return false; // alguém mandou parar enquanto isso
+    if (ctx.state !== 'running') return false;
     if (!cached || cached.sampleRate !== ctx.sampleRate) {
       const pcm = renderWakeupTune(ctx.sampleRate);
       cached = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
@@ -174,13 +187,14 @@ export async function playWakeupTune(volumePercent: number, loop = true): Promis
     source.loop = loop;
     source.connect(gain);
     source.start();
-    return ctx.state === 'running';
+    return true;
   } catch (_) {
     return false;
   }
 }
 
 export function stopWakeupTune() {
+  generation++;
   try { source?.stop(); } catch (_) { /* já parou */ }
   source = null;
 }

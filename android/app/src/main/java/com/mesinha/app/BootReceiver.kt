@@ -11,6 +11,17 @@ import android.content.Intent
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Antes do primeiro desbloqueio só dá pra mexer no despertador (que
+        // mora no armazenamento protegido pelo aparelho); o resto espera o
+        // BOOT_COMPLETED, que chega depois do desbloqueio.
+        if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) {
+            try {
+                WakeupScheduler.reschedule(context)
+            } catch (e: Exception) {
+                android.util.Log.w("BootReceiver", "Despertador não pôde reagendar no boot", e)
+            }
+            return
+        }
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             WidgetScheduler.scheduleDailyUpdate(context, MesinhaWidgetProvider::class.java, 4321)
             WidgetScheduler.scheduleDailyUpdate(context, AlpaquinhaWidgetProvider::class.java, 4322)

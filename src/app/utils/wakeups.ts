@@ -57,24 +57,44 @@ export const wakeupApi = {
     const res = await fetchAPI(`/wakeups?_t=${Date.now()}`, {}, 1);
     return Array.isArray(res?.wakeups) ? res.wakeups : [];
   },
+  /** Carimbo que muda a cada alteração — leitura barata, pra saber se vale rebaixar a lista. */
+  version: async (): Promise<number> => {
+    const res = await fetchAPI(`/wakeups/version?_t=${Date.now()}`, {}, 0);
+    return Number(res?.version) || 0;
+  },
+  // Sem retentativa automática: se a resposta demorar, repetir criaria dois despertadores.
   create: async (createdBy: Profile, input: WakeupInput): Promise<Wakeup> => {
-    const res = await fetchAPI('/wakeups', { method: 'POST', body: JSON.stringify({ createdBy, ...input }) });
+    const res = await fetchAPI('/wakeups', { method: 'POST', body: JSON.stringify({ createdBy, ...input }) }, 0);
     return res.wakeup;
   },
-  update: async (id: string, input: Partial<WakeupInput>): Promise<Wakeup> => {
-    const res = await fetchAPI(`/wakeups/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+  update: async (id: string, input: Partial<WakeupInput>, editedBy?: Profile): Promise<Wakeup> => {
+    const res = await fetchAPI(`/wakeups/${id}`, { method: 'PUT', body: JSON.stringify({ ...input, editedBy }) });
     return res.wakeup;
   },
   remove: async (id: string): Promise<void> => {
     await fetchAPI(`/wakeups/${id}`, { method: 'DELETE' });
   },
   ring: async (id: string, profile: Profile, occurrence: string, status: 'ringing' | 'missed') => {
-    await fetchAPI(`/wakeups/${id}/ring`, { method: 'POST', body: JSON.stringify({ profile, occurrence, status }) });
+    await fetchAPI(`/wakeups/${id}/ring`, {
+      method: 'POST',
+      body: JSON.stringify({ profile, occurrence, status, at: new Date().toISOString() }),
+    }, 0);
   },
-  dismiss: async (id: string, profile: Profile, occurrence: string, message: string) => {
-    await fetchAPI(`/wakeups/${id}/dismiss`, { method: 'POST', body: JSON.stringify({ profile, occurrence, message }) });
+  dismiss: async (id: string, profile: Profile, occurrence: string, message: string, at: string) => {
+    await fetchAPI(`/wakeups/${id}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ profile, occurrence, message, at }),
+    }, 0);
   },
 };
+
+/**
+ * Um "uma vez" que já passou continua `enabled` no servidor, mas não vai mais
+ * tocar: pra tela, ele está desligado (e ligar de novo vale pra próxima vez).
+ */
+export function isEffectivelyOn(w: Pick<Wakeup, 'time' | 'days' | 'date' | 'enabled'>): boolean {
+  return w.enabled && nextOccurrence(w) !== null;
+}
 
 // ── Ponte com o app Android (window.MesinhaNative) ──────────────────────────
 

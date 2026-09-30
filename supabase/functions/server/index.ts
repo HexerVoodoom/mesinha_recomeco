@@ -1572,19 +1572,38 @@ app.post("/make-server-19717bce/nudge", async (c) => {
 // servidor ficam só a lista e o ESTADO de cada toque, pra quem criou o
 // despertador pro outro poder ver se ainda está tocando ou se já desligaram.
 //
-// Chave no KV: `wakeup:<id>`. Cada despertador é pra uma pessoa ou pros dois
-// (`target`). `days` vazio = toca uma vez só, na `date`. Para desligar, a
-// pessoa escolhe uma de 6 mensagens prontas — que vai de push pro outro.
+// Chaves no KV:
+// - `wakeup:<id>`: o despertador (horário, dias, destinatário, volume, recado).
+//   `days` vazio = toca uma vez só, na `date`.
+// - `wakeupring:<id>:<perfil>`: status do último toque DAQUELA pessoa. Fica
+//   numa chave só dela de propósito: com "nós dois", os dois celulares tocam
+//   no mesmo segundo e avisam juntos — num objeto só, um aviso apagava o outro.
+// - `wakeupversion`: carimbo que muda a cada alteração. As telas perguntam só
+//   ele (leitura por chave, baratinha) e só baixam a lista quando mudou.
+//
+// Para desligar, a pessoa escolhe uma de 6 mensagens prontas — que vai de push
+// pro outro.
 //
 // Sincronização com o celular: sempre que a lista muda, o servidor manda uma
-// mensagem FCM só de dados (`type: wakeup-sync`) pros dois aparelhos. O app
-// nativo acorda, baixa a lista e reagenda o alarme local — é isso que faz o
-// despertador criado pelo outro tocar mesmo que eu nunca abra o app.
+// mensagem FCM só de dados (`type: wakeup-sync`) pros aparelhos com app novo.
+// O app nativo acorda, baixa a lista e reagenda o alarme local — é isso que
+// faz o despertador criado pelo outro tocar mesmo que eu nunca abra o app.
 
 const WAKEUP_PREFIX = "wakeup:";
+const WAKEUP_RING_PREFIX = "wakeupring:";
+const WAKEUP_VERSION_KEY = "wakeupversion";
 const WAKEUP_MIN_VOLUME = 20; // nunca deixa o despertador mudo
 const WAKEUP_NOTE_MAX = 80;
-const WAKEUP_MESSAGE_MAX = 80;
+
+// As 6 mensagens pra desligar — iguais às do PWA (wakeups.ts) e do app (Wakeups.kt).
+const WAKEUP_DISMISS_MESSAGES = [
+  "Bom dia, meu amor! ☀️",
+  "Acordei! Já tô de pé 💪",
+  "Acordei pensando em você 💕",
+  "Valeu por me acordar 🥰",
+  "Mais 5 minutinhos... 😴",
+  "Bora que o dia é nosso! 🚀",
+];
 
 type Perfil = "Amanda" | "Mateus";
 type WakeupTarget = Perfil | "both";
@@ -1601,9 +1620,16 @@ function wakeupTargets(w: any): Perfil[] {
   return w?.target === "both" ? ["Amanda", "Mateus"] : isPerfil(w?.target) ? [w.target] : [];
 }
 
+function isValidCalendarDate(s: string): boolean {
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 /** Valida e normaliza os campos editáveis; devolve string de erro se inválido. */
 function sanitizeWakeupFields(body: any, base: any = {}): any | string {
   const out: any = { ...base };
+  delete out.ring; // o status do toque mora nas chaves `wakeupring:`
   if (body.time !== undefined) {
     if (typeof body.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.time)) {
       return "Horário inválido";
@@ -1621,24 +1647,34 @@ function sanitizeWakeupFields(body: any, base: any = {}): any | string {
     ))].sort();
   }
   if (body.date !== undefined) {
-    if (body.date !== null && (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date))) {
+    if (
+      body.date !== null &&
+      (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date) || !isValidCalendarDate(body.date))
+    ) {
       return "Data inválida";
     }
     out.date = body.date;
   }
   if (body.volume !== undefined) {
     const v = Number(body.volume);
-    if (!Number.isFinite(v)) return "Volume inválido";
+    if (body.volume === null || !Number.isFinite(v)) return "Volume inválido";
     out.volume = Math.round(Math.min(100, Math.max(WAKEUP_MIN_VOLUME, v)));
   }
   if (body.note !== undefined) {
     out.note = typeof body.note === "string" ? body.note.trim().substring(0, WAKEUP_NOTE_MAX) : "";
   }
-  if (body.enabled !== undefined) out.enabled = body.enabled !== false;
+  if (body.enabled !== undefined) {
+    if (typeof body.enabled !== "boolean") return "Valor inválido pra ligado/desligado";
+    out.enabled = body.enabled;
+  }
   // "Uma vez" precisa de data; repetindo, a data não serve pra nada.
   if (Array.isArray(out.days) && out.days.length > 0) out.date = null;
   if ((!out.days || out.days.length === 0) && !out.date) return "Escolhe os dias ou a data";
   return out;
+}
+
+async function bumpWakeupVersion(): Promise<void> {
+  await kv.set(WAKEUP_VERSION_KEY, Date.now());
 }
 
 /**
@@ -1669,6 +1705,38 @@ function describeWakeupDays(w: any): string {
   return w.days.map((d: number) => nomes[d]).join(", ");
 }
 
+function pushNovoDespertador(p: Perfil, criador: Perfil, w: any) {
+  return sendPushToUser(p, {
+    title: `⏰ ${criador} criou um despertador pra ${w.target === "both" ? "vocês dois" : "você"}`,
+    body: `Vai tocar às ${w.time} (${describeWakeupDays(w)})${w.note ? ` — "${w.note}"` : ""}`,
+    tag: `mesinha-wakeup-${w.id}`,
+    url: "/",
+  }).catch(() => false);
+}
+
+/**
+ * Horário informado pelo aparelho (o celular pode ter ficado sem internet e
+ * mandar o aviso só depois): aceito se for plausível, senão vale o do servidor.
+ */
+function reportedTime(at: unknown): string {
+  const now = Date.now();
+  const t = typeof at === "string" ? Date.parse(at) : NaN;
+  if (Number.isFinite(t) && t <= now + 5 * 60 * 1000 && t >= now - 2 * 86400000) {
+    return new Date(t).toISOString();
+  }
+  return new Date(now).toISOString();
+}
+
+// Carimbo barato: as telas perguntam isso e só baixam a lista quando muda.
+app.get("/make-server-19717bce/wakeups/version", async (c) => {
+  try {
+    return c.json({ version: (await kv.get(WAKEUP_VERSION_KEY)) ?? 0 });
+  } catch (error) {
+    console.error("[GET /wakeups/version] Error:", error);
+    return c.json({ error: "Falha ao consultar despertadores" }, 500);
+  }
+});
+
 app.get("/make-server-19717bce/wakeups", async (c) => {
   try {
     // O app Android se anuncia aqui: daí em diante recebe o FCM de sincronização.
@@ -1676,9 +1744,26 @@ app.get("/make-server-19717bce/wakeups", async (c) => {
     if (isPerfil(nativo) && !(await kv.get(`wakeup-native:${nativo}`))) {
       await kv.set(`wakeup-native:${nativo}`, true);
     }
-    const list = await kv.getByPrefix(WAKEUP_PREFIX);
-    list.sort((a: any, b: any) => String(a.time).localeCompare(String(b.time)));
-    return c.json({ wakeups: list, serverTime: new Date().toISOString() });
+    const [list, rings, version] = await Promise.all([
+      kv.getByPrefix(WAKEUP_PREFIX),
+      kv.getByPrefix(WAKEUP_RING_PREFIX),
+      kv.get(WAKEUP_VERSION_KEY),
+    ]);
+    const byId = new Map<string, any>();
+    for (const w of list) {
+      if (!w?.id) continue;
+      // `ring` embutido é o formato antigo (antes das chaves por pessoa): fica como base.
+      byId.set(w.id, { ...w, ring: { ...(w.ring || {}) } });
+    }
+    for (const r of rings) {
+      const w = byId.get(r?.id);
+      if (w && isPerfil(r.profile)) {
+        const { id: _id, profile, ...state } = r;
+        w.ring[profile] = state;
+      }
+    }
+    const wakeups = [...byId.values()].sort((a, b) => String(a.time).localeCompare(String(b.time)));
+    return c.json({ wakeups, version: version ?? 0, serverTime: new Date().toISOString() });
   } catch (error) {
     console.error("[GET /wakeups] Error:", error);
     return c.json({ error: "Falha ao carregar despertadores" }, 500);
@@ -1697,31 +1782,17 @@ app.post("/make-server-19717bce/wakeups", async (c) => {
 
     const now = new Date().toISOString();
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const wakeup = {
-      id,
-      createdBy: body.createdBy,
-      createdAt: now,
-      updatedAt: now,
-      ring: {},
-      ...fields,
-    };
+    const wakeup = { id, createdBy: body.createdBy, createdAt: now, updatedAt: now, ...fields };
     await kv.set(WAKEUP_PREFIX + id, wakeup);
+    await bumpWakeupVersion();
 
     // Avisa quem vai ser acordado, se não for quem criou.
     const criador: Perfil = body.createdBy;
-    const avisar = wakeupTargets(wakeup).filter((p) => p !== criador);
     await Promise.all([
       syncWakeupDevices(),
-      ...avisar.map((p) =>
-        sendPushToUser(p, {
-          title: `⏰ ${criador} criou um despertador pra ${wakeup.target === "both" ? "vocês dois" : "você"}`,
-          body: `Vai tocar às ${wakeup.time} (${describeWakeupDays(wakeup)})${wakeup.note ? ` — "${wakeup.note}"` : ""}`,
-          tag: `mesinha-wakeup-${id}`,
-          url: "/",
-        }).catch(() => false)
-      ),
+      ...wakeupTargets(wakeup).filter((p) => p !== criador).map((p) => pushNovoDespertador(p, criador, wakeup)),
     ]);
-    return c.json({ wakeup });
+    return c.json({ wakeup: { ...wakeup, ring: {} } });
   } catch (error) {
     console.error("[POST /wakeups] Error:", error);
     return c.json({ error: "Falha ao criar despertador" }, 500);
@@ -1738,7 +1809,16 @@ app.put("/make-server-19717bce/wakeups/:id", async (c) => {
     if (typeof fields === "string") return c.json({ error: fields }, 400);
     const wakeup = { ...fields, id, updatedAt: new Date().toISOString() };
     await kv.set(WAKEUP_PREFIX + id, wakeup);
-    await syncWakeupDevices();
+    await bumpWakeupVersion();
+
+    // Quem passou a ser acordado agora (ex.: "pra mim" → "nós dois") fica sabendo.
+    const antes = new Set(wakeupTargets(current));
+    const autor: Perfil | null = isPerfil(body?.editedBy) ? body.editedBy : null;
+    const novos = wakeupTargets(wakeup).filter((p) => !antes.has(p) && p !== autor);
+    await Promise.all([
+      syncWakeupDevices(),
+      ...novos.map((p) => pushNovoDespertador(p, autor ?? wakeup.createdBy, wakeup)),
+    ]);
     return c.json({ wakeup });
   } catch (error) {
     console.error("[PUT /wakeups/:id] Error:", error);
@@ -1748,7 +1828,9 @@ app.put("/make-server-19717bce/wakeups/:id", async (c) => {
 
 app.delete("/make-server-19717bce/wakeups/:id", async (c) => {
   try {
-    await kv.del(WAKEUP_PREFIX + c.req.param("id"));
+    const id = c.req.param("id");
+    await kv.mdel([WAKEUP_PREFIX + id, `${WAKEUP_RING_PREFIX}${id}:Amanda`, `${WAKEUP_RING_PREFIX}${id}:Mateus`]);
+    await bumpWakeupVersion();
     await syncWakeupDevices();
     return c.json({ success: true });
   } catch (error) {
@@ -1757,34 +1839,47 @@ app.delete("/make-server-19717bce/wakeups/:id", async (c) => {
   }
 });
 
+/**
+ * Lê o status atual da pessoa (chave própria, ou o formato antigo embutido)
+ * e decide se o aviso novo vale: um aviso de um toque MAIS ANTIGO (fila
+ * offline chegando atrasada) nunca passa por cima de um mais novo, e nada
+ * desfaz um "desligou" do mesmo toque.
+ */
+async function currentRing(id: string, profile: Perfil, w: any): Promise<any> {
+  return (await kv.get(`${WAKEUP_RING_PREFIX}${id}:${profile}`)) ?? w?.ring?.[profile] ?? null;
+}
+
 // O aparelho avisa que começou a tocar (status "ringing") ou que tocou 30 min
 // sem ninguém desligar ("missed"). `occurrence` = "YYYY-MM-DDTHH:MM" local do
 // toque, pra não misturar o toque de hoje com o de ontem.
 app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
   try {
     const id = c.req.param("id");
-    const { profile, occurrence, status } = await c.req.json();
+    const { profile, occurrence, status, at } = await c.req.json();
     if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
     if (status !== "ringing" && status !== "missed") return c.json({ error: "Status inválido" }, 400);
+    if (typeof occurrence !== "string" || !occurrence) return c.json({ error: "Toque inválido" }, 400);
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
+    if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);
 
-    const atual = w.ring?.[profile];
-    // Um "ringing" atrasado (retentativa offline) não pode desfazer um
-    // "desligou" que já chegou para o mesmo toque.
-    if (atual?.occurrence === occurrence && atual.status === "dismissed") {
-      return c.json({ wakeup: w });
-    }
-    const now = new Date().toISOString();
+    const atual = await currentRing(id, profile, w);
+    if (atual?.occurrence && occurrence < atual.occurrence) return c.json({ ignored: "antigo" });
+    if (atual?.occurrence === occurrence && atual.status === "dismissed") return c.json({ ignored: "já desligado" });
+    if (atual?.occurrence === occurrence && atual.status === status) return c.json({ ignored: "repetido" });
+
+    const quando = reportedTime(at);
     const ring = {
-      occurrence: String(occurrence || ""),
+      id,
+      profile,
+      occurrence,
       status,
-      startedAt: atual?.occurrence === occurrence ? atual.startedAt : now,
-      ...(status === "missed" ? { endedAt: now } : {}),
+      startedAt: atual?.occurrence === occurrence ? atual.startedAt : quando,
+      ...(status === "missed" ? { endedAt: quando } : {}),
     };
-    const wakeup = { ...w, ring: { ...(w.ring || {}), [profile]: ring } };
-    await kv.set(WAKEUP_PREFIX + id, wakeup);
-    return c.json({ wakeup });
+    await kv.set(`${WAKEUP_RING_PREFIX}${id}:${profile}`, ring);
+    await bumpWakeupVersion();
+    return c.json({ ring });
   } catch (error) {
     console.error("[POST /wakeups/:id/ring] Error:", error);
     return c.json({ error: "Falha ao registrar toque" }, 500);
@@ -1795,42 +1890,49 @@ app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
 app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
   try {
     const id = c.req.param("id");
-    const { profile, occurrence, message } = await c.req.json();
+    const { profile, occurrence, message, at } = await c.req.json();
     if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
-    const msg = typeof message === "string" ? message.trim().substring(0, WAKEUP_MESSAGE_MAX) : "";
-    if (!msg) return c.json({ error: "Escolhe uma mensagem pra desligar" }, 400);
+    const msg = typeof message === "string" ? message.trim() : "";
+    if (!WAKEUP_DISMISS_MESSAGES.includes(msg)) {
+      return c.json({ error: "Escolhe um dos recadinhos pra desligar" }, 400);
+    }
+    if (typeof occurrence !== "string" || !occurrence) return c.json({ error: "Toque inválido" }, 400);
     const w = await kv.get(WAKEUP_PREFIX + id);
     if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
+    if (!wakeupTargets(w).includes(profile)) return c.json({ error: "Esse despertador não é seu" }, 403);
 
-    const atual = w.ring?.[profile];
+    const atual = await currentRing(id, profile, w);
+    if (atual?.occurrence && occurrence < atual.occurrence) return c.json({ ignored: "antigo" });
     // Retentativa do mesmo "desligou" (o celular reenvia quando estava sem
     // internet): não manda o push de novo.
-    if (atual?.occurrence === occurrence && atual.status === "dismissed") {
-      return c.json({ wakeup: w });
-    }
-    const now = new Date().toISOString();
-    const wakeup = {
-      ...w,
-      ring: {
-        ...(w.ring || {}),
-        [profile]: {
-          occurrence: String(occurrence || ""),
-          status: "dismissed",
-          startedAt: atual?.occurrence === occurrence ? atual.startedAt : now,
-          endedAt: now,
-          message: msg,
-        },
-      },
-    };
-    await kv.set(WAKEUP_PREFIX + id, wakeup);
+    if (atual?.occurrence === occurrence && atual.status === "dismissed") return c.json({ ignored: "repetido" });
 
-    await sendPushToUser(outroPerfil(profile), {
-      title: `⏰ ${profile} desligou o despertador`,
-      body: msg,
-      tag: `mesinha-wakeup-${id}`,
-      url: "/",
-    }).catch(() => false);
-    return c.json({ wakeup });
+    const quando = reportedTime(at);
+    const ring = {
+      id,
+      profile,
+      occurrence,
+      status: "dismissed",
+      startedAt: atual?.occurrence === occurrence ? atual.startedAt : quando,
+      endedAt: quando,
+      message: msg,
+    };
+    await kv.set(`${WAKEUP_RING_PREFIX}${id}:${profile}`, ring);
+    await bumpWakeupVersion();
+
+    // Dois despertadores no mesmo minuto desligam juntos: um push só pro outro.
+    const pushKey = `wakeup-push-last:${profile}`;
+    const assinatura = `${occurrence}|${msg}`;
+    if ((await kv.get(pushKey)) !== assinatura) {
+      await kv.set(pushKey, assinatura);
+      await sendPushToUser(outroPerfil(profile), {
+        title: `⏰ ${profile} desligou o despertador`,
+        body: msg,
+        tag: `mesinha-wakeup-${occurrence}`,
+        url: "/",
+      }).catch(() => false);
+    }
+    return c.json({ ring });
   } catch (error) {
     console.error("[POST /wakeups/:id/dismiss] Error:", error);
     return c.json({ error: "Falha ao desligar despertador" }, 500);

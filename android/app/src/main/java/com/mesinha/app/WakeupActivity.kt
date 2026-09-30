@@ -22,6 +22,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,8 +37,14 @@ import java.util.Locale
  */
 class WakeupActivity : AppCompatActivity() {
 
-    private val finishedReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = finish()
+    private val serviceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                WakeupRingService.ACTION_FINISHED -> finish()
+                // Entrou (ou saiu) um despertador enquanto a tela está aberta.
+                WakeupRingService.ACTION_CHANGED -> render()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,21 +67,60 @@ class WakeupActivity : AppCompatActivity() {
         })
 
         ContextCompat.registerReceiver(
-            this, finishedReceiver, IntentFilter(WakeupRingService.ACTION_FINISHED),
+            this, serviceReceiver,
+            IntentFilter().apply {
+                addAction(WakeupRingService.ACTION_FINISHED)
+                addAction(WakeupRingService.ACTION_CHANGED)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
+        startFromFallback(intent)
+        render()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        startFromFallback(intent)
+        render()
+    }
+
+    /**
+     * Aberta pela notificação de reserva (o Android não deixou o receiver
+     * subir o serviço): agora, com a tela em primeiro plano, pode — sobe o
+     * serviço e a música começa.
+     */
+    private fun startFromFallback(intent: Intent?) {
+        val ids = intent?.getStringExtra(WakeupRingService.EXTRA_IDS) ?: return
+        val occurrence = intent.getStringExtra(WakeupRingService.EXTRA_OCCURRENCE) ?: return
+        intent.removeExtra(WakeupRingService.EXTRA_IDS)
+        try {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, WakeupRingService::class.java)
+                    .setAction(WakeupRingService.ACTION_START)
+                    .putExtra(WakeupRingService.EXTRA_IDS, ids)
+                    .putExtra(WakeupRingService.EXTRA_OCCURRENCE, occurrence)
+            )
+            waitingService = true
+        } catch (_: Exception) { }
+    }
+
+    private var waitingService = false
+
+    private fun render() {
         setContentView(buildUi())
     }
 
     override fun onResume() {
         super.onResume()
         // Abriu pela notificação depois que já parou de tocar: nada a fazer aqui.
-        if (WakeupRingService.ringingIds.isEmpty()) finish()
+        if (WakeupRingService.ringingIds.isEmpty() && !waitingService) finish()
     }
 
     override fun onDestroy() {
-        try { unregisterReceiver(finishedReceiver) } catch (_: Exception) { }
+        try { unregisterReceiver(serviceReceiver) } catch (_: Exception) { }
         super.onDestroy()
     }
 
@@ -255,6 +302,13 @@ class WakeupActivity : AppCompatActivity() {
             setBackgroundColor(cream)
             isFillViewport = true
             addView(col)
+            // targetSdk 36 desenha por baixo das barras do sistema: afasta o
+            // conteúdo da barra de status e dos botões de navegação.
+            ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
         }
     }
 

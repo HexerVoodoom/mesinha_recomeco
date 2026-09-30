@@ -29,14 +29,19 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!--
       Despertador: toca na hora certa com o app fechado e por cima de tudo.
-      - SCHEDULE_EXACT_ALARM: `setAlarmClock` (a pessoa libera em "Alarmes e
-        lembretes"; o app avisa se estiver faltando).
+      - USE_EXACT_ALARM (Android 13+, concedida na instalação — a Play pede a
+        declaração de app de despertador) e SCHEDULE_EXACT_ALARM (Android 12):
+        `setAlarmClock`. Sem ela o alarme vira "inexato" e o Android 12+ não
+        deixa subir o serviço que toca a música na hora H.
       - USE_FULL_SCREEN_INTENT: tela do despertador por cima da tela de
         bloqueio (no Android 14+ a Play pede a declaração "despertador").
       - FOREGROUND_SERVICE_MEDIA_PLAYBACK: o serviço que toca o som.
       - VIBRATE: vibra junto.
     -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -193,10 +198,16 @@
         </activity>
 
         <!-- Reagenda a troca diária quando o aparelho reinicia. -->
+        <!--
+          directBootAware + LOCKED_BOOT_COMPLETED: o despertador é reagendado
+          logo depois de ligar o celular, antes do primeiro desbloqueio.
+        -->
         <receiver
             android:name=".BootReceiver"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
@@ -214,6 +225,7 @@
         <!-- Despertador: recebe o disparo do AlarmManager e reagenda quando o relógio muda. -->
         <receiver
             android:name=".WakeupReceiver"
+            android:directBootAware="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.mesinha.app.ACTION_WAKEUP_FIRE" />
@@ -229,12 +241,14 @@
         <!-- Despertador: toca o som (canal de alarme) até escolherem um recadinho. -->
         <service
             android:name=".WakeupRingService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
         <!-- Despertador: tela cheia por cima da tela de bloqueio. -->
         <activity
             android:name=".WakeupActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
