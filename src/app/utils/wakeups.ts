@@ -164,11 +164,11 @@ export function nextOccurrence(w: Pick<Wakeup, 'time' | 'days' | 'date' | 'enabl
     const at = new Date(y, mo - 1, d, h, m, 0, 0);
     return at > after ? at : null;
   }
-  const c = new Date(after);
-  c.setHours(h, m, 0, 0);
+  // Cada dia é montado do zero (data + hora): num dia de virada de horário de
+  // verão, somar dias a um Date "empurrava" a hora dos dias seguintes.
   for (let i = 0; i <= 7; i++) {
+    const c = new Date(after.getFullYear(), after.getMonth(), after.getDate() + i, h, m, 0, 0);
     if (w.days.includes(c.getDay()) && c > after) return c;
-    c.setDate(c.getDate() + 1);
   }
   return null;
 }

@@ -243,7 +243,8 @@ export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
     ]);
     markHandled(ringing.map(r => `${r.wakeup.id}|${r.occurrence}`));
     setRinging([]);
-    flushPendingDismiss(userProfile);
+    // O painel (se estiver aberto) atualiza o status já, sem esperar o próximo ciclo.
+    flushPendingDismiss(userProfile).then(() => window.dispatchEvent(new Event(WAKEUPS_CHANGED_EVENT)));
   };
 
   const retrySound = () => startSound(ringing);
