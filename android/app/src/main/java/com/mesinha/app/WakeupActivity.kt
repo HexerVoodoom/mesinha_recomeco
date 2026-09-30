@@ -14,7 +14,6 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -93,84 +92,167 @@ class WakeupActivity : AppCompatActivity() {
     private fun buildUi(): View {
         val me = WakeupStore.profile(this) ?: "Amanda"
         val partner = if (me == "Amanda") "Mateus" else "Amanda"
-        val quicksand = ResourcesCompat.getFont(this, R.font.quicksand) ?: Typeface.DEFAULT
         val bold = ResourcesCompat.getFont(this, R.font.quicksand_bold) ?: Typeface.DEFAULT_BOLD
-        val teal = ContextCompat.getColor(this, R.color.mesinha_teal_dark)
+        // Mesmos tokens de cor dos cards da Mesinha (PWA).
+        val teal = Color.parseColor("#4D989B")
         val ink = Color.parseColor("#2B2A28")
+        val muted = Color.parseColor("#8A847D")
+        val beige = Color.parseColor("#E9E4DF")
+        val cream = Color.parseColor("#F8F6F3")
+
+        fun face(profile: String) = if (profile == "Mateus") R.drawable.corvinho else R.drawable.alpaquinha
+        fun bubbleColor(profile: String) = Color.parseColor(if (profile == "Mateus") "#1A1A1A" else "#8B4513")
+        fun card(fill: Int = Color.WHITE, stroke: Int = beige) = GradientDrawable().apply {
+            cornerRadius = dp(16).toFloat()
+            setColor(fill)
+            setStroke(dp(2), stroke)
+        }
+        fun label(text: String, color: Int = teal) = TextView(this).apply {
+            this.text = text.uppercase(Locale("pt", "BR"))
+            typeface = bold
+            setTextColor(color)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = -0.01f
+        }
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(40), dp(24), dp(32))
+            setPadding(dp(24), dp(36), dp(24), dp(32))
         }
 
-        // O bichinho de quem vai receber o recado: Corvinho = Mateus, Alpaquinha = Amanda.
-        col.addView(ImageView(this).apply {
-            setImageResource(if (partner == "Mateus") R.drawable.corvinho else R.drawable.alpaquinha)
-            adjustViewBounds = true
-            layoutParams = LinearLayout.LayoutParams(dp(110), dp(110))
+        // Selinho igual ao da grade de categorias.
+        col.addView(TextView(this).apply {
+            text = "🔔 DESPERTADOR"
+            typeface = bold
+            setTextColor(ink)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(dp(16), dp(4), dp(16), dp(4))
+            background = GradientDrawable().apply { cornerRadius = dp(99).toFloat(); setColor(beige) }
         })
 
-        col.addView(TextView(this).apply {
+        val clock = TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             typeface = bold
             setTextColor(ink)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 64f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 72f)
             gravity = Gravity.CENTER
-        })
+            setPadding(0, dp(16), 0, 0)
+        }
+        col.addView(clock)
+        // Pulsinho no relógio, igual à tela do navegador.
+        android.animation.ObjectAnimator.ofPropertyValuesHolder(
+            clock,
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.04f, 1f),
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.04f, 1f)
+        ).apply { duration = 800; repeatCount = android.animation.ValueAnimator.INFINITE; start() }
+
         col.addView(TextView(this).apply {
-            text = "Hora de acordar! ⏰"
+            text = "Hora de acordar!"
             typeface = bold
             setTextColor(teal)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dp(12))
+            setPadding(0, 0, 0, dp(20))
         })
 
-        // Recadinhos de quem criou o despertador.
+        // Card com quem criou o despertador "falando" o recadinho no balão.
         val ringing = WakeupStore.all(this).filter { it.id in WakeupRingService.ringingIds }
-        for (w in ringing.filter { it.note.isNotBlank() }) {
-            col.addView(TextView(this).apply {
-                text = if (w.createdBy != me) "Recadinho de ${w.createdBy}: “${w.note}”" else "“${w.note}”"
-                typeface = quicksand
-                setTextColor(ink)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, dp(8))
-            })
-        }
+        val withNote = ringing.firstOrNull { it.note.isNotBlank() }
+        val speaker = (withNote ?: ringing.firstOrNull())?.createdBy?.takeIf { it == "Amanda" || it == "Mateus" } ?: partner
+        val fala = withNote?.note ?: if (speaker == me) "Hora de levantar! ⏰" else "Acorda, amor! ☀️"
 
-        col.addView(TextView(this).apply {
-            text = "Pra desligar, escolhe um recadinho ${if (partner == "Amanda") "pra Amanda" else "pro Mateus"}:"
-            typeface = quicksand
-            setTextColor(Color.parseColor("#6B6660"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, dp(12))
+        col.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = card()
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            val bicho = ImageView(this@WakeupActivity).apply {
+                setImageResource(face(speaker))
+                layoutParams = LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(12) }
+            }
+            addView(bicho)
+            // Chacoalhando, como despertador de desenho.
+            android.animation.ObjectAnimator.ofFloat(bicho, View.ROTATION, -8f, 8f).apply {
+                duration = 175; repeatMode = android.animation.ValueAnimator.REVERSE
+                repeatCount = android.animation.ValueAnimator.INFINITE; start()
+            }
+            addView(LinearLayout(this@WakeupActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                addView(label(
+                    if (speaker == me) "Você deixou anotado"
+                    else "${if (speaker == "Mateus") "Corvinho" else "Alpaquinha"} ($speaker) diz",
+                    muted
+                ))
+                addView(TextView(this@WakeupActivity).apply {
+                    text = fala
+                    typeface = bold
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    // Balão com a "pontinha" no canto de cima, igual aos widgets.
+                    background = GradientDrawable().apply {
+                        val r = dp(16).toFloat(); val t = dp(4).toFloat()
+                        cornerRadii = floatArrayOf(t, t, r, r, r, r, r, r)
+                        setColor(bubbleColor(speaker))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(4) }
+                })
+            })
         })
 
-        for (msg in WakeupMessages.LIST) {
-            col.addView(Button(this).apply {
-                text = msg
-                isAllCaps = false
-                typeface = bold
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(18).toFloat()
-                    setColor(teal)
-                }
-                setPadding(dp(16), dp(14), dp(16), dp(14))
+        // "Pra desligar, manda um recadinho pro Mateus" com a carinha de quem recebe.
+        col.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(24), 0, dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            addView(ImageView(this@WakeupActivity).apply {
+                setImageResource(face(partner))
+                layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(8) }
+            })
+            addView(label("Pra desligar, manda um recadinho ${if (partner == "Amanda") "pra Amanda" else "pro Mateus"}"))
+        })
+
+        // Os 6 recadinhos em grade 2x3 de cards brancos (fica verde ao tocar).
+        WakeupMessages.LIST.chunked(2).forEach { par ->
+            col.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(10) }
-                setOnClickListener { dismissWith(msg) }
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+                par.forEachIndexed { i, msg ->
+                    addView(TextView(this@WakeupActivity).apply {
+                        text = msg
+                        typeface = bold
+                        setTextColor(ink)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        gravity = Gravity.CENTER
+                        minHeight = dp(76)
+                        setPadding(dp(10), dp(14), dp(10), dp(14))
+                        isClickable = true
+                        background = android.graphics.drawable.StateListDrawable().apply {
+                            addState(intArrayOf(android.R.attr.state_pressed), card(Color.parseColor("#D6F2EF"), teal))
+                            addState(intArrayOf(), card())
+                        }
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (i == 0) marginEnd = dp(4) else marginStart = dp(4)
+                        }
+                        setOnClickListener { dismissWith(msg) }
+                    })
+                }
             })
         }
 
         return ScrollView(this).apply {
-            setBackgroundColor(ContextCompat.getColor(this@WakeupActivity, R.color.mesinha_cream))
+            setBackgroundColor(cream)
             isFillViewport = true
             addView(col)
         }

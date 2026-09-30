@@ -193,3 +193,18 @@ export function describeNext(at: Date | null, now = new Date()): string {
 export function targetsOf(w: Pick<Wakeup, 'target'>): Profile[] {
   return w.target === 'both' ? ['Amanda', 'Mateus'] : [w.target];
 }
+
+/** Evento que avisa o tocador do navegador (WakeupWebRinger) que a lista mudou. */
+export const WAKEUPS_CHANGED_EVENT = 'mesinha-wakeups-changed';
+
+// ── Elenco: Corvinho = Mateus, Alpaquinha = Amanda (igual aos widgets) ──────
+
+export const CHARACTER = {
+  Mateus: { name: 'Corvinho', img: '/characters/corvinho.png', bubble: '#1A1A1A' },
+  Amanda: { name: 'Alpaquinha', img: '/characters/alpaquinha.png', bubble: '#8B4513' },
+} as const;
+
+/** "pro Mateus" / "pra Amanda". */
+export function toPrep(p: Profile): string {
+  return p === 'Amanda' ? 'pra Amanda' : 'pro Mateus';
+}

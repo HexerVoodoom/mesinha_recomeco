@@ -155,6 +155,7 @@ interface CategoryMenuProps {
   showMood: boolean;
   showQuestion: boolean;
   showGarden: boolean;
+  showWakeup: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
@@ -176,6 +177,7 @@ export function CategoryMenu({
   showMood,
   showQuestion,
   showGarden,
+  showWakeup,
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
@@ -187,12 +189,13 @@ export function CategoryMenu({
   onOpenNudge,
   onOpenWakeup,
 }: CategoryMenuProps) {
-  // Roleta, Cutucada e Despertador abrem modais (não trocam a tela), então nunca ficam "ativas".
+  // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
   const activeTool: ToolId | null = showMeetupCalendar ? 'meetup'
     : showMap ? 'map'
     : showMood ? 'mood'
     : showQuestion ? 'question'
     : showGarden ? 'garden'
+    : showWakeup ? 'wakeup'
     : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
   const toolHandlers: Record<ToolId, () => void> = {

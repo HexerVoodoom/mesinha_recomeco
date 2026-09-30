@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import {
   type Profile,
   type Wakeup,
+  CHARACTER,
+  WAKEUPS_CHANGED_EVENT,
   WAKEUP_DISMISS_MESSAGES,
+  toPrep,
   WAKEUP_MAX_RING_MS,
   occurrenceKey,
   wakeupApi,
 } from '../utils/wakeups';
 import { playWakeupTune, stopWakeupTune } from '../utils/wakeupTune';
-import { WAKEUPS_CHANGED_EVENT } from './WakeupModal';
+import { CharacterFace, SpeechBubble } from './WakeupPanel';
 
 // Despertador no NAVEGADOR (fora do app Android). Só toca com o Mesinha
 // aberto — o navegador não deixa nada tocar com a aba fechada. No app
@@ -126,38 +130,63 @@ export function WakeupWebRinger({ userProfile }: { userProfile: Profile }) {
     playWakeupTune(volume, true).then(ok => setSoundBlocked(!ok));
   };
 
-  const notes = ringing.wakeups.filter(w => w.note);
+  // Quem "fala" na tela: quem criou o despertador (o recadinho é dele).
+  const speaker: Profile = ringing.wakeups.find(w => w.note)?.createdBy ?? ringing.wakeups[0].createdBy;
+  const bubble = ringing.wakeups.find(w => w.note)?.note
+    ?? (speaker === userProfile ? 'Hora de levantar! ⏰' : 'Acorda, amor! ☀️');
 
   return (
-    <div
-      className="fixed inset-0 z-[200] bg-[#F8F6F3] flex flex-col items-center justify-center px-6 py-8 overflow-y-auto font-['Quicksand',sans-serif]"
-      style={{ maxWidth: 390, margin: '0 auto' }}
-    >
-      <div className="text-7xl font-bold text-[#2B2A28] animate-pulse">{ringing.occurrence.slice(11)}</div>
-      <div className="text-2xl font-bold text-[#4D989B] mb-4">Hora de acordar! ⏰</div>
-      {notes.map(w => (
-        <p key={w.id} className="text-center text-base mb-2">
-          {w.createdBy !== userProfile ? `Recadinho de ${w.createdBy}: ` : ''}“{w.note}”
-        </p>
-      ))}
-      {soundBlocked && (
-        <button onClick={retrySound} className="mb-3 text-sm underline text-[#4D989B]">
-          🔇 O navegador bloqueou o som — toca aqui pra ouvir
-        </button>
-      )}
-      <p className="text-sm text-muted-foreground text-center my-3">
-        Pra desligar, escolhe um recadinho pr{partner === 'Amanda' ? 'a Amanda' : 'o Mateus'}:
-      </p>
-      <div className="w-full space-y-2">
-        {WAKEUP_DISMISS_MESSAGES.map(msg => (
-          <button
-            key={msg}
-            onClick={() => dismiss(msg)}
-            className="w-full py-3.5 px-4 rounded-2xl bg-[#4D989B] text-white font-bold text-base"
-          >
-            {msg}
+    <div className="fixed inset-0 z-[200] bg-[#F8F6F3] overflow-y-auto font-['Quicksand',sans-serif]">
+      <div className="mx-auto flex min-h-full flex-col items-center px-6 py-8" style={{ maxWidth: 390 }}>
+        {/* Selinho igual ao da grade de categorias */}
+        <div className="bg-[#E9E4DF] rounded-full px-4 py-1 mb-5">
+          <span className="font-bold text-xs text-[#2B2A28] uppercase tracking-tight">🔔 Despertador</span>
+        </div>
+
+        <motion.div
+          animate={{ scale: [1, 1.04, 1] }}
+          transition={{ repeat: Infinity, duration: 0.8 }}
+          className="text-7xl font-bold text-[#2B2A28] tracking-tight leading-none"
+        >
+          {ringing.occurrence.slice(11)}
+        </motion.div>
+        <p className="font-bold text-lg text-[#4D989B] mt-1 mb-6">Hora de acordar!</p>
+
+        <div className="w-full rounded-2xl border-2 border-[#E9E4DF] bg-white p-4 flex items-start gap-3 mb-2">
+          <motion.div animate={{ rotate: [-8, 8, -8] }} transition={{ repeat: Infinity, duration: 0.35 }} className="shrink-0">
+            <CharacterFace profile={speaker} className="w-16 h-16" />
+          </motion.div>
+          <div className="pt-1">
+            <p className="text-[11px] font-bold uppercase tracking-tight text-[#8A847D] mb-1">
+              {speaker === userProfile ? 'Você deixou anotado' : `${CHARACTER[speaker].name} (${speaker}) diz`}
+            </p>
+            <SpeechBubble profile={speaker}>{bubble}</SpeechBubble>
+          </div>
+        </div>
+
+        {soundBlocked && (
+          <button onClick={retrySound} className="mt-2 text-xs font-bold text-[#4D989B] bg-[#4D989B]/10 px-3 py-1.5 rounded-full">
+            🔇 O navegador segurou o som — toca aqui pra ouvir
           </button>
-        ))}
+        )}
+
+        <div className="w-full mt-5 flex items-center gap-2 mb-3">
+          <CharacterFace profile={partner} className="w-8 h-8" />
+          <p className="font-bold text-xs uppercase tracking-tight text-[#4D989B]">
+            Pra desligar, manda um recadinho {toPrep(partner)}
+          </p>
+        </div>
+        <div className="w-full grid grid-cols-2 gap-2">
+          {WAKEUP_DISMISS_MESSAGES.map(msg => (
+            <button
+              key={msg}
+              onClick={() => dismiss(msg)}
+              className="rounded-2xl border-2 border-[#E9E4DF] bg-white px-3 py-4 text-sm font-bold text-[#2B2A28] leading-snug active:bg-[#81D8D0]/30 active:border-[#4D989B] transition-colors"
+            >
+              {msg}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

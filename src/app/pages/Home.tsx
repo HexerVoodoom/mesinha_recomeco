@@ -20,7 +20,7 @@ import { SearchContent } from '../components/SearchContent';
 import { MeetupCalendar } from '../components/MeetupCalendar';
 import { MapView } from '../components/MapView';
 import { NudgeModal } from '../components/NudgeModal';
-import { WakeupModal } from '../components/WakeupModal';
+import { WakeupPanel } from '../components/WakeupPanel';
 import { WakeupWebRinger } from '../components/WakeupWebRinger';
 import { hasNativeWakeups } from '../utils/wakeups';
 import { DateRouletteModal } from '../components/DateRouletteModal';
@@ -152,7 +152,7 @@ export default function Home() {
   const [showMeetupCalendar, setShowMeetupCalendar] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showNudgeModal, setShowNudgeModal] = useState(false);
-  const [showWakeupModal, setShowWakeupModal] = useState(false);
+  const [showWakeup, setShowWakeup] = useState(false);
   const [showRouletteModal, setShowRouletteModal] = useState(false);
   const [showMood, setShowMood] = useState(false);
   const [showQuestion, setShowQuestion] = useState(false);
@@ -963,6 +963,7 @@ export default function Home() {
     setShowMood(false);
     setShowQuestion(false);
     setShowGarden(false);
+    setShowWakeup(false);
   };
 
   const handleCategoryChange = (categoryId: Category) => {
@@ -975,11 +976,12 @@ export default function Home() {
   };
 
   /** Abre o painel pedido fechando os demais; tocar no ativo fecha (toggle). */
-  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question' | 'garden') => {
+  const togglePanel = (panel: 'meetup' | 'map' | 'mood' | 'question' | 'garden' | 'wakeup') => {
     const isOpen = panel === 'meetup' ? showMeetupCalendar
       : panel === 'map' ? showMap
       : panel === 'mood' ? showMood
       : panel === 'question' ? showQuestion
+      : panel === 'wakeup' ? showWakeup
       : showGarden;
     closeAllPanels();
     if (isOpen) return;
@@ -987,6 +989,7 @@ export default function Home() {
     else if (panel === 'map') setShowMap(true);
     else if (panel === 'mood') setShowMood(true);
     else if (panel === 'question') setShowQuestion(true);
+    else if (panel === 'wakeup') setShowWakeup(true);
     else setShowGarden(true);
   };
 
@@ -1157,6 +1160,7 @@ export default function Home() {
           showMood={showMood}
           showQuestion={showQuestion}
           showGarden={showGarden}
+          showWakeup={showWakeup}
           onCategoryChange={handleCategoryChange}
           onOpenMeetupCalendar={handleToggleMeetupCalendar}
           onOpenMap={handleToggleMap}
@@ -1166,7 +1170,7 @@ export default function Home() {
           onOpenRoulette={() => setShowRouletteModal(true)}
           onOpenGames={() => setShowGamesModal(true)}
           onOpenNudge={() => setShowNudgeModal(true)}
-          onOpenWakeup={() => setShowWakeupModal(true)}
+          onOpenWakeup={() => togglePanel('wakeup')}
         />
 
         {error && (
@@ -1212,6 +1216,8 @@ export default function Home() {
           <QuestionPanel userProfile={userProfile} />
         ) : showGarden ? (
           <GardenPanel userProfile={userProfile} />
+        ) : showWakeup ? (
+          <WakeupPanel userProfile={userProfile} />
         ) : showSearch ? (
           <SearchContent
             items={items}
@@ -1342,7 +1348,7 @@ export default function Home() {
       </main>
 
       {/* FAB - escondido quando busca, calendário de encontros ou mapa está ativo */}
-      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && !showGarden && (
+      {!showSearch && !showMeetupCalendar && !showMap && !showMood && !showQuestion && !showGarden && !showWakeup && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddModal(true)}
@@ -1373,12 +1379,6 @@ export default function Home() {
       <NudgeModal
         isOpen={showNudgeModal}
         onClose={() => setShowNudgeModal(false)}
-        userProfile={userProfile}
-      />
-
-      <WakeupModal
-        isOpen={showWakeupModal}
-        onClose={() => setShowWakeupModal(false)}
         userProfile={userProfile}
       />
 

@@ -320,6 +320,7 @@ class WakeupRingService : Service() {
             .setContentTitle("⏰ Despertador tocando!")
             .setContentText("Toca aqui e escolhe um recadinho pra desligar")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setColor(android.graphics.Color.parseColor("#4D989B"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)

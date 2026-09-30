@@ -332,7 +332,10 @@ Requer `ANTHROPIC_API_KEY` e `API_BASE_URL` no `.env.local` (na raiz do projeto)
 
 ## Despertador
 
-Ferramenta "Despertador" (ícone de sino na página 2 da grade). Qualquer um cria
+Ferramenta "Despertador" (ícone de sino na página 2 da grade), que abre um
+painel no mesmo visual da Pergunta do Dia e do Jardim, com Corvinho (Mateus) e
+Alpaquinha (Amanda) nos balõezinhos, como nos widgets. A tela do alarme
+tocando, no Android e no navegador, segue esse mesmo visual. Qualquer um cria
 um despertador **pra si, pro outro ou pros dois**, com horário, dias da semana
 (nenhum dia = toca uma vez só), volume (**mínimo 20%**, nunca fica mudo) e um
 recadinho opcional que aparece na tela quando tocar.
