@@ -4,7 +4,7 @@ import { logger } from "npm:hono/logger";
 import webpush from "npm:web-push";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
-import { sendFcmToUser } from "./fcm.tsx";
+import { sendFcmDataToUser, sendFcmToUser } from "./fcm.tsx";
 
 /**
  * Cria a chave só se ela ainda não existir (INSERT ... ON CONFLICT DO
@@ -1562,6 +1562,278 @@ app.post("/make-server-19717bce/nudge", async (c) => {
   } catch (error) {
     console.error("[POST /nudge] Error:", error);
     return c.json({ error: "Failed to send nudge", details: String(error) }, 500);
+  }
+});
+
+// ── Despertador ──────────────────────────────────────────────────────────────
+//
+// Despertador de verdade: toca no horário mesmo com o app fechado (quem toca é
+// o app Android nativo, com AlarmManager + serviço em primeiro plano). Aqui no
+// servidor ficam só a lista e o ESTADO de cada toque, pra quem criou o
+// despertador pro outro poder ver se ainda está tocando ou se já desligaram.
+//
+// Chave no KV: `wakeup:<id>`. Cada despertador é pra uma pessoa ou pros dois
+// (`target`). `days` vazio = toca uma vez só, na `date`. Para desligar, a
+// pessoa escolhe uma de 6 mensagens prontas — que vai de push pro outro.
+//
+// Sincronização com o celular: sempre que a lista muda, o servidor manda uma
+// mensagem FCM só de dados (`type: wakeup-sync`) pros dois aparelhos. O app
+// nativo acorda, baixa a lista e reagenda o alarme local — é isso que faz o
+// despertador criado pelo outro tocar mesmo que eu nunca abra o app.
+
+const WAKEUP_PREFIX = "wakeup:";
+const WAKEUP_MIN_VOLUME = 20; // nunca deixa o despertador mudo
+const WAKEUP_NOTE_MAX = 80;
+const WAKEUP_MESSAGE_MAX = 80;
+
+type Perfil = "Amanda" | "Mateus";
+type WakeupTarget = Perfil | "both";
+
+function isPerfil(p: unknown): p is Perfil {
+  return p === "Amanda" || p === "Mateus";
+}
+
+function outroPerfil(p: Perfil): Perfil {
+  return p === "Amanda" ? "Mateus" : "Amanda";
+}
+
+function wakeupTargets(w: any): Perfil[] {
+  return w?.target === "both" ? ["Amanda", "Mateus"] : isPerfil(w?.target) ? [w.target] : [];
+}
+
+/** Valida e normaliza os campos editáveis; devolve string de erro se inválido. */
+function sanitizeWakeupFields(body: any, base: any = {}): any | string {
+  const out: any = { ...base };
+  if (body.time !== undefined) {
+    if (typeof body.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.time)) {
+      return "Horário inválido";
+    }
+    out.time = body.time;
+  }
+  if (body.target !== undefined) {
+    if (!isPerfil(body.target) && body.target !== "both") return "Destinatário inválido";
+    out.target = body.target as WakeupTarget;
+  }
+  if (body.days !== undefined) {
+    if (!Array.isArray(body.days)) return "Dias inválidos";
+    out.days = [...new Set(body.days.filter((d: unknown) =>
+      Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6
+    ))].sort();
+  }
+  if (body.date !== undefined) {
+    if (body.date !== null && (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date))) {
+      return "Data inválida";
+    }
+    out.date = body.date;
+  }
+  if (body.volume !== undefined) {
+    const v = Number(body.volume);
+    if (!Number.isFinite(v)) return "Volume inválido";
+    out.volume = Math.round(Math.min(100, Math.max(WAKEUP_MIN_VOLUME, v)));
+  }
+  if (body.note !== undefined) {
+    out.note = typeof body.note === "string" ? body.note.trim().substring(0, WAKEUP_NOTE_MAX) : "";
+  }
+  if (body.enabled !== undefined) out.enabled = body.enabled !== false;
+  // "Uma vez" precisa de data; repetindo, a data não serve pra nada.
+  if (Array.isArray(out.days) && out.days.length > 0) out.date = null;
+  if ((!out.days || out.days.length === 0) && !out.date) return "Escolhe os dias ou a data";
+  return out;
+}
+
+/**
+ * Acorda os dois celulares pra rebaixarem a lista e reagendarem o alarme.
+ * Só vai pra quem já tem o app com despertador (marcado no GET com
+ * `?native=<perfil>`): a versão antiga do app mostraria uma notificação
+ * vazia "Mesinha" ao receber uma mensagem só de dados.
+ */
+async function syncWakeupDevices(): Promise<void> {
+  await Promise.all((["Amanda", "Mateus"] as Perfil[]).map(async (p) => {
+    try {
+      if (!(await kv.get(`wakeup-native:${p}`))) return false;
+      return await sendFcmDataToUser(p, { type: "wakeup-sync" });
+    } catch (err) {
+      console.error(`[Wakeup] sync falhou para ${p}:`, err);
+      return false;
+    }
+  }));
+}
+
+function describeWakeupDays(w: any): string {
+  if (!Array.isArray(w.days) || w.days.length === 0) {
+    const [, m, d] = String(w.date || "").split("-");
+    return m && d ? `no dia ${d}/${m}` : "uma vez";
+  }
+  if (w.days.length === 7) return "todo dia";
+  const nomes = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  return w.days.map((d: number) => nomes[d]).join(", ");
+}
+
+app.get("/make-server-19717bce/wakeups", async (c) => {
+  try {
+    // O app Android se anuncia aqui: daí em diante recebe o FCM de sincronização.
+    const nativo = c.req.query("native");
+    if (isPerfil(nativo) && !(await kv.get(`wakeup-native:${nativo}`))) {
+      await kv.set(`wakeup-native:${nativo}`, true);
+    }
+    const list = await kv.getByPrefix(WAKEUP_PREFIX);
+    list.sort((a: any, b: any) => String(a.time).localeCompare(String(b.time)));
+    return c.json({ wakeups: list, serverTime: new Date().toISOString() });
+  } catch (error) {
+    console.error("[GET /wakeups] Error:", error);
+    return c.json({ error: "Falha ao carregar despertadores" }, 500);
+  }
+});
+
+app.post("/make-server-19717bce/wakeups", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!isPerfil(body?.createdBy)) return c.json({ error: "Perfil inválido" }, 400);
+    const fields = sanitizeWakeupFields(
+      { volume: 70, note: "", enabled: true, days: [], date: null, ...body },
+    );
+    if (typeof fields === "string") return c.json({ error: fields }, 400);
+    if (!fields.time || !fields.target) return c.json({ error: "Faltou horário ou destinatário" }, 400);
+
+    const now = new Date().toISOString();
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const wakeup = {
+      id,
+      createdBy: body.createdBy,
+      createdAt: now,
+      updatedAt: now,
+      ring: {},
+      ...fields,
+    };
+    await kv.set(WAKEUP_PREFIX + id, wakeup);
+
+    // Avisa quem vai ser acordado, se não for quem criou.
+    const criador: Perfil = body.createdBy;
+    const avisar = wakeupTargets(wakeup).filter((p) => p !== criador);
+    await Promise.all([
+      syncWakeupDevices(),
+      ...avisar.map((p) =>
+        sendPushToUser(p, {
+          title: `⏰ ${criador} criou um despertador pra ${wakeup.target === "both" ? "vocês dois" : "você"}`,
+          body: `Vai tocar às ${wakeup.time} (${describeWakeupDays(wakeup)})${wakeup.note ? ` — "${wakeup.note}"` : ""}`,
+          tag: `mesinha-wakeup-${id}`,
+          url: "/",
+        }).catch(() => false)
+      ),
+    ]);
+    return c.json({ wakeup });
+  } catch (error) {
+    console.error("[POST /wakeups] Error:", error);
+    return c.json({ error: "Falha ao criar despertador" }, 500);
+  }
+});
+
+app.put("/make-server-19717bce/wakeups/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const current = await kv.get(WAKEUP_PREFIX + id);
+    if (!current) return c.json({ error: "Despertador não encontrado" }, 404);
+    const body = await c.req.json();
+    const fields = sanitizeWakeupFields(body, current);
+    if (typeof fields === "string") return c.json({ error: fields }, 400);
+    const wakeup = { ...fields, id, updatedAt: new Date().toISOString() };
+    await kv.set(WAKEUP_PREFIX + id, wakeup);
+    await syncWakeupDevices();
+    return c.json({ wakeup });
+  } catch (error) {
+    console.error("[PUT /wakeups/:id] Error:", error);
+    return c.json({ error: "Falha ao atualizar despertador" }, 500);
+  }
+});
+
+app.delete("/make-server-19717bce/wakeups/:id", async (c) => {
+  try {
+    await kv.del(WAKEUP_PREFIX + c.req.param("id"));
+    await syncWakeupDevices();
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /wakeups/:id] Error:", error);
+    return c.json({ error: "Falha ao apagar despertador" }, 500);
+  }
+});
+
+// O aparelho avisa que começou a tocar (status "ringing") ou que tocou 30 min
+// sem ninguém desligar ("missed"). `occurrence` = "YYYY-MM-DDTHH:MM" local do
+// toque, pra não misturar o toque de hoje com o de ontem.
+app.post("/make-server-19717bce/wakeups/:id/ring", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const { profile, occurrence, status } = await c.req.json();
+    if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
+    if (status !== "ringing" && status !== "missed") return c.json({ error: "Status inválido" }, 400);
+    const w = await kv.get(WAKEUP_PREFIX + id);
+    if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
+
+    const atual = w.ring?.[profile];
+    // Um "ringing" atrasado (retentativa offline) não pode desfazer um
+    // "desligou" que já chegou para o mesmo toque.
+    if (atual?.occurrence === occurrence && atual.status === "dismissed") {
+      return c.json({ wakeup: w });
+    }
+    const now = new Date().toISOString();
+    const ring = {
+      occurrence: String(occurrence || ""),
+      status,
+      startedAt: atual?.occurrence === occurrence ? atual.startedAt : now,
+      ...(status === "missed" ? { endedAt: now } : {}),
+    };
+    const wakeup = { ...w, ring: { ...(w.ring || {}), [profile]: ring } };
+    await kv.set(WAKEUP_PREFIX + id, wakeup);
+    return c.json({ wakeup });
+  } catch (error) {
+    console.error("[POST /wakeups/:id/ring] Error:", error);
+    return c.json({ error: "Falha ao registrar toque" }, 500);
+  }
+});
+
+// Desligou: grava a mensagem escolhida e manda ela de push pro outro.
+app.post("/make-server-19717bce/wakeups/:id/dismiss", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const { profile, occurrence, message } = await c.req.json();
+    if (!isPerfil(profile)) return c.json({ error: "Perfil inválido" }, 400);
+    const msg = typeof message === "string" ? message.trim().substring(0, WAKEUP_MESSAGE_MAX) : "";
+    if (!msg) return c.json({ error: "Escolhe uma mensagem pra desligar" }, 400);
+    const w = await kv.get(WAKEUP_PREFIX + id);
+    if (!w) return c.json({ error: "Despertador não encontrado" }, 404);
+
+    const atual = w.ring?.[profile];
+    // Retentativa do mesmo "desligou" (o celular reenvia quando estava sem
+    // internet): não manda o push de novo.
+    if (atual?.occurrence === occurrence && atual.status === "dismissed") {
+      return c.json({ wakeup: w });
+    }
+    const now = new Date().toISOString();
+    const wakeup = {
+      ...w,
+      ring: {
+        ...(w.ring || {}),
+        [profile]: {
+          occurrence: String(occurrence || ""),
+          status: "dismissed",
+          startedAt: atual?.occurrence === occurrence ? atual.startedAt : now,
+          endedAt: now,
+          message: msg,
+        },
+      },
+    };
+    await kv.set(WAKEUP_PREFIX + id, wakeup);
+
+    await sendPushToUser(outroPerfil(profile), {
+      title: `⏰ ${profile} desligou o despertador`,
+      body: msg,
+      tag: `mesinha-wakeup-${id}`,
+      url: "/",
+    }).catch(() => false);
+    return c.json({ wakeup });
+  } catch (error) {
+    console.error("[POST /wakeups/:id/dismiss] Error:", error);
+    return c.json({ error: "Falha ao desligar despertador" }, 500);
   }
 });
 

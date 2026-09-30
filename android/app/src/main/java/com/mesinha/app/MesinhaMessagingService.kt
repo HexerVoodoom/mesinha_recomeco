@@ -23,6 +23,13 @@ class MesinhaMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        // Despertador: mensagem só de dados, sem nada na tela. O outro criou ou
+        // mudou um despertador — baixa a lista e reagenda aqui mesmo (esta
+        // chamada já roda fora da thread principal).
+        if (message.data["type"] == "wakeup-sync") {
+            WakeupSync.syncNow(applicationContext)
+            return
+        }
         val title = message.notification?.title ?: message.data["title"] ?: "Mesinha"
         val body = message.notification?.body ?: message.data["body"] ?: ""
         NotificationHelper.show(this, title, body)

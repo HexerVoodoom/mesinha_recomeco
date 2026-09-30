@@ -23,6 +23,7 @@ import {
   Sparkles,
   Sprout,
   Spade,
+  BellRing,
 } from 'lucide-react';
 import imgIconeMural from "figma:asset/f55be14c67f2ee6191fde351aa33771fce7d5b93.png";
 import imgIconLembrete from "figma:asset/5097108198344c1c84390e42ebe8df3ec16868c9.png";
@@ -122,6 +123,7 @@ const tools = [
   { id: 'roleta' as const, icon: Dices, label: 'Roleta' },
   { id: 'cartas' as const, icon: Spade, label: 'Jogos' },
   { id: 'nudge' as const, icon: HeartHandshake, label: 'Cutucada' },
+  { id: 'wakeup' as const, icon: BellRing, label: 'Despertador' },
 ];
 type ToolId = (typeof tools)[number]['id'];
 
@@ -153,6 +155,7 @@ interface CategoryMenuProps {
   showMood: boolean;
   showQuestion: boolean;
   showGarden: boolean;
+  showWakeup: boolean;
   onCategoryChange: (categoryId: Category) => void;
   onOpenMeetupCalendar: () => void;
   onOpenMap: () => void;
@@ -162,6 +165,7 @@ interface CategoryMenuProps {
   onOpenRoulette: () => void;
   onOpenGames: () => void;
   onOpenNudge: () => void;
+  onOpenWakeup: () => void;
 }
 
 /** Cartão com o badge da categoria ativa e a grade de ícones (6x2, com slide pra mais páginas). */
@@ -173,6 +177,7 @@ export function CategoryMenu({
   showMood,
   showQuestion,
   showGarden,
+  showWakeup,
   onCategoryChange,
   onOpenMeetupCalendar,
   onOpenMap,
@@ -182,6 +187,7 @@ export function CategoryMenu({
   onOpenRoulette,
   onOpenGames,
   onOpenNudge,
+  onOpenWakeup,
 }: CategoryMenuProps) {
   // Roleta e Cutucada abrem modais (não trocam a tela), então nunca ficam "ativas".
   const activeTool: ToolId | null = showMeetupCalendar ? 'meetup'
@@ -189,6 +195,7 @@ export function CategoryMenu({
     : showMood ? 'mood'
     : showQuestion ? 'question'
     : showGarden ? 'garden'
+    : showWakeup ? 'wakeup'
     : null;
   const activeToolMeta = tools.find(t => t.id === activeTool);
   const toolHandlers: Record<ToolId, () => void> = {
@@ -200,6 +207,7 @@ export function CategoryMenu({
     roleta: onOpenRoulette,
     cartas: onOpenGames,
     nudge: onOpenNudge,
+    wakeup: onOpenWakeup,
   };
 
   // Ordem da grade: a página 1 fica EXATAMENTE como sempre foi (11 categorias

@@ -6,8 +6,8 @@ import android.content.Intent
 
 /**
  * Após o aparelho reiniciar, os alarmes agendados são perdidos. Este receiver
- * reagenda a troca diária de frase dos três widgets e religa o rastreio
- * contínuo do Mapa, se ele estava ligado.
+ * reagenda a troca diária de frase dos três widgets, o despertador e religa o
+ * rastreio contínuo do Mapa, se ele estava ligado.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -20,6 +20,14 @@ class BootReceiver : BroadcastReceiver() {
             // WidgetScheduler.scheduleDailyUpdate(context, GardenWidgetProvider::class.java, 4325)
             WidgetScheduler.scheduleDailyUpdate(context, CalendarWidgetProvider::class.java, 4326)
             WidgetScheduler.scheduleDailyUpdate(context, CalendarWeekWidgetProvider::class.java, 4327)
+
+            // Despertador: o AlarmManager esquece tudo no reboot. Reagenda com
+            // a cópia local na hora e depois confere a lista no servidor.
+            try {
+                WakeupSync.syncAsync(context)
+            } catch (e: Exception) {
+                android.util.Log.w("BootReceiver", "Despertador não pôde reagendar no boot", e)
+            }
 
             // Modo "sempre" do Mapa. A partir do Android 12 nem todo app pode
             // subir um serviço em primeiro plano vindo do background — com a

@@ -96,6 +96,11 @@ Todos prefixados em `/make-server-19717bce`:
 | GET/POST/DELETE | `/cards` | Baralho de cartas dos jogos (verdade / desafio / o que prefere) |
 | GET | `/garden` | Sequência, nível do jardim e retrospectiva (cache diário, invalidado por contagem) |
 | GET | `/meetup-month` | Dias com encontro de um mês (tipo + confirmação) — usado pelos widgets nativos de calendário; `?month=YYYY-MM` opcional (padrão: mês atual) |
+| GET | `/wakeups` | Lista os despertadores (com o status do último toque de cada um). `?native=<perfil>` marca o aparelho como apto a receber o FCM de sincronização |
+| POST | `/wakeups` | Cria despertador (pra si, pro outro ou pros dois) — push avisando quem vai ser acordado + FCM de sincronização |
+| PUT/DELETE | `/wakeups/:id` | Edita / apaga (e sincroniza os celulares) |
+| POST | `/wakeups/:id/ring` | O aparelho avisa que começou a tocar (`ringing`) ou que tocou 30 min sem ninguém desligar (`missed`) |
+| POST | `/wakeups/:id/dismiss` | Desligou: grava o recadinho escolhido e manda ele de push pro outro |
 
 ### Padrões de chave no KV
 
@@ -111,6 +116,8 @@ Todos prefixados em `/make-server-19717bce`:
 | `question-used` | Últimas 60 perguntas usadas (evita repetir) |
 | `card-deck` | Cartas dos jogos escritas pelo casal, por tipo |
 | `garden:<data>` | Cache diário da sequência/retrospectiva |
+| `wakeup:<id>` | Despertador (horário, dias, destinatário, volume, recadinho e `ring` = status do último toque por pessoa) |
+| `wakeup-native:<perfil>` | O app Android dessa pessoa já tem despertador (recebe o FCM `wakeup-sync`) |
 
 ---
 
@@ -320,6 +327,59 @@ node weekly-summary.mjs
 ```
 
 Requer `ANTHROPIC_API_KEY` e `API_BASE_URL` no `.env.local` (na raiz do projeto).
+
+---
+
+## Despertador
+
+Ferramenta "Despertador" (ícone de sino na página 2 da grade), que abre um
+painel no mesmo visual da Pergunta do Dia e do Jardim, com Corvinho (Mateus) e
+Alpaquinha (Amanda) nos balõezinhos, como nos widgets. A tela do alarme
+tocando, no Android e no navegador, segue esse mesmo visual. Qualquer um cria
+um despertador **pra si, pro outro ou pros dois**, com horário, dias da semana
+(nenhum dia = toca uma vez só), volume (**mínimo 20%**, nunca fica mudo) e um
+recadinho opcional que aparece na tela quando tocar.
+
+**Pra desligar não tem botão de desligar nem soneca:** a pessoa escolhe um de 6
+recadinhos prontos, que vai de push pro outro. Quem criou pro outro vê no card
+o status ao vivo: 🔔 tocando agora / ✅ desligou às 07:03 com "Bom dia, meu
+amor! ☀️" / 😴 tocou 30 min e ninguém desligou.
+
+### Quem toca de verdade é o app Android
+
+| Peça | O que faz |
+|---|---|
+| `WakeupScheduler` (`Wakeups.kt`) | Agenda SÓ o próximo toque com `setAlarmClock` — exato, fura o Doze, ícone de despertador na barra |
+| `WakeupReceiver` | Recebe o disparo, sobe o serviço e reagenda o próximo; reagenda também quando o relógio/fuso muda e quando o app atualiza |
+| `WakeupRingService` | Serviço em primeiro plano: toca no canal de **alarme** (fura silencioso; o Não Perturbe libera alarmes por padrão), força o volume de alarme pro escolhido e sobe de novo se alguém abaixar, pede foco de áudio, vibra. Desiste depois de 30 min |
+| `WakeupActivity` | Tela cheia por cima da tela de bloqueio com os 6 recadinhos. Voltar e teclas de volume não fazem nada |
+| `WakeupTune.kt` | O toque (ver abaixo) |
+
+**Sincronização:** a lista fica em cache no aparelho (toca sem internet). Ela
+é baixada ao abrir o app, quando o PWA mexe nela (`MesinhaNative.wakeupsChanged`),
+no boot e quando chega um FCM só de dados `wakeup-sync` — que o servidor manda
+pros dois celulares sempre que a lista muda. É isso que faz o despertador que
+o Mateus criou pra Amanda tocar no celular dela mesmo que ela nunca abra o app.
+Os avisos de "tocando"/"desligou" que falham sem internet ficam numa fila e
+são reenviados no próximo sync.
+
+**Permissões** (a tela do Despertador mostra um aviso com botão "Liberar" pro
+que estiver faltando): "Alarmes e lembretes" (`SCHEDULE_EXACT_ALARM` — sem ela
+cai pra um alarme inexato que pode atrasar), tela cheia (`USE_FULL_SCREEN_INTENT`
+— no Android 14+ a Play Console pede a declaração, categoria "despertador"),
+notificações e bateria sem restrição.
+
+**No navegador** (fora do app) o despertador só toca com o Mesinha aberto
+(`WakeupWebRinger`), com a mesma tela dos 6 recadinhos.
+
+### O toque: "Abertura de Anime" (procedural)
+
+Enquanto as músicas escolhidas não entram, o toque é gerado na hora: loop de 8
+compassos no espírito das aberturas de anime dos anos 90 — progressão "royal
+road" (IV–V–iii–vi), melodia de synth quadrado com vibrato, baixo pulando
+oitava, acordes nos contratempos e bateria. O mesmo sintetizador existe em
+`src/app/utils/wakeupTune.ts` (prévia no app / toque no navegador) e em
+`android/.../WakeupTune.kt` (toque de verdade). Mexeu num, mexe no outro.
 
 ---
 
