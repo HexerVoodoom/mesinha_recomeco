@@ -154,9 +154,11 @@ export interface OnThisDayMemory {
   yearsAgo: number;
 }
 
-export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> => {
+const QUESTION_CACHE_KEY = 'mesinha-question-cache';
+
+export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2, timeoutMs = 60000): Promise<any> => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased to 60 seconds for large responses
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs); // Increased to 60 seconds for large responses
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -217,7 +219,7 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retr
       (error instanceof Error && error.message.includes('connection closed'))
     )) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      return fetchAPI(endpoint, options, retries - 1);
+      return fetchAPI(endpoint, options, retries - 1, timeoutMs);
     }
     
     if (error instanceof Error && error.name === 'AbortError') {
@@ -437,7 +439,21 @@ export const api = {
 
   // Pergunta do Dia
   getQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus'): Promise<QuestionOfTheDay> => {
-    return await fetchAPI(`/question-of-the-day?profile=${profile}&_t=${Date.now()}`);
+    // Timeout curto (12s) e 1 retry: se o servidor travar, em ~25s cai no
+    // cache local em vez de deixar "Carregando..." por minutos.
+    try {
+      const q: QuestionOfTheDay = await fetchAPI(`/question-of-the-day?profile=${profile}&_t=${Date.now()}`, {}, 1, 12000);
+      try { localStorage.setItem(QUESTION_CACHE_KEY, JSON.stringify({ profile, question: q })); } catch { /* sem cache, tudo bem */ }
+      return q;
+    } catch (error) {
+      // Fallback: a pergunta de hoje guardada da última vez que carregou.
+      try {
+        const cached = JSON.parse(localStorage.getItem(QUESTION_CACHE_KEY) || 'null');
+        const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10); // horário de Brasília
+        if (cached?.profile === profile && cached.question?.date === hoje) return cached.question;
+      } catch { /* cache ilegível: segue o erro original */ }
+      throw error;
+    }
   },
 
   answerQuestionOfTheDay: async (profile: 'Amanda' | 'Mateus', answer: string): Promise<QuestionOfTheDay> => {
