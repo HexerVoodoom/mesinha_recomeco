@@ -90,7 +90,7 @@ Todos prefixados em `/make-server-19717bce`:
 | POST | `/trigger-reminders` | Dispara lembretes (chamado pelo pg_cron) |
 | POST | `/nudge` | Cutucada: push imediato pro outro (rate limit de 3 min por pessoa) |
 | GET | `/memories/on-this-day` | Posts do mural desta data em anos anteriores (cache diário em KV) |
-| GET | `/question-of-the-day` | Pergunta do dia (cria na 1ª chamada); esconde a resposta do outro até os dois responderem |
+| GET | `/question-of-the-day` | Pergunta do dia (cria na 1ª chamada; 70 perguntas padrão na fila quando o banco do casal acaba); esconde a resposta do outro até os dois responderem |
 | POST | `/question-of-the-day/answer` | Responde a pergunta de hoje |
 | GET/POST/DELETE | `/question-bank` | Banco de perguntas escritas pelo casal |
 | GET/POST/DELETE | `/cards` | Baralho de cartas dos jogos (verdade / desafio / o que prefere) |
