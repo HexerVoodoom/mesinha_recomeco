@@ -403,6 +403,8 @@ object WakeupSync {
             }
         }
         WakeupScheduler.reschedule(context)
+        // Recibo pro servidor: o painel mostra se chegou mesmo neste celular.
+        try { WakeupDiagnostics.reportDevice(context) } catch (_: Exception) { }
         if (flush) WakeupApi.flushQueue(context)
     }
 

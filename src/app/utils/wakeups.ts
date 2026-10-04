@@ -33,6 +33,17 @@ export interface Wakeup {
   ring: Partial<Record<Profile, WakeupRing>>;
 }
 
+/** Recibo que o app Android manda depois de cada sincronização. */
+export interface WakeupDevice {
+  profile: Profile;
+  ids: string[]; // despertadores que esse celular tem agendados (com próximo toque)
+  nextAt: string | null;
+  perms: Partial<WakeupPermissions>;
+  appVersion: string;
+  model: string;
+  at: string;
+}
+
 export type WakeupInput = Pick<Wakeup, 'target' | 'time' | 'days' | 'date' | 'volume' | 'note' | 'enabled'>;
 
 /** Volume mínimo: o despertador nunca fica mudo. */
@@ -56,6 +67,14 @@ export const wakeupApi = {
   list: async (): Promise<Wakeup[]> => {
     const res = await fetchAPI(`/wakeups?_t=${Date.now()}`, {}, 1);
     return Array.isArray(res?.wakeups) ? res.wakeups : [];
+  },
+  /** Lista + o recibo de cada celular (o que ele tem agendado). */
+  listWithDevices: async (): Promise<{ wakeups: Wakeup[]; devices: Partial<Record<Profile, WakeupDevice>> }> => {
+    const res = await fetchAPI(`/wakeups?_t=${Date.now()}`, {}, 1);
+    return {
+      wakeups: Array.isArray(res?.wakeups) ? res.wakeups : [],
+      devices: res?.devices && typeof res.devices === 'object' ? res.devices : {},
+    };
   },
   /** Carimbo que muda a cada alteração — leitura barata, pra saber se vale rebaixar a lista. */
   version: async (): Promise<number> => {
@@ -103,6 +122,8 @@ export interface WakeupPermissions {
   fullScreen: boolean;
   notifications: boolean;
   battery: boolean;
+  /** Só nas marcas com "início automático" (Xiaomi, OPPO, vivo, Huawei...). */
+  autostart?: boolean;
 }
 
 interface WakeupBridge {
@@ -114,6 +135,11 @@ interface WakeupBridge {
 function bridge(): WakeupBridge | null {
   const b = (window as unknown as { MesinhaNative?: WakeupBridge }).MesinhaNative;
   return b && typeof b.wakeupsChanged === 'function' ? b : null;
+}
+
+/** true dentro do app Android, mesmo numa versão antiga (sem despertador). */
+export function isInsideAndroidApp(): boolean {
+  return !!(window as unknown as { MesinhaNative?: unknown }).MesinhaNative;
 }
 
 /** true dentro do app Android com suporte a despertador (toca com o app fechado). */
