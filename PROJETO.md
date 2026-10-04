@@ -101,6 +101,7 @@ Todos prefixados em `/make-server-19717bce`:
 | POST | `/wakeups` | Cria despertador (pra si, pro outro ou pros dois) — push avisando quem vai ser acordado + FCM de sincronização |
 | PUT/DELETE | `/wakeups/:id` | Edita / apaga (e sincroniza os celulares) |
 | POST | `/wakeups/:id/ring` | O aparelho avisa que começou a tocar (`ringing`) ou que tocou 30 min sem ninguém desligar (`missed`). Aviso de um toque mais antigo que o gravado é ignorado |
+| POST | `/wakeups/device` | Recibo do app Android depois de cada sync: ids que ele tem agendados, próximo toque, permissões faltando, versão e modelo. O GET `/wakeups` devolve isso em `devices` |
 | POST | `/wakeups/:id/dismiss` | Desligou: grava o recadinho (só aceita um dos 6) e manda de push pro outro — um push só se dois despertadores desligarem juntos |
 
 ### Padrões de chave no KV
@@ -121,6 +122,7 @@ Todos prefixados em `/make-server-19717bce`:
 | `wakeupring:<id>:<perfil>` | Status do último toque DAQUELA pessoa (chave própria: com "nós dois" os celulares avisam no mesmo segundo e, num objeto só, um aviso apagava o outro) |
 | `wakeupversion` | Carimbo que muda a cada alteração de despertador/toque |
 | `wakeup-push-last:<perfil>` | Último push de "desligou" (evita push repetido com dois despertadores no mesmo minuto) |
+| `wakeup-device:<perfil>` | Último recibo do celular dessa pessoa (o que ele tem agendado e o que falta liberar) |
 | `wakeup-native:<perfil>` | O app Android dessa pessoa já tem despertador (recebe o FCM `wakeup-sync`) |
 
 ---
@@ -372,7 +374,18 @@ instalação; no Android 12 `SCHEDULE_EXACT_ALARM`). É obrigatória: sem alarme
 exato o Android 12+ não deixa subir o serviço que toca a música. A Play Console
 pede a declaração de app de despertador pra ela e pra tela cheia
 (`USE_FULL_SCREEN_INTENT`). A tela do Despertador mostra um aviso com botão
-"Liberar" pro que estiver faltando (tela cheia, notificações, bateria).
+"Liberar" pro que estiver faltando (tela cheia, notificações, bateria e, nas
+marcas que têm essa trava — Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo,
+Huawei/Honor, Asus —, o **início automático**; sem ele o sistema não deixa o
+alarme acordar o app fechado e nada toca). Na Xiaomi o estado é lido de verdade
+(op 10008 do MIUI); nas outras conta como liberado depois de abrir a tela.
+
+**Recibo do celular:** depois de cada sync o app manda `POST /wakeups/device`
+dizendo o que tem agendado. Cada card do painel mostra, pra cada pessoa,
+"📱 Agendado no celular da Amanda", "⚠️ Ainda não chegou no celular…" (app
+desatualizado ou nunca aberto) ou "falta liberar: …" — antes, um despertador
+podia estar certinho no servidor e o celular nem saber dele. O painel também
+avisa quando o aparelho não toca com o app fechado (navegador ou app antigo).
 
 **Robustez** (vista em duas rodadas de QA, testada num emulador Android 14):
 - *Reinício do celular:* a lista fica no armazenamento protegido pelo aparelho

@@ -1632,6 +1632,7 @@ app.post("/make-server-19717bce/nudge", async (c) => {
 const WAKEUP_PREFIX = "wakeup:";
 const WAKEUP_RING_PREFIX = "wakeupring:";
 const WAKEUP_VERSION_KEY = "wakeupversion";
+const WAKEUP_DEVICE_PREFIX = "wakeup-device:";
 const WAKEUP_MIN_VOLUME = 20; // nunca deixa o despertador mudo
 const WAKEUP_NOTE_MAX = 80;
 
@@ -1793,10 +1794,11 @@ app.get("/make-server-19717bce/wakeups", async (c) => {
     if (isPerfil(nativo) && !(await kv.get(`wakeup-native:${nativo}`))) {
       await kv.set(`wakeup-native:${nativo}`, true);
     }
-    const [list, rings, version] = await Promise.all([
+    const [list, rings, version, devices] = await Promise.all([
       kv.getByPrefix(WAKEUP_PREFIX),
       kv.getByPrefix(WAKEUP_RING_PREFIX),
       kv.get(WAKEUP_VERSION_KEY),
+      kv.mget([`${WAKEUP_DEVICE_PREFIX}Amanda`, `${WAKEUP_DEVICE_PREFIX}Mateus`]),
     ]);
     const byId = new Map<string, any>();
     for (const w of list) {
@@ -1812,10 +1814,57 @@ app.get("/make-server-19717bce/wakeups", async (c) => {
       }
     }
     const wakeups = [...byId.values()].sort((a, b) => String(a.time).localeCompare(String(b.time)));
-    return c.json({ wakeups, version: version ?? 0, serverTime: new Date().toISOString() });
+    // Recibo de cada celular (o que ele tem agendado): o painel mostra se o
+    // despertador chegou mesmo lá e o que falta liberar.
+    const devicesByProfile: Record<string, any> = {};
+    for (const d of devices ?? []) if (d && isPerfil(d.profile)) devicesByProfile[d.profile] = d;
+    return c.json({
+      wakeups,
+      devices: devicesByProfile,
+      version: version ?? 0,
+      serverTime: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[GET /wakeups] Error:", error);
     return c.json({ error: "Falha ao carregar despertadores" }, 500);
+  }
+});
+
+// Recibo do app Android: depois de cada sincronização, o celular conta o que
+// tem agendado (ids que vão tocar, próximo toque) e o que falta liberar. Não
+// mexe no carimbo de versão de propósito: o recibo chega logo depois de um
+// sync, e mudar o carimbo faria as telas rebaixarem a lista à toa.
+app.post("/make-server-19717bce/wakeups/device", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!isPerfil(body?.profile)) return c.json({ error: "Perfil inválido" }, 400);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((i: unknown) => typeof i === "string" && i.length <= 64).slice(0, 50)
+      : [];
+    const perms: Record<string, boolean> = {};
+    if (body.perms && typeof body.perms === "object") {
+      for (const k of ["exact", "fullScreen", "notifications", "battery", "autostart"]) {
+        if (typeof body.perms[k] === "boolean") perms[k] = body.perms[k];
+      }
+    }
+    const nextAt = typeof body.nextAt === "string" && Number.isFinite(Date.parse(body.nextAt))
+      ? new Date(body.nextAt).toISOString()
+      : null;
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.substring(0, max) : "");
+    await kv.set(WAKEUP_DEVICE_PREFIX + body.profile, {
+      profile: body.profile,
+      ids,
+      nextAt,
+      perms,
+      appVersion: str(body.appVersion, 20),
+      model: str(body.model, 60),
+      sdk: Number.isInteger(body.sdk) ? body.sdk : null,
+      at: new Date().toISOString(),
+    });
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("[POST /wakeups/device] Error:", error);
+    return c.json({ error: "Falha ao salvar recibo do celular" }, 500);
   }
 });
 

@@ -353,17 +353,8 @@ class MainActivity : AppCompatActivity() {
          * fechado. O PWA mostra um aviso com botão pra cada item `false`.
          */
         @JavascriptInterface
-        fun wakeupPermissions(): String {
-            val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-            val fullScreen = if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
-            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
-            return org.json.JSONObject()
-                .put("exact", WakeupScheduler.canScheduleExact(this@MainActivity))
-                .put("fullScreen", fullScreen)
-                .put("notifications", nm.areNotificationsEnabled() && WakeupRingService.channelEnabled(this@MainActivity))
-                .put("battery", pm.isIgnoringBatteryOptimizations(packageName))
-                .toString()
-        }
+        fun wakeupPermissions(): String =
+            WakeupDiagnostics.permissions(this@MainActivity).toString()
 
         /** Abre a tela do sistema pra liberar uma das permissões do despertador. */
         @JavascriptInterface
@@ -379,6 +370,10 @@ class MainActivity : AppCompatActivity() {
                         .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
                     "battery" -> {
                         LocationSharing.requestBatteryExemption(this@MainActivity)
+                        null
+                    }
+                    "autostart" -> {
+                        OemAutostart.open(this@MainActivity)
                         null
                     }
                     else -> null

@@ -6,6 +6,7 @@ import {
   type Profile,
   type Wakeup,
   type WakeupInput,
+  type WakeupDevice,
   type WakeupPermissions,
   CHARACTER,
   DAY_LETTERS,
@@ -17,6 +18,7 @@ import {
   describeNext,
   hasNativeWakeups,
   isEffectivelyOn,
+  isInsideAndroidApp,
   nativeWakeupPermissions,
   nextOccurrence,
   notifyNativeWakeupsChanged,
@@ -37,7 +39,13 @@ const PERMISSION_TEXTS: Record<keyof WakeupPermissions, { title: string; why: st
   fullScreen: { title: 'Tela cheia', why: 'pra aparecer por cima da tela de bloqueio' },
   notifications: { title: 'Notificações', why: 'sem elas o Android esconde o despertador' },
   battery: { title: 'Bateria sem restrição', why: 'algumas marcas desligam a Mesinha e aí não toca' },
+  autostart: { title: 'Início automático', why: 'sem isso o celular não deixa a Mesinha acordar sozinha pra tocar' },
 };
+
+type Devices = Partial<Record<Profile, WakeupDevice>>;
+
+const noCelular = (p: Profile, userProfile: Profile) =>
+  p === userProfile ? 'no seu celular' : p === 'Amanda' ? 'no celular da Amanda' : 'no celular do Mateus';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (iso?: string) => {
@@ -86,6 +94,7 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
   const native = hasNativeWakeups();
 
   const [wakeups, setWakeups] = useState<Wakeup[]>([]);
+  const [devices, setDevices] = useState<Devices>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Wakeup | 'new' | null>(null);
   const [perms, setPerms] = useState<WakeupPermissions | null>(null);
@@ -94,7 +103,9 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
   /** Devolve true se conseguiu baixar a lista. */
   const load = useCallback(async (): Promise<boolean> => {
     try {
-      setWakeups(await wakeupApi.list());
+      const res = await wakeupApi.listWithDevices();
+      setWakeups(res.wakeups);
+      setDevices(res.devices);
       return true;
     } catch (_) {
       return false; // mantém o que já estava na tela
@@ -182,12 +193,23 @@ export function WakeupPanel({ userProfile }: WakeupPanelProps) {
         </div>
       )}
 
+      {!native && (
+        <div className="rounded-2xl border-2 border-[#F6C177] bg-[#FFF8EC] p-4 mb-4 flex gap-3 items-start">
+          <span className="text-lg">📵</span>
+          <p className="text-xs text-[#8A847D] leading-relaxed">
+            {isInsideAndroidApp()
+              ? 'Esse app da Mesinha está desatualizado: aqui o despertador só toca com ela aberta. Atualiza pela Play Store pra tocar com tudo fechado.'
+              : 'Aqui no navegador o despertador só toca com a Mesinha aberta. No app Android ele toca com tudo fechado.'}
+          </p>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-10 text-muted-foreground">Dando corda no despertador...</div>
       ) : (
         <div className="space-y-3 mb-4">
           {wakeups.map(w => (
-            <WakeupCard key={w.id} wakeup={w} userProfile={userProfile} onEdit={() => setEditing(w)} onToggle={() => toggle(w)} />
+            <WakeupCard key={w.id} wakeup={w} devices={devices} userProfile={userProfile} onEdit={() => setEditing(w)} onToggle={() => toggle(w)} />
           ))}
         </div>
       )}
@@ -214,8 +236,9 @@ function isRinging(w: Wakeup, p: Profile): boolean {
   return r?.status === 'ringing' && Date.now() - new Date(r.startedAt).getTime() < WAKEUP_MAX_RING_MS + 5 * 60 * 1000;
 }
 
-function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
+function WakeupCard({ wakeup: w, devices, userProfile, onEdit, onToggle }: {
   wakeup: Wakeup;
+  devices: Devices;
   userProfile: Profile;
   onEdit: () => void;
   onToggle: () => void;
@@ -273,6 +296,9 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
             ⏰ {describeNext(next)}
           </span>
         )}
+        {on && !ringing && targets.map(p => (
+          <DeviceStatus key={`dev-${p}`} wakeup={w} person={p} device={devices[p]} userProfile={userProfile} />
+        ))}
         {w.createdBy !== userProfile && (
           <span className="text-[11px] font-bold text-[#8A847D] bg-[#E9E4DF]/60 px-2.5 py-1 rounded-full">
             feito {w.createdBy === 'Amanda' ? 'pela Amanda' : 'pelo Mateus'} 💌
@@ -280,6 +306,48 @@ function WakeupCard({ wakeup: w, userProfile, onEdit, onToggle }: {
         )}
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Chegou mesmo no celular? Cada app Android manda um recibo do que tem
+ * agendado depois de sincronizar — sem ele, o despertador pode estar certinho
+ * aqui e o celular nem saber que existe.
+ */
+function DeviceStatus({ wakeup: w, person, device, userProfile }: {
+  wakeup: Wakeup;
+  person: Profile;
+  device?: WakeupDevice;
+  userProfile: Profile;
+}) {
+  const pill = 'text-[11px] font-bold px-2.5 py-1 rounded-xl leading-snug';
+  const onde = noCelular(person, userProfile);
+  if (!device) {
+    return (
+      <span className={`${pill} text-[#B7791F] bg-[#FFF8EC]`}>
+        ⚠️ Ainda não chegou {onde} — abre a Mesinha atualizada lá
+      </span>
+    );
+  }
+  const faltando = (Object.keys(PERMISSION_TEXTS) as (keyof WakeupPermissions)[])
+    .filter(k => device.perms?.[k] === false)
+    .map(k => PERMISSION_TEXTS[k].title);
+  const agendado = device.ids?.includes(w.id);
+  return (
+    <>
+      {agendado ? (
+        <span className={`${pill} text-[#2B2A28] bg-[#81D8D0]/30`}>📱 Agendado {onde}</span>
+      ) : new Date(device.at).getTime() < new Date(w.updatedAt).getTime() ? (
+        <span className={`${pill} text-[#8A847D] bg-[#E9E4DF]/60`}>⏳ Esperando chegar {onde}…</span>
+      ) : (
+        <span className={`${pill} text-[#B7791F] bg-[#FFF8EC]`}>⚠️ Não está agendado {onde} — abre a Mesinha lá</span>
+      )}
+      {faltando.length > 0 && (
+        <span className={`${pill} text-[#B7791F] bg-[#FFF8EC]`}>
+          ⚠️ {onde.replace(/^no /, 'No ')}, falta liberar: {faltando.join(', ')}
+        </span>
+      )}
+    </>
   );
 }
 
