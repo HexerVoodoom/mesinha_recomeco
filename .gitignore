@@ -25,3 +25,6 @@ dist-ssr
 
 # One-off operational scripts and data backups - contain real user data, never commit
 scripts/
+backup_*.json
+test_items.json
+*.zip
