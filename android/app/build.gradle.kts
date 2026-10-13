@@ -16,8 +16,24 @@ android {
         versionName = "1.1"
     }
 
+    // Assinatura de release: lê keystore/senhas de variáveis de ambiente (nunca versionadas).
+    signingConfigs {
+        create("release") {
+            val ks = System.getenv("MESINHA_KEYSTORE")
+            if (ks != null) {
+                storeFile = file(ks)
+                storePassword = System.getenv("MESINHA_STOREPASS")
+                keyAlias = System.getenv("MESINHA_ALIAS")
+                keyPassword = System.getenv("MESINHA_STOREPASS")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (System.getenv("MESINHA_KEYSTORE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
