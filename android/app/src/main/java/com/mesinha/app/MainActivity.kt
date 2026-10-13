@@ -16,6 +16,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.firebase.messaging.FirebaseMessaging
 
 /**
@@ -114,6 +116,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setContentView(webView)
+
+        // Android 15+ força edge-to-edge: sem isso a WebView fica por baixo das
+        // barras de status/navegação. Aplica os insets como padding.
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
 
         webView.loadUrl(MESINHA_URL)
 
