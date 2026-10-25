@@ -9,7 +9,7 @@ on:
       - main
     paths:
       - 'android/**'
-      - 'scripts/check-widget-sizes.sh'
+      - '.github/scripts/check-widget-sizes.sh'
       - '.github/workflows/android-build.yml'
   workflow_dispatch: {}
 
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checar tamanhos mínimos do widget de Conversa
-        run: bash scripts/check-widget-sizes.sh
+        run: bash .github/scripts/check-widget-sizes.sh
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4

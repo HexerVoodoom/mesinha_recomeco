@@ -482,3 +482,11 @@ O mapa é travado na região metropolitana de Goiânia (`GOIANIA_BOUNDS`, zoom
 mínimo 11). Se alguém estiver fora do retângulo (viagem), os limites são
 liberados automaticamente — um limite que esconde a pessoa justo quando ela está
 longe seria o pior momento possível para ser rígido.
+
+## Widgets redimensionáveis e cache de configurações
+
+- Os widgets Conversa, Alpaquinha e Corvinho têm `minHeight` e `minResizeHeight`
+  em 40dp (POCO/MIUI usam `minHeight` como piso e travavam em 2 células).
+  `.github/scripts/check-widget-sizes.sh` roda no CI e falha se subirem.
+- `getSettings` usa timeout de 12s (1 retry) e guarda a última resposta em
+  `localStorage`, usada como fallback quando o servidor não responde.
