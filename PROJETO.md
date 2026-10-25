@@ -487,6 +487,6 @@ longe seria o pior momento possível para ser rígido.
 
 - Os widgets Conversa, Alpaquinha e Corvinho têm `minHeight` e `minResizeHeight`
   em 40dp (POCO/MIUI usam `minHeight` como piso e travavam em 2 células).
-  `.github/scripts/check-widget-sizes.sh` roda no CI e falha se subirem.
+  `.github/ci/check-widget-sizes.sh` roda no CI e falha se subirem.
 - `getSettings` usa timeout de 12s (1 retry) e guarda a última resposta em
   `localStorage`, usada como fallback quando o servidor não responde.
