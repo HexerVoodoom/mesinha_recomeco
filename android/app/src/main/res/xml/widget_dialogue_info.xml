@@ -9,7 +9,7 @@
   Por isso minHeight e minResizeHeight ficam os dois em 40dp. O tamanho inicial
   continua sendo 4x2 porque quem manda nele (Android 12+) é targetCell*.
   NÃO suba estes valores: já regrediu antes (80dp -> 40dp foi corrigido em 3a7d98c).
-  Há um guarda no CI (scripts/check-widget-sizes.sh) que falha se subirem.
+  Há um guarda no CI (.github/scripts/check-widget-sizes.sh) que falha se subirem.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"

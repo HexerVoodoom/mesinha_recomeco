@@ -154,6 +154,7 @@ export interface OnThisDayMemory {
   yearsAgo: number;
 }
 
+const SETTINGS_CACHE_KEY = 'mesinha-settings-cache';
 const QUESTION_CACHE_KEY = 'mesinha-question-cache';
 
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}, retries = 2, timeoutMs = 60000): Promise<any> => {
@@ -325,8 +326,18 @@ export const api = {
 
   // Settings
   getSettings: async (): Promise<Settings> => {
-    const data = await fetchAPI('/settings');
-    return data.settings;
+    try {
+      const data = await fetchAPI('/settings', {}, 1, 12000);
+      try { localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(data.settings)); } catch { /* sem cache, tudo bem */ }
+      return data.settings;
+    } catch (error) {
+      // Fallback: últimas configurações carregadas, pra tela não ficar vazia offline.
+      try {
+        const cached = JSON.parse(localStorage.getItem(SETTINGS_CACHE_KEY) || 'null');
+        if (cached) return cached;
+      } catch { /* cache ilegível: segue o erro original */ }
+      throw error;
+    }
   },
 
   updateSettings: async (settings: Partial<Settings>): Promise<Settings> => {
