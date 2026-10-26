@@ -57,6 +57,21 @@ guarde segredos em gerenciador de senhas, GitHub Secrets ou no KV do Supabase
 - Build local (sem os secrets) simplesmente não assina — não trava o build de
   debug (`android-build.yml`), só o de release.
 
+### Onde encontrar a chave (PC do dono)
+- Keystore de upload: `D:\Arquivos\Desktop-antigo\mesinha_recomeco\keys\mesinhauploadkeystore.jks`
+- Senha e alias: `...\keys\mesinhauploadkeystoreCREDENTIALS.txt` (mesma pasta)
+- Base64 pronto pro secret: `...\keys\mesinhauploadkeystoreBASE64.txt`
+- Nunca commitar nenhum desses arquivos (a pasta `keys/` está fora do git).
+
+### Publicar nova versão sem trabalho manual
+Actions → "Build & Publish Release AAB" → Run workflow. Com os 4 secrets
+acima + `PLAY_SERVICE_ACCOUNT_JSON`, ele gera o AAB assinado (versionCode =
+número do run) e publica na faixa de teste. Setup único da conta de serviço:
+Play Console → Configuração → Acesso à API → vincular projeto Google Cloud →
+criar conta de serviço (chave JSON) → convidar o e-mail dela em Usuários e
+permissões (permissão de lançar em faixas de teste) → salvar o JSON inteiro
+como secret `PLAY_SERVICE_ACCOUNT_JSON`.
+
 ### Se perder o keystore
 Como o app já foi publicado usando **Play App Signing** (padrão do Google
 Play para apps novos), perder a chave de **upload** não é catastrófico:
